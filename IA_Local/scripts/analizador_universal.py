@@ -21,6 +21,7 @@ import analizador_app as base
 import reportes_profesionales as pro
 import bi_productivo as bi
 import dashboard_planner as dp
+import dashboard_dynamic as dd
 
 
 # ---------------------------------------------------------------------------
@@ -836,10 +837,9 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         if spec["outputs"].get("html"):
-            html_path = base.REPORTES / f"Dashboard_Clientes_{stem}_{stamp}.html"
-            payload = dp.customer_payload(model, path.name, len(original))
-            template = Path(__file__).resolve().parent / "templates" / "dashboard_clientes.html"
-            bi.generate_html(html_path, template, payload, ["customer_performance"])
+            html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
             pdf_path = base.REPORTES / f"Reporte_Ejecutivo_Clientes_{stem}_{stamp}.pdf"
@@ -885,12 +885,10 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
-        template = Path(__file__).resolve().parent / "templates" / "dashboard_bi.html"
-
         if spec["outputs"].get("html"):
-            html_path = base.REPORTES / f"Dashboard_BI_{stem}_{stamp}.html"
-            payload = bi.build_dashboard_payload(work, model, path.name)
-            bi.generate_html(html_path, template, payload, spec["sections"])
+            html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
             pdf_path = base.REPORTES / f"Reporte_Ejecutivo_BI_{stem}_{stamp}.pdf"
@@ -953,9 +951,9 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         spec = bi.compile_report_spec(prompt)
         outputs = {"html": None, "pdf": None, "excel": None}
         if spec["outputs"].get("html"):
-            html_path = base.REPORTES / f"Dashboard_Adaptable_{stem}_{stamp}.html"
-            template = Path(__file__).resolve().parent / "templates" / "dashboard_generico.html"
-            bi.generate_html(html_path, template, dp.generic_payload(original, path.name, prompt, meta.get("hoja_analizada") or ""), list(sections.keys()))
+            html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("excel"):
             xlsx_path = base.REPORTES / f"Reporte_Ejecutivo_{stem}_{stamp}.xlsx"
@@ -1012,12 +1010,12 @@ base.infer_roles = infer_roles
 base.build_profile = build_profile
 base.build_overview_sections = build_overview_sections
 base.analyze_file = analyze_file
-base.app.version = "8.5.5-r8"
+base.app.version = "8.5.5-r9"
 
 # Actualiza textos de la interfaz sin duplicar todo el HTML de V3.
 base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analizador Empresarial de Excel / CSV",
-    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R8 · Dashboard Adaptativo",
+    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R9 · Dashboard Dinámico IA",
 ).replace(
     "Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.",
     "Detecta automaticamente hojas, encabezados, columnas, tipos de datos y metricas. Procesa los datos con Python y usa Qwen local solo para interpretar resultados; nada se envia a Internet.",
@@ -1029,10 +1027,10 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analiza completamente el archivo y genera un dashboard HTML interactivo, un reporte ejecutivo PDF y un Excel analitico. Incluye resumen, evolucion, lineas, productos, clientes, vendedores, facturas, clientes perdidos, clientes en caida, oportunidades y calidad de datos. Usa solo columnas reales y calculos deterministas; no inventes costos, margenes ni formulas.",
 ).replace(
     "<title>IA Empresarial Local - Analizador</title>",
-    "<title>IA Empresarial Local - V8.5.5 R8 · Dashboard Adaptativo</title>",
+    "<title>IA Empresarial Local - V8.5.5 R9 · Dashboard Dinámico IA</title>",
 ).replace(
     "<h1>Analizador Universal Empresarial de Excel / CSV</h1>",
-    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R8</span></h1>",
+    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R9</span></h1>",
 )
 
 
@@ -1057,7 +1055,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"version": "8.5.5-r8", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML interactivo + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt driven + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"version": "8.5.5-r9", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt driven + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:

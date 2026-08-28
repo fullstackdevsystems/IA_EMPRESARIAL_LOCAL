@@ -449,8 +449,9 @@ def _opportunities(customers: pd.DataFrame, products: pd.DataFrame, lines: pd.Da
         if qv is not None and medm is not None:
             for _,r in customers.loc[(customers['Ventas']>=qv)&(customers['Margen_%'].notna())&(customers['Margen_%']<medm)].head(10).iterrows():
                 out.append({'Tipo':'Cliente','Entidad':r['Cliente'],'Indicador':'Alto volumen / margen bajo','Detalle':f"Ventas {r['Ventas']:,.0f}; margen {r['Margen_%']:.2f}%"})
-        for _,r in customers.loc[customers['Utilidad_Ton'].notna()].sort_values('Utilidad_Ton',ascending=False).head(5).iterrows():
-            out.append({'Tipo':'Cliente','Entidad':r['Cliente'],'Indicador':'Alta utilidad por tonelada','Detalle':f"{r['Utilidad_Ton']:,.2f} por ton"})
+        if 'Utilidad_Ton' in customers:
+            for _,r in customers.loc[customers['Utilidad_Ton'].notna()].sort_values('Utilidad_Ton',ascending=False).head(5).iterrows():
+                out.append({'Tipo':'Cliente','Entidad':r['Cliente'],'Indicador':'Alta utilidad por tonelada','Detalle':f"{r['Utilidad_Ton']:,.2f} por ton"})
     if not products.empty and 'Utilidad_Ton' in products:
         for _,r in products.loc[products['Utilidad_Ton'].notna()].sort_values('Utilidad_Ton',ascending=False).head(5).iterrows():
             out.append({'Tipo':'Producto','Entidad':r.iloc[0],'Indicador':'Alta utilidad por tonelada','Detalle':f"{r['Utilidad_Ton']:,.2f} por ton"})

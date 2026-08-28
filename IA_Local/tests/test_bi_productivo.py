@@ -175,6 +175,41 @@ def test_r8_generic_dashboard_fallback_exists():
         assert 'DASHBOARD ADAPTABLE' in html
         assert 'Temperatura' in html
 
+
+def test_r9_dynamic_dashboard_prompt_driven_no_domain_template():
+    import os
+    import dashboard_dynamic as dd
+    old=os.environ.get('IA_DYNAMIC_DASHBOARD_LLM')
+    os.environ['IA_DYNAMIC_DASHBOARD_LLM']='0'
+    try:
+        df=pd.DataFrame([
+            {'Cliente':'A','Producto':'Maiz','Zona':'Norte','Actual':100.0,'Presupuesto':120.0,'Anterior':80.0},
+            {'Cliente':'B','Producto':'Sorgo','Zona':'Sur','Actual':50.0,'Presupuesto':40.0,'Anterior':60.0},
+        ])
+        plan=dd.build_dashboard_plan(df,'Genera dashboard de clientes con top 20 por zona, actual, presupuesto y anterior','demo.xlsx','BDO')
+        assert plan['kpis']
+        assert plan['charts']
+        assert any(f['column']=='Zona' for f in plan['filters'])
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)/'dynamic.html'
+            used=dd.generate_dynamic_dashboard(out,df,'dashboard por zona y cliente','demo.xlsx','BDO')
+            html=out.read_text(encoding='utf-8')
+            assert 'PRIMOS & COUSINS' in html
+            assert 'Dashboard generado automáticamente' in html
+            assert 'dashboard_clientes.html' not in html
+            assert 'dashboard_bi.html' not in html
+            assert used['planner']=='deterministic-fallback'
+    finally:
+        if old is None: os.environ.pop('IA_DYNAMIC_DASHBOARD_LLM',None)
+        else: os.environ['IA_DYNAMIC_DASHBOARD_LLM']=old
+
+
+def test_r9_sales_without_cost_does_not_require_utilidad_ton():
+    customers=pd.DataFrame([{'Cliente':'A','Ventas':100.0},{'Cliente':'B','Ventas':50.0}])
+    products=pd.DataFrame([{'Producto':'P','Ventas':150.0}])
+    out=bi._opportunities(customers,products,pd.DataFrame(),pd.DataFrame())
+    assert isinstance(out,pd.DataFrame)
+
 if __name__=='__main__':
     tests=[v for k,v in globals().items() if k.startswith('test_') and callable(v)]
     for t in tests:
