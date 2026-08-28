@@ -337,7 +337,7 @@ def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
         fletes, origen destino, evolución por fecha, comparación por semana y alertas."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
         assert plan["title"] == "Dashboard Ejecutivo de Ventas y Rentabilidad"
-        assert plan["prompt_compiler"]["version"] in {"r9.4","r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9"}
+        assert plan["prompt_compiler"]["version"] in {"r9.4","r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.1.1"}
         assert plan["prompt_compiler"]["kpi_count"] >= 14
         assert plan["prompt_compiler"]["filter_count"] >= 10
         assert plan["prompt_compiler"]["chart_count"] >= 10
@@ -346,7 +346,7 @@ def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
         assert "Utilidad por Tonelada" in labels
         assert "Costo de Fletes" in labels
         assert any(x.get("column") == "ctrl_alm" for x in plan["filters"])
-        assert "enterprise-prompt-compiler-r9." in plan["planner"]
+        assert ("enterprise-prompt-compiler-r9." in plan["planner"] or "enterprise-prompt-compiler-r10.1.1" in plan["planner"])
     finally:
         if old is None:
             os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
@@ -369,7 +369,7 @@ def test_r9_5_advanced_analytics_payload():
           {"Fecha":"2026-08-01","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C1","Cliente":"CLIENTE 1","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"GDL","Cliente_Recoge":"N","Refer":"R1","Toneladas_Vendidas":10.0,"Importe_Venta":1000.0,"Costo":900.0,"Utilidad":100.0,"Costo_Producto":800.0,"Costo_Flete":80.0,"Otros_Costos":20.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"},
           {"Fecha":"2026-08-02","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C2","Cliente":"CLIENTE 2","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"MTY","Cliente_Recoge":"N","Refer":"R2","Toneladas_Vendidas":0.0,"Importe_Venta":0.0,"Costo":50.0,"Utilidad":-50.0,"Costo_Producto":0.0,"Costo_Flete":50.0,"Otros_Costos":0.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"}])
         p=dd.build_dashboard_plan(df,"Genera dashboard ejecutivo completo de ventas, rentabilidad, fletes, clientes, proveedores, rutas, operaciones con utilidad negativa, margen por tonelada, KPIs ejecutivos y evolución por fecha.","demo.xlsx","BD")
-        assert p["prompt_compiler"]["version"] in {"r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9"}
+        assert p["prompt_compiler"]["version"] in {"r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.1.1"}
         assert p["advanced"]["negative_operations"]
         assert p["advanced"]["clients"]
         assert p["advanced"]["routes"]
@@ -466,7 +466,7 @@ def test_r9_7_execution_plan_detects_generic_components():
         resumen ejecutivo, validación matemática y preguntas en lenguaje natural."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
         ep = plan["execution_plan"]
-        assert ep["version"] == "r9.9"
+        assert ep["version"] == "r10.1.1"
         assert ep["source_of_truth"] == "BD"
         by_key = {x["key"]:x for x in ep["components"]}
         assert by_key["pivot_customer"]["status"] == "ready"
@@ -475,7 +475,7 @@ def test_r9_7_execution_plan_detects_generic_components():
         assert by_key["natural_language"]["status"] == "ready"
         assert ep["requested_count"] >= 10
         assert 0 < ep["coverage_pct"] <= 100
-        assert "enterprise-prompt-compiler-r9.9" in plan["planner"]
+        assert "enterprise-prompt-compiler-r10.1.1" in plan["planner"]
     finally:
         if old is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM",None)
         else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
@@ -497,8 +497,8 @@ def test_r9_7_warning_and_version_are_consistent():
     import enterprise_prompt_compiler as c
     import inspect
     src = inspect.getsource(c.compile_enterprise_prompt)
-    assert '"version":"r9.9"' in src
-    assert 'R9.9 compiló un plan de ejecución auditable' in src
+    assert '"version":"r10.1.1"' in src
+    assert 'R10.1.1 compiló un plan de ejecución auditable' in src
     assert 'R9.5.1 compiló métricas' not in src
 
 def test_r9_7_1_multiselect_filters_have_todos_and_clear_semantics():
@@ -527,9 +527,9 @@ def test_r9_8_versions_are_consistent():
     import prompt_execution_plan as pep
     c = inspect.getsource(epc)
     p = inspect.getsource(pep)
-    assert 'enterprise-prompt-compiler-r9.9' in c
-    assert '"version":"r9.9"' in c
-    assert '"version": "r9.9"' in p
+    assert 'enterprise-prompt-compiler-r10.1.1' in c
+    assert '"version":"r10.1.1"' in c
+    assert '"version": "r10.1.1"' in p
 
 
 def test_r9_9_natural_language_query_is_ready_and_reactive():
@@ -552,10 +552,45 @@ def test_r9_9_versions_are_consistent():
     import enterprise_prompt_compiler as epc
     import prompt_execution_plan as pep
     import analizador_universal as au
-    assert 'enterprise-prompt-compiler-r9.9' in inspect.getsource(epc)
-    assert '"version": "r9.9"' in inspect.getsource(pep)
-    assert '8.5.5-r9.9' in inspect.getsource(au)
+    assert 'enterprise-prompt-compiler-r10.1.1' in inspect.getsource(epc)
+    assert '"version": "r10.1.1"' in inspect.getsource(pep)
+    assert '8.5.5-r10.1.1' in inspect.getsource(au)
 
+
+
+
+def test_r10_1_executive_dashboard_is_clear_and_referenced():
+    import inspect
+    import dashboard_dynamic as dynamic
+    src = inspect.getsource(dynamic)
+    assert 'Lectura ejecutiva' in src
+    assert 'chart-ref' in src and 'ref-chip' in src
+    assert 'Cobertura del valor' in src
+    assert 'chart-value' in src
+    assert 'line-stats' in src
+    assert 'showAllCharts=false' in src
+    assert 'charts.slice(0,4)' in src
+    assert 'Ver todas las gráficas' in src
+    assert 'tablePageSize=20' in src
+    assert '>Todos</option>' in src
+    assert 'multiPrev' in src
+    assert 'view-secondary' in src and 'openSection' in src
+
+
+def test_r10_1_1_executive_polish_reduces_clutter_and_value_coverage():
+    import inspect
+    import dashboard_dynamic as dynamic
+    src = inspect.getsource(dynamic)
+    assert 'id="toggleKpis"' in src
+    assert 'id="toggleFilters"' in src
+    assert 'kpi-secondary' in src
+    assert 'filter-extra' in src
+    assert "MAIN_FILTERS=new Set(['Zona','Vendedor','ctrl_alm'])" in src
+    assert 'shownValue' in src and 'totalValue' in src
+    assert 'Cobertura del valor' in src
+    assert "$('auditoria').classList.add('is-open')" not in src
+    assert '<span>Análisis avanzado</span>' in src
+    assert 'R10.1.1 · Consulta local' in src
 
 if __name__=='__main__':
     tests=[v for k,v in globals().items() if k.startswith('test_') and callable(v)]

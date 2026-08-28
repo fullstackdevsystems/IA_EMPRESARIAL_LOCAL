@@ -89,7 +89,7 @@ def build_prompt_execution_plan(df, prompt: str, sheet: str = "") -> Dict[str, A
     coverage = round((len(ready) + 0.5 * len(partial)) / len(requested) * 100, 1) if requested else 100.0
 
     return {
-        "version": "r9.9",
+        "version": "r10.1.1",
         "source_of_truth": sheet or "BD",
         "prompt_length": len(str(prompt or "")),
         "requested_count": len(requested),

@@ -153,7 +153,7 @@ def compile_enterprise_prompt(
     from enterprise_analytics import build_advanced_analytics
     out["advanced"] = build_advanced_analytics(df)
     out["prompt_compiler"] = {
-        "version":"r9.9",
+        "version":"r10.1.1",
         "mode":"generic-execution-plan",
         "source_of_truth": sheet or "BD",
         "kpi_count": len(kpis),
@@ -163,11 +163,11 @@ def compile_enterprise_prompt(
         "dynamic_components": True,
     }
     out["warnings"] = warnings + [
-        "R9.9 compiló un plan de ejecución auditable, métricas, filtros, componentes dinámicos, XLSX real y consulta natural determinística desde el prompt.",
+        "R10.1.1 compiló un plan de ejecución auditable, métricas, filtros, componentes dinámicos, XLSX real y consulta natural determinística desde el prompt.",
         "Los indicadores financieros principales se calculan con código sobre los datos filtrados; la IA no realiza las sumas base.",
         "Los requisitos no soportados se registran explícitamente en el plan de ejecución sin inventar resultados."
     ]
     from prompt_execution_plan import build_prompt_execution_plan
     out["execution_plan"] = build_prompt_execution_plan(df, prompt, sheet)
-    out["planner"] = str(out.get("planner") or "validated") + "|enterprise-prompt-compiler-r9.9"
+    out["planner"] = str(out.get("planner") or "validated") + "|enterprise-prompt-compiler-r10.1.1"
     return out
