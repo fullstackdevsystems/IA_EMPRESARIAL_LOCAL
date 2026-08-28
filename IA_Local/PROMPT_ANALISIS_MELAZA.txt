@@ -1,0 +1,47 @@
+ANALISIS DE RENDIMIENTO DE MELAZA
+
+Analiza el archivo que te proporciono usando herramientas de calculo.
+No calcules cifras importantes mentalmente si puedes obtenerlas con Python.
+
+Objetivo:
+Determinar el rendimiento comercial del producto MELAZA.
+
+1. Identifica las hojas, columnas y periodo disponible.
+2. Localiza los registros de MELAZA sin confundirlos con otros productos.
+3. Antes de calcular, indica que columnas usaras para:
+   - fecha
+   - producto
+   - cantidad
+   - importe de venta
+   - costo
+   - cliente
+   - vendedor, si existe
+4. Calcula, solo si los datos lo permiten:
+   - cantidad total vendida
+   - ventas totales
+   - costo total
+   - utilidad bruta
+   - margen bruto %
+   - precio promedio de venta
+   - ventas por mes
+   - utilidad por mes
+   - principales clientes
+   - mejores y peores meses
+   - tendencia del periodo
+5. Detecta valores faltantes, duplicados y datos atipicos que puedan afectar el resultado.
+6. No inventes costos, unidades, precios ni campos que no existan.
+7. Si una metrica no se puede calcular, explicame exactamente que dato falta.
+8. Genera graficas claras de ventas y utilidad por mes.
+9. Crea:
+   C:\IA_Local\workspace\Reportes\Reporte_Melaza.xlsx
+   C:\IA_Local\workspace\Reportes\Reporte_Melaza.pdf
+10. En el Excel conserva una hoja con el detalle filtrado usado para los calculos.
+11. En el PDF incluye:
+    - resumen ejecutivo
+    - indicadores principales
+    - evolucion mensual
+    - clientes principales
+    - hallazgos
+    - advertencias de calidad de datos
+    - conclusiones
+12. Al terminar, dime las rutas exactas de los archivos creados.

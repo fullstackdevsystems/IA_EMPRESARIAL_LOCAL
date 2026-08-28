@@ -1,0 +1,14 @@
+PRUEBA UNIVERSAL
+
+1) Analisis completo (funciona con cualquier tabla):
+Analiza completamente el archivo segun las columnas realmente disponibles. Identifica estructura, calidad de datos, metricas numericas, fechas, categorias, rankings y tendencias que puedan calcularse. No inventes columnas ni formulas.
+
+2) Si el archivo es de ventas:
+Analiza ventas netas, unidades, operaciones, ticket promedio, productos, clientes, paises, tendencia mensual y cancelaciones/devoluciones. Si no existe costo, indicalo y no inventes utilidad ni margen.
+
+3) Ejemplos para otros Excel:
+- Calcula el promedio de Edad por Departamento y ordena de mayor a menor.
+- Dame los 10 proveedores con mayor Monto Total.
+- Muestra la tendencia mensual de Gastos usando Fecha y Monto.
+- Cuales son las categorias con mas registros?
+- Calcula la correlacion entre Horas Trabajadas y Produccion.

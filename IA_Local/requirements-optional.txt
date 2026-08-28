@@ -1,0 +1,3 @@
+# Opcional: backend vectorial preferente.
+# El instalador intenta instalarlo; si no esta disponible se usa SQLiteVectorStore persistente.
+qdrant-client

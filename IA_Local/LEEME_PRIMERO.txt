@@ -1,0 +1,6 @@
+IA EMPRESARIAL LOCAL V8.5.5 R7
+
+Para una instalacion NUEVA usa el instalador externo incluido en el ZIP:
+INSTALAR_IA_EMPRESARIAL_LOCAL.bat
+
+Este paquete esta limpio: no contiene informacion de la empresa ni de instalaciones anteriores.

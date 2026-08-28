@@ -1,0 +1,61 @@
+IA EMPRESARIAL LOCAL V8.5.5 R7 - INSTALADOR COMPLETO LIMPIO CORREGIDO V2
+
+IA EMPRESARIAL LOCAL V8.5.5 R7 - INSTALADOR COMPLETO LIMPIO
+
+OBJETIVO
+Instalar IA Empresarial Local desde cero en C:\IA_Local.
+
+INCLUYE
+- Ollama como proveedor local (el instalador lo detecta e intenta instalar con winget si falta).
+- Modelo principal qwen3:4b-instruct.
+- Embeddings nomic-embed-text.
+- Open WebUI.
+- Asistente/Analizador Universal en puerto 8090.
+- Memoria permanente.
+- RAG local con Qdrant y fallback SQLite.
+- Analizador BI deterministico.
+- Semantic Column Mapper v2.
+- Dashboard Enterprise V8.5.5 estilo BI, autocontenido/offline.
+- Generacion y descarga de Dashboard HTML, PDF y Excel.
+- Gates BI y Enterprise incluidos.
+
+NO INCLUYE DATOS PERSONALES O DE UNA INSTALACION ANTERIOR
+- No contiene memoria existente.
+- No contiene documentos empresariales.
+- No contiene bases Qdrant previas.
+- No contiene tokens ni secretos.
+- No contiene reportes.
+- No contiene logs.
+- No contiene backups.
+- No contiene .venv copiado de otra PC.
+
+REQUISITOS
+- Windows 10/11 x64.
+- Conexion a Internet durante la primera instalacion para descargar dependencias y modelos.
+- Espacio libre recomendado: 12 GB o mas.
+- Ejecutar como Administrador.
+
+INSTALACION
+1. Extrae TODO el ZIP en una carpeta temporal, por ejemplo C:\IA_Empresarial_Instalador.
+2. Clic derecho en INSTALAR_IA_EMPRESARIAL_LOCAL.bat -> Ejecutar como administrador.
+3. El instalador verificara SHA-256, copiara la base a C:\IA_Local, preparara Python 3.11, Ollama y dependencias.
+4. Descargara qwen3:4b-instruct y nomic-embed-text si no existen.
+5. Creara secretos y token locales NUEVOS.
+6. Ejecutara gates BI y Enterprise.
+7. Iniciara la IA y abrira la interfaz.
+
+PROTECCION
+Si C:\IA_Local ya existe, el instalador se detiene. No borra ni sobrescribe una instalacion existente.
+
+PUERTOS
+- 8080: Open WebUI
+- 8090: Analizador/Asistente IA Empresarial
+- 11434: Ollama
+- 8000: Open Terminal, solo si se habilita
+
+VERSION
+IA Empresarial Local 8.5.5 R7 - instalacion limpia consolidada.
+
+MEJORAS DASHBOARD R7:
+- Toneladas exactas + porcentaje por artículo.
+- Tooltip al pasar el mouse en históricos, con valor exacto por mes y serie.

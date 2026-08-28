@@ -1,0 +1,40 @@
+C:\IA_Local
+|
++-- INSTALAR_Y_ABRIR.bat        Instalacion/reparacion de dependencias
++-- INICIAR_IA.bat              Arranca los servicios
++-- DETENER_IA.bat              Detiene los servicios
++-- DIAGNOSTICO_PRODUCTIVO.bat   Diagnostico tecnico
++-- RESPALDAR_IA.bat             Respaldo de datos persistentes
++-- ABRIR_ASISTENTE.bat          Abre puerto 8090 / assistant
++-- ABRIR_ADMIN_MEMORIA_RAG.bat  Administracion de memoria/RAG
++-- ABRIR_INTERFAZ.bat           Interfaz principal
++-- ABRIR_REPORTES.bat           Carpeta de reportes
++-- VERSION.txt                  Version instalada
++-- requirements-local.txt       Dependencias Python
++|
++-- config\                      Configuracion, secreto y token generados localmente
++-- data\enterprise\            Memoria, RAG, Qdrant/SQLite
++-- data\open-webui\            Base local de Open WebUI
++-- logs\                        Logs de ejecucion
++-- workspace\
++|   +-- Entrada\                Archivos fuente
++|   +-- Reportes\               HTML/PDF/Excel generados
++|   +-- Historico\
++|   +-- Conocimiento\           Documentos de conocimiento
++|
++-- scripts\
++|   +-- Instalar.ps1
++|   +-- Iniciar.ps1
++|   +-- Detener.ps1
++|   +-- Comun.ps1
++|   +-- analizador_universal.py Motor web/BI
++|   +-- analizador_app.py       Lectura y analisis base
++|   +-- bi_productivo.py        Motor BI deterministico
++|   +-- reportes_profesionales.py
++|   +-- bootstrap_enterprise.py
++|   +-- templates\dashboard_bi.html
++|   +-- enterprise_ai\         Memoria/RAG/seguridad/proveedores/contexto
++|
++-- tests\
++    +-- test_bi_productivo.py   Gate BI: 8 pruebas
++    +-- test_enterprise_ai.py   Gate Enterprise: 30 pruebas
