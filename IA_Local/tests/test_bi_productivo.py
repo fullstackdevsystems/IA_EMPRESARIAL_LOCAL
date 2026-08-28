@@ -136,8 +136,48 @@ def test_dashboard_negative_utilities_supported():
     assert 'vmax=Math.max(0,...vals)' in tpl
     assert 'sy(0)' in tpl
 
+
+def test_r8_customer_performance_planner_and_dashboard():
+    import dashboard_planner as dp
+    df=pd.DataFrame([
+        {'cod_linea':'GRANO','Cod_Cliente':'C1','articulo':'MAIZ','cliente':'Cliente Uno','categoria':'VENTA EN CAMPO','Zona':' NORTE ','Vendedor':' Ana ','Toneladas_Vendidas_Actual':100,'Toneladas_Vendidas_Presupuesto':120,'Toneladas_Vendidas_Anterior':80,'Fecha_Inicial':'2026-01-01','Fecha_Final':'2026-12-31'},
+        {'cod_linea':'GRANO','Cod_Cliente':'C2','articulo':'SORGO','cliente':'Cliente Dos','categoria':'CUENTA CLAVE','Zona':' SUR ','Vendedor':' Beto ','Toneladas_Vendidas_Actual':0,'Toneladas_Vendidas_Presupuesto':50,'Toneladas_Vendidas_Anterior':75,'Fecha_Inicial':'2026-01-01','Fecha_Final':'2026-12-31'},
+        {'cod_linea':'PASTA','Cod_Cliente':'C3','articulo':'SOYA','cliente':'Cliente Tres','categoria':'CALL CENTER','Zona':' CENTRO ','Vendedor':' Carla ','Toneladas_Vendidas_Actual':30,'Toneladas_Vendidas_Presupuesto':0,'Toneladas_Vendidas_Anterior':0,'Fecha_Inicial':'2026-01-01','Fecha_Final':'2026-12-31'},
+    ])
+    plan=dp.detect_dashboard_plan(df,'dashboard de manejo y seguimiento de clientes con semaforo y presupuesto')
+    assert plan['type']=='customer_performance'
+    work,notes=dp.prepare_customer_performance(df,plan)
+    model=dp.build_customer_performance_model(work,'prompt',plan)
+    assert model['kpis']['Toneladas_Actuales']==130.0
+    assert model['kpis']['Clientes_Perdidos']==1
+    assert model['kpis']['Clientes_Recuperados']==1
+    assert model['kpis']['Clientes_Presupuesto_Sin_Venta']==1
+    with tempfile.TemporaryDirectory() as td:
+        out=Path(td)/'clientes.html'
+        bi.generate_html(out,ROOT/'scripts'/'templates'/'dashboard_clientes.html',dp.customer_payload(model,'clientes.xlsx',len(df)),['customer_performance'])
+        html=out.read_text(encoding='utf-8')
+        assert 'SEMÁFORO DE CARTERA' in html
+        assert 'CLIENTES PERDIDOS' in html
+        assert 'Presupuesto' in html
+        assert 'const DATA=' in html
+
+
+def test_r8_generic_dashboard_fallback_exists():
+    import dashboard_planner as dp
+    df=pd.DataFrame([{'Equipo':'A','Temperatura':10},{'Equipo':'B','Temperatura':20}])
+    plan=dp.detect_dashboard_plan(df,'crea un dashboard interactivo')
+    assert plan['type']=='generic'
+    payload=dp.generic_payload(df,'equipos.xlsx','crea un dashboard','Datos')
+    with tempfile.TemporaryDirectory() as td:
+        out=Path(td)/'generic.html'
+        bi.generate_html(out,ROOT/'scripts'/'templates'/'dashboard_generico.html',payload,['generic'])
+        html=out.read_text(encoding='utf-8')
+        assert 'DASHBOARD ADAPTABLE' in html
+        assert 'Temperatura' in html
+
 if __name__=='__main__':
     tests=[v for k,v in globals().items() if k.startswith('test_') and callable(v)]
     for t in tests:
         t(); print('PASS',t.__name__)
     print(f'{len(tests)}/{len(tests)} PASS')
+

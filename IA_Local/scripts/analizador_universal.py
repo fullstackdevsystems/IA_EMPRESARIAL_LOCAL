@@ -20,6 +20,7 @@ import pandas as pd
 import analizador_app as base
 import reportes_profesionales as pro
 import bi_productivo as bi
+import dashboard_planner as dp
 
 
 # ---------------------------------------------------------------------------
@@ -805,9 +806,55 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
     # V8.5.5: mapeo BI semántico independiente de la cardinalidad. El encabezado y
     # las relaciones entre columnas tienen prioridad sobre el número de valores únicos.
     roles_bi = bi.semantic_map(original)
+    dashboard_plan = dp.detect_dashboard_plan(original, prompt)
+    is_customer_performance = dashboard_plan.get("type") == "customer_performance"
     is_commercial_bi = bool(roles_bi.get("revenue") and roles_bi.get("date") and (roles_bi.get("customer") or roles_bi.get("product")))
 
-    if is_commercial_bi:
+    if is_customer_performance:
+        # R8: familia especializada para seguimiento de clientes Actual/Presupuesto/Anterior.
+        # No exige importe de venta ni fecha transaccional y respeta Fecha_Inicial/Fecha_Final
+        # únicamente como cobertura del reporte.
+        work, planner_notes = dp.prepare_customer_performance(original, dashboard_plan)
+        model = dp.build_customer_performance_model(work, prompt, dashboard_plan)
+        spec = bi.compile_report_spec(prompt)
+        notes = list(planner_notes)
+        if meta.get("advertencia_hojas"):
+            notes.append(meta["advertencia_hojas"])
+        if meta.get("errores_hojas"):
+            notes.append("Algunas hojas no pudieron leerse y quedaron registradas en la trazabilidad.")
+
+        # Perfil universal para trazabilidad y para los generadores PDF/Excel existentes.
+        roles = infer_roles(original)
+        source_work, source_derived = base.prepare_df(original, roles)
+        profile = build_profile(source_work, original, roles, source_derived, meta)
+        profile["dashboard_plan"] = dashboard_plan
+        profile["customer_performance_kpis"] = model["kpis"]
+        sections = dp.customer_sections(model)
+        narrative = dp.customer_narrative(model)
+
+        stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
+        stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
+        outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
+        if spec["outputs"].get("html"):
+            html_path = base.REPORTES / f"Dashboard_Clientes_{stem}_{stamp}.html"
+            payload = dp.customer_payload(model, path.name, len(original))
+            template = Path(__file__).resolve().parent / "templates" / "dashboard_clientes.html"
+            bi.generate_html(html_path, template, payload, ["customer_performance"])
+            outputs["html"] = html_path.name
+        if spec["outputs"].get("pdf"):
+            pdf_path = base.REPORTES / f"Reporte_Ejecutivo_Clientes_{stem}_{stamp}.pdf"
+            pro.pdf_report_professional(pdf_path, prompt, profile, sections, notes, narrative, "comercial")
+            outputs["pdf"] = pdf_path.name
+        if spec["outputs"].get("excel"):
+            xlsx_path = base.REPORTES / f"Analisis_Clientes_{stem}_{stamp}.xlsx"
+            pro.excel_report_professional(xlsx_path, prompt, profile, {"type":"customer_performance","dashboard_plan":dashboard_plan}, sections, notes, narrative, original, source_work, roles, "comercial")
+            outputs["excel"] = xlsx_path.name
+
+        result = pd.DataFrame([model["kpis"]])
+        plan = {"type":"customer_performance","dashboard_plan":dashboard_plan,"report_spec":spec}
+        domain = "comercial-clientes"
+
+    elif is_commercial_bi:
         work, derived_bi, bi_notes = bi.prepare_business(original, roles_bi)
         # Compatibilidad con las capas existentes (perfil, registro de dataset y RAG).
         roles = {
@@ -901,12 +948,23 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         narrative = base.narrate(prompt, profile, plan, sections, notes)
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
-        xlsx_path = base.REPORTES / f"Reporte_Ejecutivo_{stem}_{stamp}.xlsx"
-        pdf_path = base.REPORTES / f"Reporte_Ejecutivo_{stem}_{stamp}.pdf"
-        pro.excel_report_professional(xlsx_path, prompt, profile, plan, sections, notes, narrative, original, work, roles, domain)
-        pro.pdf_report_professional(pdf_path, prompt, profile, sections, notes, narrative, domain)
-        outputs = {"html": None, "pdf": pdf_path.name, "excel": xlsx_path.name}
-        spec = {"version": "legacy-universal", "outputs": {"html": False, "pdf": True, "excel": True}, "sections": list(sections.keys()), "prompt_applied": True}
+        # R8: el fallback universal también respeta las salidas pedidas y SI puede
+        # producir HTML, evitando el antiguo camino que siempre devolvía html=None.
+        spec = bi.compile_report_spec(prompt)
+        outputs = {"html": None, "pdf": None, "excel": None}
+        if spec["outputs"].get("html"):
+            html_path = base.REPORTES / f"Dashboard_Adaptable_{stem}_{stamp}.html"
+            template = Path(__file__).resolve().parent / "templates" / "dashboard_generico.html"
+            bi.generate_html(html_path, template, dp.generic_payload(original, path.name, prompt, meta.get("hoja_analizada") or ""), list(sections.keys()))
+            outputs["html"] = html_path.name
+        if spec["outputs"].get("excel"):
+            xlsx_path = base.REPORTES / f"Reporte_Ejecutivo_{stem}_{stamp}.xlsx"
+            pro.excel_report_professional(xlsx_path, prompt, profile, plan, sections, notes, narrative, original, work, roles, domain)
+            outputs["excel"] = xlsx_path.name
+        if spec["outputs"].get("pdf"):
+            pdf_path = base.REPORTES / f"Reporte_Ejecutivo_{stem}_{stamp}.pdf"
+            pro.pdf_report_professional(pdf_path, prompt, profile, sections, notes, narrative, domain)
+            outputs["pdf"] = pdf_path.name
 
     # Registra el archivo tabular para consultas deterministicas futuras del ContextEngine.
     try:
@@ -927,7 +985,7 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         "motor_excel": meta.get("motor_excel"),
         "dominio": domain,
         "roles": roles,
-        "roles_bi": roles_bi if is_commercial_bi else None,
+        "roles_bi": roles_bi if (is_commercial_bi or is_customer_performance) else None,
         "plan": plan,
         "report_spec": spec,
         "resultado": base.dataframe_records(result, 100),
@@ -954,12 +1012,12 @@ base.infer_roles = infer_roles
 base.build_profile = build_profile
 base.build_overview_sections = build_overview_sections
 base.analyze_file = analyze_file
-base.app.version = "8.5.5"
+base.app.version = "8.5.5-r8"
 
 # Actualiza textos de la interfaz sin duplicar todo el HTML de V3.
 base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analizador Empresarial de Excel / CSV",
-    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 BI Productivo + Prompt Driven",
+    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R8 · Dashboard Adaptativo",
 ).replace(
     "Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.",
     "Detecta automaticamente hojas, encabezados, columnas, tipos de datos y metricas. Procesa los datos con Python y usa Qwen local solo para interpretar resultados; nada se envia a Internet.",
@@ -971,10 +1029,10 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analiza completamente el archivo y genera un dashboard HTML interactivo, un reporte ejecutivo PDF y un Excel analitico. Incluye resumen, evolucion, lineas, productos, clientes, vendedores, facturas, clientes perdidos, clientes en caida, oportunidades y calidad de datos. Usa solo columnas reales y calculos deterministas; no inventes costos, margenes ni formulas.",
 ).replace(
     "<title>IA Empresarial Local - Analizador</title>",
-    "<title>IA Empresarial Local - V8.5.5 BI Productivo + Prompt Driven</title>",
+    "<title>IA Empresarial Local - V8.5.5 R8 · Dashboard Adaptativo</title>",
 ).replace(
     "<h1>Analizador Universal Empresarial de Excel / CSV</h1>",
-    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5</span></h1>",
+    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R8</span></h1>",
 )
 
 
@@ -999,7 +1057,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"version": "8.5.5", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML interactivo + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt driven + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"version": "8.5.5-r8", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML interactivo + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt driven + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:
