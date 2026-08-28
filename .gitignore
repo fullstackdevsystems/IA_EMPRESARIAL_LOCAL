@@ -12,3 +12,9 @@ IA_Local/workspace/Reportes/
 IA_Local/config/enterprise.secret
 IA_Local/config/local-user.token
 IA_Local/.webui_secret_key
+
+# Parches y respaldos locales de releases R9.x
+R9_*_PATCH/
+_backup_r9_*/
+*.backup_*
+*.backup_r951
