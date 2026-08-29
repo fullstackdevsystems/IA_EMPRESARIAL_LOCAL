@@ -259,6 +259,24 @@ class StructuredDataService:
             if value and norm(value) in pnorm:
                 safe_filters.append(item)
         plan["filters"] = safe_filters
+        # R10.11: para CSV grandes, ejecutar agregaciones exactas por chunks antes de cargar todo a RAM.
+        try:
+            from .performance import try_execute_large_query
+            fast_result = try_execute_large_query(
+                dataset, plan, principal=principal, prompt=prompt, analytics=self.analytics, precedence=self.precedence
+            )
+            if fast_result is not None:
+                try:
+                    trace_step(
+                        fast_result.get('trace_id'), 'large_data_execution',
+                        {'engine':'python/pandas-chunked','exact':True,'source':fast_result.get('source',{}),'performance':fast_result.get('performance',{})}
+                    )
+                except Exception:
+                    pass
+                return fast_result
+        except Exception:
+            # Compatibilidad: si la optimizacion no aplica, conserva la ruta productiva existente.
+            pass
         df, sheet = self._load(dataset)
         roles = infer_roles(list(map(str, df.columns)))
         semantic_applied = []

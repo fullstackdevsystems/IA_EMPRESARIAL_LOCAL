@@ -589,6 +589,21 @@ def install_enterprise_routes(app, root: str | Path):
         components.db.audit("settings.update", principal.company_id, principal.user_id, "settings", details={"fields": list(data)})
         return {"ok": True, "restart_required": True}
 
+    @router.get("/api/enterprise/performance")
+    def enterprise_performance(principal: Principal = Depends(admin_dependency)):
+        from .performance import optional_engines
+        return {
+            "ok": True,
+            "version": "8.5.5-r10.11-large-data",
+            "engines": optional_engines(),
+            "policy": {
+                "large_csv": "streaming exacto por chunks",
+                "profiling": "muestra controlada permitida",
+                "business_metrics": "siempre exactas",
+                "governed_rules": "fallback a evaluador completo para conservar semantica",
+            },
+        }
+
     @router.get("/api/enterprise/audit")
     def audit(limit: int = 100, principal: Principal = Depends(admin_dependency)):
         rows = components.db.query(

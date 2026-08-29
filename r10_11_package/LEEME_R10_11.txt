@@ -1,0 +1,8 @@
+IA EMPRESARIAL LOCAL R10.11 - ARCHIVOS GRANDES Y RENDIMIENTO
+
+Base requerida: R10.10.
+Instalar:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_release\Aplicar_R10_11_Rendimiento.ps1
+
+Si no tiene R10.10, el ZIP incluye prerequisite_R10_10.zip como respaldo previo.
