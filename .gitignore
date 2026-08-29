@@ -24,3 +24,10 @@ IA_Local/scripts/enterprise_ai/*.bak_*
 
 # Archivos empresariales de entrada / pruebas locales
 IA_Local/workspace/Entrada/
+
+# Paquetes y artefactos locales de desarrollo R10.x
+/IA EMPRESARIAL LOCAL.zip
+/R10_*_UPDATE/
+/r10_*_package/
+/r10_*_package_v*/
+/r10_*_v*_package/
