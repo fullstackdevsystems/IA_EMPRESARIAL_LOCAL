@@ -1,0 +1,13 @@
+IA EMPRESARIAL LOCAL R10.11.1 - HOTFIX DATA CONTRACT V3
+
+IMPORTANTE:
+No use los instaladores V1/V2.
+
+V3:
+- recupera automáticamente la base previa si V2 dejó analizador_app.py con SyntaxError;
+- preserva R10.12 si ya estaba instalada;
+- comprueba $LASTEXITCODE y nunca anuncia éxito cuando falla una prueba.
+
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_1_release\Aplicar_R10_11_1_Hotfix_DataContract_V3.ps1

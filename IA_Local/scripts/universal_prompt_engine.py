@@ -41,11 +41,17 @@ def _is_numeric(s: pd.Series) -> bool:
 def _is_date(s: pd.Series) -> bool:
     if pd.api.types.is_datetime64_any_dtype(s):
         return True
-    sample = s.dropna().head(200)
+    if pd.api.types.is_numeric_dtype(s):
+        return False
+    sample = s.dropna().astype(str).str.strip().head(200)
     if sample.empty:
         return False
-    parsed = pd.to_datetime(sample, errors="coerce", dayfirst=False)
-    return parsed.notna().mean() >= 0.85
+    # Parse only values that already look like calendar dates.
+    looks = sample.str.match(r"^(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})(?:\s|$)")
+    if float(looks.mean()) < 0.85:
+        return False
+    parsed = pd.to_datetime(sample[looks], errors="coerce", dayfirst=False)
+    return float(parsed.notna().mean()) >= 0.85
 
 
 ROLE_SYNONYMS: Dict[str, Sequence[str]] = {
@@ -247,7 +253,7 @@ def parse_prompt_intent(prompt: str) -> PromptIntent:
     for key, terms in {
         "html": ("html", "dashboard", "tablero"),
         "pdf": ("pdf", "reporte ejecutivo"),
-        "excel": ("excel", "xlsx", "libro analitico", "libro analítico"),
+        "excel": ("generar excel", "genera excel", "reporte excel", "excel analitico", "excel analítico", "libro analitico", "libro analítico", "salida xlsx"),
     }.items():
         if any(norm(t) in n for t in terms):
             outputs.append(key)

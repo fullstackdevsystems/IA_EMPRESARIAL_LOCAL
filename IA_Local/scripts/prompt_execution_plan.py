@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from universal_prompt_engine import compile_universal_plan
+from semantic_contract_enforcer import enforce_semantic_contract
 
 
 def _component(key: str, name: str, requested: bool, status: str, detail: str, missing=None, renderer=None) -> Dict[str, Any]:
@@ -20,6 +21,7 @@ def _component(key: str, name: str, requested: bool, status: str, detail: str, m
 def build_prompt_execution_plan(df, prompt: str, sheet: str = "") -> Dict[str, Any]:
     """Build an auditable execution contract from arbitrary prompt + arbitrary schema."""
     plan = compile_universal_plan(df, prompt, sheet=sheet)
+    plan = enforce_semantic_contract(plan, df, prompt)
     intent = plan.get("intent", {})
     roles = plan.get("semantic_roles", {})
     components: List[Dict[str, Any]] = []
@@ -73,8 +75,8 @@ def build_prompt_execution_plan(df, prompt: str, sheet: str = "") -> Dict[str, A
     coverage = round((len(ready) + 0.5 * len(partial)) / len(requested) * 100, 1) if requested else 100.0
 
     return {
-        "version": "r10.2",
-        "mode": "universal-prompt-driven",
+        "version": "r10.11.3",
+        "mode": "universal-prompt-driven+strict-semantic-contract",
         "source_of_truth": sheet or None,
         "prompt_length": len(str(prompt or "")),
         "requested_count": len(requested),

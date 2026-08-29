@@ -1,0 +1,15 @@
+IA EMPRESARIAL LOCAL R10.11.1 - HOTFIX DATA CONTRACT V4
+
+IMPORTANTE:
+No use V1, V2 ni V3.
+
+V4 corrige:
+- recuperación directa cuando VERSION indica el hotfix roto;
+- no deja que stderr de py_compile aborte PowerShell antes de revisar exit code;
+- busca específicamente un backup limpio R10.12;
+- conserva R10.12 + hotfix;
+- fail-fast real si apply o tests fallan.
+
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_1_release\Aplicar_R10_11_1_Hotfix_DataContract_V4.ps1

@@ -1,0 +1,13 @@
+IA EMPRESARIAL LOCAL — R10.11.3 PLAN CONSISTENCY + UTF-8
+
+Requiere R10.11.2.
+
+Objetivo:
+- execution_plan usa el mismo semantic_contract_enforcer que el dashboard efectivo;
+- elimina contradicción quantity=Toneladas_Costo cuando el mapa estricto resuelve Toneladas_Vendidas;
+- no modifica fórmulas financieras ya validadas;
+- limpia residuos mojibake visibles del renderer HTML/JavaScript.
+
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_3_release\Aplicar_R10_11_3_Plan_UTF8.ps1

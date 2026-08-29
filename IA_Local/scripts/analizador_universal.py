@@ -27,6 +27,7 @@ import reportes_profesionales as pro
 import bi_productivo as bi
 import dashboard_planner as dp
 import dashboard_dynamic as dd
+from data_contract import validate_workbook_contract, DataContractError
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +196,7 @@ def _sheet_relevance(sheet: str, df: pd.DataFrame, prompt: str) -> float:
 
 
 def load_tabular(path: Path, prompt: str = "") -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    contract = validate_workbook_contract(path, prompt)
     ext = path.suffix.lower()
     meta: Dict[str, Any] = {"archivo": path.name, "extension": ext, "hojas": [], "hojas_info": []}
 
@@ -238,6 +240,19 @@ def load_tabular(path: Path, prompt: str = "") -> Tuple[pd.DataFrame, Dict[str, 
 
     if not frames:
         raise ValueError("El libro no contiene hojas legibles con datos tabulares.")
+
+    requested_sheet = contract.get("explicit_sheet")
+    if requested_sheet:
+        for _sheet, _frame, _header_idx in frames:
+            if norm(_sheet) == norm(requested_sheet):
+                meta["hoja_analizada"] = _sheet
+                meta["data_contract"] = contract
+                return _frame, meta
+        raise DataContractError(
+            f'La hoja requerida "{requested_sheet}" no pudo cargarse como tabla.',
+            code="SOURCE_SHEET_UNREADABLE",
+            details={"requested_sheet": requested_sheet},
+        )
 
     # Agrupa hojas con el mismo esquema normalizado. Si un esquema aparece en varias
     # hojas (por ano, mes, sucursal, etc.) se consolidan automaticamente.

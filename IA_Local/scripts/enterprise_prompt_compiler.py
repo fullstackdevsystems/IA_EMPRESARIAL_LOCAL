@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from universal_prompt_engine import compile_universal_plan, norm
+from semantic_contract_enforcer import enforce_semantic_contract
 
 
 def is_enterprise_analytics_prompt(prompt: str) -> bool:
@@ -26,6 +27,7 @@ def compile_enterprise_prompt(
         return out
 
     universal = compile_universal_plan(df, prompt, filename, sheet)
+    universal = enforce_semantic_contract(universal, df, prompt)
 
     # The universal contract controls domain-sensitive parts. Keep a validated
     # generic fallback only when the prompt/data did not produce a replacement.

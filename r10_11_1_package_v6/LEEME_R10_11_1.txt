@@ -1,0 +1,12 @@
+IA EMPRESARIAL LOCAL — R10.11.1 HOTFIX V6
+
+V6 reemplaza V5.
+
+Corrige:
+- numpy.bool_ / escalares Pandas-NumPy en JSON;
+- ROOT relativo a la instalación real;
+- fail-fast.
+
+Instalar:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_1_release\Aplicar_R10_11_1_Hotfix_V6_JSON_ROOT.ps1

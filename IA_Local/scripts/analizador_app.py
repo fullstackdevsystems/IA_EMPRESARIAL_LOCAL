@@ -7,6 +7,7 @@ import math
 import os
 import re
 import shutil
+import traceback
 import sys
 import time
 import unicodedata
@@ -26,7 +27,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-ROOT = Path(os.environ.get("IA_LOCAL_ROOT", r"C:\IA_Local"))
+ROOT = Path(os.environ.get("IA_LOCAL_ROOT", str(Path(__file__).resolve().parent.parent))).resolve()
 WORKSPACE = ROOT / "workspace"
 ENTRADA = WORKSPACE / "Entrada"
 REPORTES = WORKSPACE / "Reportes"
@@ -963,7 +964,28 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...)):
     except HTTPException:
         raise
     except Exception as e:
-        return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"}, status_code=500)
+        stage = getattr(e, "stage", "analyze_file")
+        code = getattr(e, "code", "INTERNAL_ANALYZER_ERROR")
+        details = getattr(e, "details", None)
+        payload = {
+            "ok": False,
+            "error": f"{type(e).__name__}: {e}",
+            "code": code,
+            "stage": stage,
+            "details": details,
+        }
+        try:
+            log_dir = ROOT / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with (log_dir / "analizador.err.log").open("a", encoding="utf-8") as fh:
+                fh.write("\n=== ANALYZER ERROR ===\n")
+                fh.write(f"stage={stage} code={code} file={getattr(file, 'filename', '')}\n")
+                fh.write(traceback.format_exc())
+                fh.write("\n")
+        except Exception:
+            pass
+        status = 422 if code in {"SOURCE_SHEET_NOT_FOUND","DECLARED_COLUMNS_MISSING","SOURCE_SHEET_UNREADABLE","DATA_CONTRACT_ERROR"} else 500
+        return JSONResponse(payload, status_code=status)
 
 
 @app.get("/download/{filename}")

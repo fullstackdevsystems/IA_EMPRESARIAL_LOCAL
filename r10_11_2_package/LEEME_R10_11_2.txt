@@ -1,0 +1,15 @@
+IA EMPRESARIAL LOCAL — R10.11.2 SEMANTIC CONTRACT ENFORCEMENT
+
+Requiere R10.11.1 V6.
+
+Corrige:
+- mapa semántico estricto prevalece sobre inferencias heurísticas;
+- KPIs usan Toneladas_Vendidas cuando el mapa estricto la identifica como quantity;
+- utilidad/ton, costo/ton y precio/ton usan el denominador correcto;
+- filtros incluyen Semana, ctrl_alm, origen, destino y Cliente_Recoge cuando existen;
+- Fecha desde/hasta usa el renderer existente;
+- corrige mojibake visible del HTML.
+
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_2_release\Aplicar_R10_11_2_Semantic_Contract.ps1

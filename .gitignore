@@ -21,3 +21,6 @@ _backup_r10_*/
 # R10.3+ - instaladores, payloads y respaldos locales
 IA_Local/updates/
 IA_Local/scripts/enterprise_ai/*.bak_*
+
+# Archivos empresariales de entrada / pruebas locales
+IA_Local/workspace/Entrada/

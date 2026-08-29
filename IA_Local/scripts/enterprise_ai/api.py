@@ -102,6 +102,16 @@ class AnalyticBindRequest(BaseModel):
     priority: int = 100
     scope: str = "company"
 
+class FineTuningBuildRequest(BaseModel):
+    pass
+
+class FineTuningDecisionRequest(BaseModel):
+    approve: bool
+    reason: Optional[str] = None
+
+class FineTuningExportRequest(BaseModel):
+    format: str = "jsonl"
+
 class SettingsRequest(BaseModel):
     llm_provider: Optional[str] = None
     ollama_model: Optional[str] = None
@@ -603,6 +613,38 @@ def install_enterprise_routes(app, root: str | Path):
                 "governed_rules": "fallback a evaluador completo para conservar semantica",
             },
         }
+
+    @router.get("/api/enterprise/fine-tuning/runs")
+    def finetune_runs(limit: int = 50, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        return {"runs": FineTuningDatasetManager(components.db, components.cfg.root).list_runs(principal, limit)}
+
+    @router.post("/api/enterprise/fine-tuning/runs")
+    def finetune_build(body: FineTuningBuildRequest, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        return FineTuningDatasetManager(components.db, components.cfg.root).build(principal)
+
+    @router.get("/api/enterprise/fine-tuning/runs/{run_id}")
+    def finetune_run(run_id: str, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        return FineTuningDatasetManager(components.db, components.cfg.root).get_run(principal, run_id)
+
+    @router.post("/api/enterprise/fine-tuning/examples/{example_id}/decision")
+    def finetune_decision(example_id: str, body: FineTuningDecisionRequest, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        try: return FineTuningDatasetManager(components.db, components.cfg.root).decide(principal, example_id, body.approve, body.reason)
+        except (KeyError, ValueError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.post("/api/enterprise/fine-tuning/runs/{run_id}/approve-safe")
+    def finetune_approve_safe(run_id: str, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        return FineTuningDatasetManager(components.db, components.cfg.root).approve_all_safe(principal, run_id)
+
+    @router.post("/api/enterprise/fine-tuning/runs/{run_id}/export")
+    def finetune_export(run_id: str, body: FineTuningExportRequest, principal: Principal = Depends(admin_dependency)):
+        from .fine_tuning_dataset import FineTuningDatasetManager
+        try: return FineTuningDatasetManager(components.db, components.cfg.root).export(principal, run_id, body.format)
+        except (KeyError, ValueError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/audit")
     def audit(limit: int = 100, principal: Principal = Depends(admin_dependency)):

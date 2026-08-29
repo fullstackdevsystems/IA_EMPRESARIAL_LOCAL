@@ -1,0 +1,13 @@
+IA EMPRESARIAL LOCAL — R10.11.1 HOTFIX V5
+
+Requiere V4 ya instalado.
+
+Corrige:
+1. JSON del dashboard acepta escalares NumPy/Pandas como numpy.bool_.
+2. ROOT usa por defecto la carpeta real IA_Local del script.
+3. IA_LOCAL_ROOT sigue pudiendo sobrescribir la ruta.
+4. Instalador fail-fast.
+
+Instalar:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_1_release\Aplicar_R10_11_1_Hotfix_V5_JSON_ROOT.ps1

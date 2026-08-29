@@ -1,0 +1,7 @@
+IA EMPRESARIAL LOCAL R10.11.1 - HOTFIX DATA CONTRACT
+
+Base requerida: R10.11.
+
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_11_1_release\Aplicar_R10_11_1_Hotfix_DataContract.ps1

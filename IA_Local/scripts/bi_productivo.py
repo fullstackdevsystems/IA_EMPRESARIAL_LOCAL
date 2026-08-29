@@ -89,6 +89,11 @@ def semantic_map(df: pd.DataFrame, semantic_context: Optional[Dict[str, Any]] = 
     r['quantity'] = _first_existing(df, ['Toneladas_Vendidas','Toneladas','Tons','Cantidad','Quantity','Unidades'], ['toneladas vendidas','toneladas','tons','cantidad','quantity','unidades'])
     r['revenue'] = _first_existing(df, ['Importe_Venta','Venta','Ventas','Ventas_Netas','Importe','Revenue','Sales','Amount'], ['importe venta','ventas netas','venta','sales','revenue','importe'])
     r['total_cost'] = _first_existing(df, ['Costo','Costo_Total','Total_Cost','Cost'], ['costo total','total cost'])
+    r['profit'] = _first_existing(df, ['Utilidad','Ganancia','Profit','Beneficio'], ['utilidad','ganancia','profit','beneficio'])
+    r['freight_total'] = _first_existing(df, ['Costo_Flete','Costo Flete','Freight_Cost','Freight Cost'], ['costo flete','freight cost'], ['corto','largo','traspaso'])
+    r['supplier'] = _first_existing(df, ['Proveedor','Supplier','Vendor'], ['proveedor','supplier','vendor'], ['cod','codigo',' id'])
+    r['week'] = _first_existing(df, ['Semana','Week'], ['semana','week'])
+    r['product_group'] = _first_existing(df, ['ctrl_alm','Agrupador','Grupo_Producto'], ['ctrl alm','agrupador','grupo producto'])
     r['cost_without_freight'] = _first_existing(df, ['Costo_Sin_Flete','Costo sin flete'], ['costo sin flete'])
     r['product_cost'] = _first_existing(df, ['Costo_Producto','Costo Producto'], ['costo producto'])
     r['other_cost'] = _first_existing(df, ['Otros_Costos','Otros Costos'], ['otros costos'])
@@ -148,7 +153,12 @@ def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]], analytic
 
     freight_cols = [roles.get('freight_short'), roles.get('freight_long'), roles.get('freight_transfer')]
     freight_cols = [c for c in freight_cols if c]
-    if freight_cols:
+    freight_total = roles.get('freight_total')
+    if freight_total:
+        work['_flete'] = _num(work[freight_total])
+        derived['flete'] = freight_total
+        derived['flete_fuente'] = 'columna_real'
+    elif freight_cols:
         freight = pd.Series(0.0, index=work.index)
         any_value = pd.Series(False, index=work.index)
         for c in freight_cols:
@@ -157,6 +167,7 @@ def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]], analytic
             freight = freight.add(n.fillna(0), fill_value=0)
         work['_flete'] = freight.where(any_value)
         derived['flete'] = ' + '.join(freight_cols)
+        derived['flete_fuente'] = 'componentes'
 
     # Costo total: prioriza una columna semánticamente explícita. Verifica componentes
     # para no volver a restar fletes si ya están incluidos.
@@ -191,9 +202,23 @@ def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]], analytic
     else:
         notes.append('No se detectó una estructura de costo total utilizable; utilidad y margen se omiten.')
 
-    if '_ventas' in work.columns and '_costo' in work.columns:
+    profit_col = roles.get('profit')
+    if profit_col:
+        work['_utilidad'] = _num(work[profit_col])
+        derived['utilidad'] = profit_col
+        derived['utilidad_fuente'] = 'columna_real'
+        if '_ventas' in work.columns and '_costo' in work.columns:
+            calc = work['_ventas'] - work['_costo']
+            coverage, median_rel = _coverage_ratio(work['_utilidad'], calc)
+            derived['validacion_utilidad'] = {
+                'formula_comparada': 'ventas - costo total',
+                'cobertura': coverage,
+                'error_relativo_mediano': median_rel,
+            }
+    elif '_ventas' in work.columns and '_costo' in work.columns:
         work['_utilidad'] = work['_ventas'] - work['_costo']
         derived['utilidad'] = 'ventas - costo total'
+        derived['utilidad_fuente'] = 'derivada_por_ausencia'
     if actx:
         from enterprise_ai.analytic_rules import evaluate_analytic_context
         mctx={**actx,'bindings':[b for b in actx.get('bindings',[]) if b.get('rule_type')=='metric']}
@@ -251,7 +276,7 @@ def compile_report_spec(prompt: str) -> Dict[str, Any]:
     outputs = {'html': False, 'pdf': False, 'excel': False}
     html_terms = ('html','dashboard','tablero','interactivo','business intelligence','power bi')
     pdf_terms = ('pdf','reporte ejecutivo','direccion','dirección','directivo')
-    excel_terms = ('excel','excel analitico','excel analítico','xlsx','libro analitico','libro analítico')
+    excel_terms = ('generar excel','genera excel','reporte excel','excel analitico','excel analítico','libro analitico','libro analítico','salida xlsx')
     if has_any(*html_terms) and not negated('html','dashboard','tablero'): outputs['html'] = True
     if has_any(*pdf_terms) and not negated('pdf','reporte ejecutivo'): outputs['pdf'] = True
     if has_any(*excel_terms) and not negated('excel','xlsx','libro analitico'): outputs['excel'] = True

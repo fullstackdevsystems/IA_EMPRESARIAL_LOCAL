@@ -1,0 +1,6 @@
+IA EMPRESARIAL LOCAL R10.12 - DATASET CONTROLADO PARA FINE-TUNING
+Base requerida: R10.11.
+Instalación:
+  Set-ExecutionPolicy -Scope Process Bypass
+  .\r10_12_release\Aplicar_R10_12_Dataset_FineTuning.ps1
+Esta fase prepara/revisa/exporta datasets. NO entrena modelos.
