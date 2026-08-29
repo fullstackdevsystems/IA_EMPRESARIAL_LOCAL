@@ -1,4 +1,9 @@
 from __future__ import annotations
+try:
+    from enterprise_ai.traceability import build_file_trace
+except Exception:
+    build_file_trace = None
+
 
 """Capa universal V4 sobre el analizador V3.
 
@@ -145,23 +150,47 @@ def _excel_engine(ext: str) -> str:
 
 
 def _sheet_relevance(sheet: str, df: pd.DataFrame, prompt: str) -> float:
-    p = norm(prompt)
-    stop = {
-        "analiza", "analizar", "archivo", "excel", "reporte", "resumen", "completo", "completamente",
-        "dame", "quiero", "calcula", "calcular", "datos", "informacion", "principales", "mejor", "peor",
-        "todos", "todas", "sobre", "para", "con", "del", "las", "los", "una", "uno", "por", "que",
-    }
+    """R10.2: rank sheets by explicit user intent + transactional detail.
+
+    A sheet is no longer selected merely because it is large or because a domain
+    prompt happened to mention legacy columns. If the user explicitly names a
+    sheet, that instruction wins. Otherwise the engine favors tables that look
+    like detailed transactions and only uses prompt/schema overlap as a tiebreaker.
+    """
+    from universal_prompt_engine import norm as _unorm, score_transactional_source
+
+    p = _unorm(prompt)
+    sname = _unorm(sheet)
+    info = score_transactional_source(df)
+    score = float(info.get("score", 0.0)) * 4.0
+
+    # Explicit source references are authoritative.
+    explicit_patterns = [
+        rf"\bhoja\s+{re.escape(sname)}\b",
+        rf"\b{sname}\s+(?:es\s+)?(?:la\s+)?(?:fuente|base de datos principal|unica fuente)\b",
+    ] if sname else []
+    if any(re.search(pat, p) for pat in explicit_patterns):
+        score += 1000.0
+    elif sname and sname in p:
+        score += 40.0
+
+    # Prompt/schema overlap is useful, but secondary to transactional structure.
+    stop = {"analiza","analizar","archivo","excel","reporte","resumen","completo","completamente",
+            "dame","quiero","calcula","calcular","datos","informacion","principales","mejor","peor",
+            "todos","todas","sobre","para","con","del","las","los","una","uno","por","que"}
     tokens = [t for t in p.split() if len(t) >= 3 and t not in stop]
-    blob_sheet = norm(sheet)
-    blob_cols = " | ".join(norm(c) for c in df.columns)
-    score = math.log10(max(10, len(df)))
-    if blob_sheet and blob_sheet in p:
-        score += 50
+    blob_cols = " | ".join(_unorm(c) for c in df.columns)
     for tok in tokens:
-        if tok in blob_sheet:
-            score += 8
         if tok in blob_cols:
-            score += 3
+            score += 1.5
+        if tok in sname:
+            score += 2.0
+
+    # Weak naming hints only; never override explicit user choice.
+    if any(x in sname for x in ("resumen", "dashboard", "grafica", "pivot", "td", "reporte")):
+        score -= 6.0
+    if any(x in sname for x in ("bd", "base", "datos", "detalle", "movimiento", "transaccion")):
+        score += 3.0
     return score
 
 
@@ -799,15 +828,15 @@ def _ensure_commercial_report_sections(work: pd.DataFrame, roles: Dict[str, Opti
     return sections
 
 
-def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
+def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     started = base.time.time()
     original, meta = load_tabular(path, prompt)
     original.columns = _dedupe_columns(original.columns)
 
     # V8.5.5: mapeo BI semántico independiente de la cardinalidad. El encabezado y
     # las relaciones entre columnas tienen prioridad sobre el número de valores únicos.
-    roles_bi = bi.semantic_map(original)
-    dashboard_plan = dp.detect_dashboard_plan(original, prompt)
+    roles_bi = bi.semantic_map(original, semantic_context)
+    dashboard_plan = dp.detect_dashboard_plan(original, prompt, semantic_context)
     is_customer_performance = dashboard_plan.get("type") == "customer_performance"
     is_commercial_bi = bool(roles_bi.get("revenue") and roles_bi.get("date") and (roles_bi.get("customer") or roles_bi.get("product")))
 
@@ -826,6 +855,11 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
 
         # Perfil universal para trazabilidad y para los generadores PDF/Excel existentes.
         roles = infer_roles(original)
+        try:
+            from enterprise_ai.semantic_registry import merge_context_roles
+            roles = merge_context_roles(roles, semantic_context)
+        except Exception:
+            pass
         source_work, source_derived = base.prepare_df(original, roles)
         profile = build_profile(source_work, original, roles, source_derived, meta)
         profile["dashboard_plan"] = dashboard_plan
@@ -838,7 +872,7 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
@@ -850,12 +884,14 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
             pro.excel_report_professional(xlsx_path, prompt, profile, {"type":"customer_performance","dashboard_plan":dashboard_plan}, sections, notes, narrative, original, source_work, roles, "comercial")
             outputs["excel"] = xlsx_path.name
 
+        if build_file_trace:
+            profile["traceability"] = build_file_trace(filename=path.name, sheet=meta.get("hoja_analizada"), rows=len(original), columns=[str(c) for c in original.columns], roles=roles, derived=profile.get("calculos_derivados", {}), notes=notes, outputs=outputs, prompt=prompt)
         result = pd.DataFrame([model["kpis"]])
         plan = {"type":"customer_performance","dashboard_plan":dashboard_plan,"report_spec":spec}
         domain = "comercial-clientes"
 
     elif is_commercial_bi:
-        work, derived_bi, bi_notes = bi.prepare_business(original, roles_bi)
+        work, derived_bi, bi_notes = bi.prepare_business(original, roles_bi, analytic_context)
         # Compatibilidad con las capas existentes (perfil, registro de dataset y RAG).
         roles = {
             "date": roles_bi.get("date"),
@@ -887,7 +923,7 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
@@ -913,6 +949,11 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
     else:
         # Mantiene el analizador universal V7/V8 para archivos que no son comerciales.
         roles = infer_roles(original)
+        try:
+            from enterprise_ai.semantic_registry import merge_context_roles
+            roles = merge_context_roles(roles, semantic_context)
+        except Exception:
+            pass
         work, derived = base.prepare_df(original, roles)
         profile = build_profile(work, original, roles, derived, meta)
         hplan = base.heuristic_plan(prompt)
@@ -952,7 +993,7 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         outputs = {"html": None, "pdf": None, "excel": None}
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "")
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("excel"):
@@ -1010,12 +1051,12 @@ base.infer_roles = infer_roles
 base.build_profile = build_profile
 base.build_overview_sections = build_overview_sections
 base.analyze_file = analyze_file
-base.app.version = "8.5.5-r10.1.1"
+base.app.version = "8.5.5-r10.2"
 
 # Actualiza textos de la interfaz sin duplicar todo el HTML de V3.
 base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analizador Empresarial de Excel / CSV",
-    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R10.1.1 · Dashboard Dinámico IA",
+    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R10.2 · Dashboard Dinámico IA",
 ).replace(
     "Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.",
     "Detecta automaticamente hojas, encabezados, columnas, tipos de datos y metricas. Procesa los datos con Python y usa Qwen local solo para interpretar resultados; nada se envia a Internet.",
@@ -1027,10 +1068,10 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analiza completamente el archivo y genera un dashboard HTML interactivo, un reporte ejecutivo PDF y un Excel analitico. Incluye resumen, evolucion, lineas, productos, clientes, vendedores, facturas, clientes perdidos, clientes en caida, oportunidades y calidad de datos. Usa solo columnas reales y calculos deterministas; no inventes costos, margenes ni formulas.",
 ).replace(
     "<title>IA Empresarial Local - Analizador</title>",
-    "<title>IA Empresarial Local - V8.5.5 R10.1.1 · Dashboard Dinámico IA</title>",
+    "<title>IA Empresarial Local - V8.5.5 R10.2 · Dashboard Dinámico IA</title>",
 ).replace(
     "<h1>Analizador Universal Empresarial de Excel / CSV</h1>",
-    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R10.1.1</span></h1>",
+    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R10.2</span></h1>",
 )
 
 
@@ -1055,7 +1096,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"version": "8.5.5-r10.1.1", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:
@@ -1080,3 +1121,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

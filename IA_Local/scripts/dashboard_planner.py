@@ -23,7 +23,7 @@ def _find(df: pd.DataFrame, *names: str) -> Optional[str]:
     return None
 
 
-def detect_dashboard_plan(df: pd.DataFrame, prompt: str='') -> Dict[str,Any]:
+def detect_dashboard_plan(df: pd.DataFrame, prompt: str='', semantic_context: Optional[Dict[str,Any]]=None) -> Dict[str,Any]:
     """Clasifica el dataset sin inventar campos. Las familias especializadas tienen
     prioridad; si no encaja, devuelve generic para que el sistema pueda generar HTML.
     """
@@ -41,6 +41,14 @@ def detect_dashboard_plan(df: pd.DataFrame, prompt: str='') -> Dict[str,Any]:
         'period_start':_find(df,'Fecha_Inicial'),
         'period_end':_find(df,'Fecha_Final'),
     }
+    try:
+        from enterprise_ai.semantic_registry import merge_context_roles, current_context
+        ctx = semantic_context if semantic_context is not None else current_context()
+        governed = merge_context_roles({}, ctx)
+        for key in ('line','customer_id','product','customer','category','zone','seller','actual','budget','previous','period_start','period_end'):
+            if governed.get(key): cols[key] = governed[key]
+    except Exception:
+        pass
     customer_score=sum(bool(cols[k]) for k in ('customer_id','customer','actual','budget','previous'))
     p=norm(prompt)
     requested_customer=any(t in p for t in ('manejo de clientes','seguimiento de clientes','desempeno de clientes','clientes perdidos','presupuesto sin venta','semaforo de cartera'))

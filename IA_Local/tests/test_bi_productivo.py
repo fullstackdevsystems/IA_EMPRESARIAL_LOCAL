@@ -337,7 +337,7 @@ def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
         fletes, origen destino, evolución por fecha, comparación por semana y alertas."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
         assert plan["title"] == "Dashboard Ejecutivo de Ventas y Rentabilidad"
-        assert plan["prompt_compiler"]["version"] in {"r9.4","r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.1.1"}
+        assert plan["prompt_compiler"]["version"] in {"r9.4","r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.2"}
         assert plan["prompt_compiler"]["kpi_count"] >= 14
         assert plan["prompt_compiler"]["filter_count"] >= 10
         assert plan["prompt_compiler"]["chart_count"] >= 10
@@ -346,7 +346,7 @@ def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
         assert "Utilidad por Tonelada" in labels
         assert "Costo de Fletes" in labels
         assert any(x.get("column") == "ctrl_alm" for x in plan["filters"])
-        assert ("enterprise-prompt-compiler-r9." in plan["planner"] or "enterprise-prompt-compiler-r10.1.1" in plan["planner"])
+        assert ("enterprise-prompt-compiler-r9." in plan["planner"] or "enterprise-prompt-compiler-r10.2" in plan["planner"])
     finally:
         if old is None:
             os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
@@ -369,7 +369,7 @@ def test_r9_5_advanced_analytics_payload():
           {"Fecha":"2026-08-01","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C1","Cliente":"CLIENTE 1","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"GDL","Cliente_Recoge":"N","Refer":"R1","Toneladas_Vendidas":10.0,"Importe_Venta":1000.0,"Costo":900.0,"Utilidad":100.0,"Costo_Producto":800.0,"Costo_Flete":80.0,"Otros_Costos":20.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"},
           {"Fecha":"2026-08-02","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C2","Cliente":"CLIENTE 2","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"MTY","Cliente_Recoge":"N","Refer":"R2","Toneladas_Vendidas":0.0,"Importe_Venta":0.0,"Costo":50.0,"Utilidad":-50.0,"Costo_Producto":0.0,"Costo_Flete":50.0,"Otros_Costos":0.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"}])
         p=dd.build_dashboard_plan(df,"Genera dashboard ejecutivo completo de ventas, rentabilidad, fletes, clientes, proveedores, rutas, operaciones con utilidad negativa, margen por tonelada, KPIs ejecutivos y evolución por fecha.","demo.xlsx","BD")
-        assert p["prompt_compiler"]["version"] in {"r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.1.1"}
+        assert p["prompt_compiler"]["version"] in {"r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.2"}
         assert p["advanced"]["negative_operations"]
         assert p["advanced"]["clients"]
         assert p["advanced"]["routes"]
@@ -466,7 +466,7 @@ def test_r9_7_execution_plan_detects_generic_components():
         resumen ejecutivo, validación matemática y preguntas en lenguaje natural."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
         ep = plan["execution_plan"]
-        assert ep["version"] == "r10.1.1"
+        assert ep["version"] == "r10.2"
         assert ep["source_of_truth"] == "BD"
         by_key = {x["key"]:x for x in ep["components"]}
         assert by_key["pivot_customer"]["status"] == "ready"
@@ -475,7 +475,7 @@ def test_r9_7_execution_plan_detects_generic_components():
         assert by_key["natural_language"]["status"] == "ready"
         assert ep["requested_count"] >= 10
         assert 0 < ep["coverage_pct"] <= 100
-        assert "enterprise-prompt-compiler-r10.1.1" in plan["planner"]
+        assert "enterprise-prompt-compiler-r10.2" in plan["planner"]
     finally:
         if old is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM",None)
         else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
@@ -497,8 +497,8 @@ def test_r9_7_warning_and_version_are_consistent():
     import enterprise_prompt_compiler as c
     import inspect
     src = inspect.getsource(c.compile_enterprise_prompt)
-    assert '"version":"r10.1.1"' in src
-    assert 'R10.1.1 compiló un plan de ejecución auditable' in src
+    assert '"version": "r10.2"' in src
+    assert 'R10.2 resolvió conceptos empresariales' in src
     assert 'R9.5.1 compiló métricas' not in src
 
 def test_r9_7_1_multiselect_filters_have_todos_and_clear_semantics():
@@ -527,9 +527,9 @@ def test_r9_8_versions_are_consistent():
     import prompt_execution_plan as pep
     c = inspect.getsource(epc)
     p = inspect.getsource(pep)
-    assert 'enterprise-prompt-compiler-r10.1.1' in c
-    assert '"version":"r10.1.1"' in c
-    assert '"version": "r10.1.1"' in p
+    assert 'enterprise-prompt-compiler-r10.2' in c
+    assert '"version": "r10.2"' in c
+    assert '"version": "r10.2"' in p
 
 
 def test_r9_9_natural_language_query_is_ready_and_reactive():
@@ -542,7 +542,7 @@ def test_r9_9_natural_language_query_is_ready_and_reactive():
     assert 'id="nlAsk"' in src
     assert 'function answerNaturalQuestion(question,rows)' in src
     assert 'const q=$(\'nlQuestion\').value.trim(),rows=filtered()' in src
-    assert 'Consulta determinística en lenguaje natural' in psrc
+    assert 'Consulta determinística sobre las filas filtradas' in psrc
     assert '"natural_language"' in psrc
     assert 'supported=False' not in psrc.split('add("natural_language"',1)[1].split('\n',1)[0]
 
@@ -552,9 +552,9 @@ def test_r9_9_versions_are_consistent():
     import enterprise_prompt_compiler as epc
     import prompt_execution_plan as pep
     import analizador_universal as au
-    assert 'enterprise-prompt-compiler-r10.1.1' in inspect.getsource(epc)
-    assert '"version": "r10.1.1"' in inspect.getsource(pep)
-    assert '8.5.5-r10.1.1' in inspect.getsource(au)
+    assert 'enterprise-prompt-compiler-r10.2' in inspect.getsource(epc)
+    assert '"version": "r10.2"' in inspect.getsource(pep)
+    assert '8.5.5-r10.2' in inspect.getsource(au)
 
 
 
@@ -585,12 +585,103 @@ def test_r10_1_1_executive_polish_reduces_clutter_and_value_coverage():
     assert 'id="toggleFilters"' in src
     assert 'kpi-secondary' in src
     assert 'filter-extra' in src
-    assert "MAIN_FILTERS=new Set(['Zona','Vendedor','ctrl_alm'])" in src
+    assert "const MAIN_FILTERS=new Set([sc('zone','Zona'),sc('seller','Vendedor')" in src
     assert 'shownValue' in src and 'totalValue' in src
     assert 'Cobertura del valor' in src
     assert "$('auditoria').classList.add('is-open')" not in src
     assert '<span>Análisis avanzado</span>' in src
-    assert 'R10.1.1 · Consulta local' in src
+    assert 'R10.2 · Consulta local' in src
+
+
+def test_r10_2_semantic_layer_maps_generic_business_columns():
+    from semantic_layer import resolve_semantic_map
+    df = pd.DataFrame({
+        "Transaction Date": ["2026-08-01", "2026-08-02"],
+        "Customer Name": ["ACME", "BETA"],
+        "Customer ID": ["C1", "C2"],
+        "SKU Description": ["Maiz", "Sorgo"],
+        "Sales Rep": ["Ana", "Luis"],
+        "Sales Region": ["Norte", "Sur"],
+        "Sales Amount": [1000.0, 1500.0],
+        "Total Cost": [800.0, 1200.0],
+        "Profit": [200.0, 300.0],
+        "Quantity": [10.0, 15.0],
+        "Freight Cost": [50.0, 80.0],
+        "Freight Rate": [5.0, 5.3333],
+        "Supplier": ["P1", "P2"],
+        "Warehouse": ["W1", "W2"],
+        "Origin City": ["A", "B"],
+        "Destination City": ["X", "Y"],
+        "Invoice": ["F1", "F2"],
+    })
+    sm = resolve_semantic_map(df)
+    u = sm["usable"]
+    assert sm["version"] == "r10.2"
+    assert u["revenue"] == "Sales Amount"
+    assert u["cost"] == "Total Cost"
+    assert u["profit"] == "Profit"
+    assert u["quantity"] == "Quantity"
+    assert u["customer"] == "Customer Name"
+    assert u["customer_id"] == "Customer ID"
+    assert u["seller"] == "Sales Rep"
+    assert u["zone"] == "Sales Region"
+    assert u["freight"] == "Freight Cost"
+    assert u["freight_per_unit"] == "Freight Rate"
+    assert u["freight"] != u["freight_per_unit"]
+
+
+def test_r10_2_ambiguous_semantics_are_not_auto_used():
+    from semantic_layer import resolve_semantic_map
+    df = pd.DataFrame({
+        "Sales": [100.0, 120.0, 130.0],
+        "Revenue": [101.0, 121.0, 131.0],
+        "Customer": ["A", "B", "C"],
+    })
+    sm = resolve_semantic_map(df)
+    rev = sm["concepts"]["revenue"]
+    assert rev["confidence"] == "AMBIGUOUS"
+    assert rev["column"] is None
+    assert sm["usable"]["revenue"] is None
+
+
+def test_r10_2_enterprise_compiler_uses_generic_semantic_columns():
+    import os
+    import dashboard_dynamic as dd
+    old = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
+    try:
+        df = pd.DataFrame({
+            "Date": ["2026-08-01", "2026-08-02"],
+            "Customer": ["ACME", "BETA"],
+            "Product": ["Maiz", "Sorgo"],
+            "Sales Rep": ["Ana", "Luis"],
+            "Region": ["Norte", "Sur"],
+            "Revenue": [1000.0, 1500.0],
+            "Cost": [800.0, 1200.0],
+            "Profit": [200.0, 300.0],
+            "Quantity": [10.0, 15.0],
+        })
+        prompt = "Genera un dashboard ejecutivo de ventas, costos, utilidad, rentabilidad, clientes, productos, vendedores, zonas y evolución por fecha con KPIs ejecutivos."
+        plan = dd.build_dashboard_plan(df, prompt, "generic.xlsx", "Data")
+        assert "semantic-layer-r10.2" in plan["planner"]
+        assert plan["semantic_columns_strict"]["revenue"] == "Revenue"
+        assert any(k.get("column") == "Revenue" for k in plan["kpis"])
+        assert any(c.get("dimension") == "Product" for c in plan["charts"])
+        assert any(f.get("column") == "Sales Rep" for f in plan["filters"])
+    finally:
+        if old is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
+        else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
+
+
+def test_r10_2_dashboard_embeds_auditable_semantic_map():
+    import inspect
+    import dashboard_dynamic as dd
+    src = inspect.getsource(dd)
+    assert 'Mapa Semántico R10.2' in src
+    assert 'id="semanticMap"' in src
+    assert 'function renderSemanticMap()' in src
+    assert "ambiguous=no-auto-calc" in src
+    assert "const P=DATA.plan||{},ALL=DATA.rows||[],$=id=>document.getElementById(id),S=P.semantic_columns_strict||{}" in src
 
 if __name__=='__main__':
     tests=[v for k,v in globals().items() if k.startswith('test_') and callable(v)]

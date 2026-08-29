@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from .factory import build_components
 from .security import Principal, ensure_secret, safe_component, verify_token
+from .admin_console import UNIFIED_ADMIN_HTML
 
 
 class ChatRequest(BaseModel):
@@ -37,6 +38,69 @@ class MemoryUpdateRequest(BaseModel):
     expires_at: Optional[str] = None
     active: Optional[bool] = None
 
+
+class SemanticResolveRequest(BaseModel):
+    columns: List[str] = Field(default_factory=list)
+    inferred_roles: Dict[str, Optional[str]] = Field(default_factory=dict)
+    on_date: Optional[str] = None
+
+
+class RuleBindingRequest(BaseModel):
+    rule_type: str
+    target: str
+    priority: int = 100
+    scope: str = "company"
+
+
+class FeedbackRequest(BaseModel):
+    feedback_type: str
+    target_type: Optional[str] = None
+    target_ref: Optional[str] = None
+    area: Optional[str] = None
+    original_text: Optional[str] = None
+    correction_text: Optional[str] = None
+    proposal_type: str = "auto"
+    proposal_name: Optional[str] = None
+    physical_name: Optional[str] = None
+    semantic_name: Optional[str] = None
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+    scope: str = "company"
+    source_context: Dict[str, Any] = Field(default_factory=dict)
+
+
+class FeedbackDecisionRequest(BaseModel):
+    replace_conflicts: bool = False
+
+
+class GovernanceValidateRequest(BaseModel):
+    replace_conflicts: bool = False
+
+class BusinessRuleCreateRequest(BaseModel):
+    name: str
+    expression: str
+    area: Optional[str] = None
+    description: Optional[str] = None
+    scope: str = "company"
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+
+class SemanticDefinitionCreateRequest(BaseModel):
+    physical_name: str
+    semantic_name: str
+    data_type: Optional[str] = None
+    unit: Optional[str] = None
+    area: Optional[str] = None
+    description: Optional[str] = None
+    scope: str = "company"
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+
+class AnalyticBindRequest(BaseModel):
+    rule_type: str
+    target: str
+    priority: int = 100
+    scope: str = "company"
 
 class SettingsRequest(BaseModel):
     llm_provider: Optional[str] = None
@@ -85,8 +149,8 @@ function md(text){
 }
 function add(cls,text,extra=''){const d=document.createElement('div');d.className='m '+cls;if(cls==='a')d.innerHTML=md(text);else d.textContent=text;if(extra){const s=document.createElement('div');s.className='src';s.innerHTML=extra;d.appendChild(s)}msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d}
 let activeController=null;
-function sourceHtml(d){let src=(d.sources||[]).map(x=>{if(x.type==='dataset')return 'Dataset: '+escHtml(x.file)+' | '+escHtml(x.sheet||'')+' | filas usadas: '+escHtml(x.rows_used??'N/D');if(x.type==='memory')return 'Memoria: '+escHtml(x.category)+' | '+escHtml(x.source_type||'fuente local');if(x.type==='model_knowledge')return 'Conocimiento general: '+escHtml(x.provider||'modelo local')+' / '+escHtml(x.model||'N/D');if(x.type==='system_capabilities')return 'Capacidades del sistema: configuración local verificada | '+escHtml(x.model||'N/D');return 'Documento: '+escHtml(x.file)+(x.page?' | pág. '+escHtml(x.page):'')+(x.sheet?' | hoja '+escHtml(x.sheet):'')+(x.rows?' | filas '+escHtml(x.rows):'')}).join('<br>');if(d.retrieval&&d.retrieval.response_profile){src+=(src?'<br>':'')+'Respuesta: '+escHtml(d.retrieval.response_profile);const cr=d.retrieval.completion_reason||'natural';if(cr==='natural')src+=' | finalización natural';else if(cr==='complete')src+=' | información del sistema completa';else if(cr==='continued_to_eos')src+=' | continuada automáticamente hasta completar';else if(cr==='repetition_guard_stop')src+=' | continuación detenida por repetición';else if(cr==='technical_context_stop')src+=' | límite técnico de contexto alcanzado';else if(cr==='operational_safety_stop')src+=' | detenida por salvaguarda operativa';if((d.retrieval.continuations||0)>0)src+=' | continuaciones: '+escHtml(d.retrieval.continuations);const cp=d.retrieval.context_plan;if(cp&&cp.num_ctx)src+=' | contexto dinámico: '+escHtml(cp.num_ctx);}if(d.timings_ms){if(d.timings_ms.first_token_ms!=null&&d.timings_ms.first_token_ms>0)src+=(src?'<br>':'')+'Primer token: '+escHtml(d.timings_ms.first_token_ms)+' ms';if(d.timings_ms.queue_ms!=null&&d.timings_ms.queue_ms>0)src+=(src?'<br>':'')+'Cola: '+escHtml(d.timings_ms.queue_ms)+' ms';src+=(src?'<br>':'')+'Tiempo total: '+escHtml(d.timings_ms.total_ms??'N/D')+' ms'}if(d.request_id)src+=(src?'<br>':'')+'Solicitud: '+escHtml(d.request_id);return src}
-async function send(){const q=document.getElementById('q');const m=q.value.trim();if(!m||!token||activeController)return;add('u',m);q.value='';const btn=document.getElementById('send'),stop=document.getElementById('stop');btn.disabled=true;stop.style.display='block';activeController=new AbortController();const bubble=add('a','Preparando respuesta...');let answer='',done=false;const t0=Date.now();const setStatus=t=>{if(!answer){bubble.textContent=t}else{let st=bubble.querySelector('.stream-status');if(!st){st=document.createElement('div');st.className='status stream-status';bubble.appendChild(st)}st.textContent=t}};try{const r=await fetch('/api/enterprise/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({message:m,history:hist.slice(-6)}),signal:activeController.signal});if(!r.ok){let d={};try{d=await r.json()}catch{}throw new Error(d.detail||d.error||'Error '+r.status)}const reader=r.body.getReader(),dec=new TextDecoder();let buf='';while(true){const x=await reader.read();if(x.done)break;buf+=dec.decode(x.value,{stream:true});let lines=buf.split('\n');buf=lines.pop();for(const line of lines){if(!line.trim())continue;const ev=JSON.parse(line);if(ev.type==='status'){setStatus(ev.message+' '+Math.floor((Date.now()-t0)/1000)+' s');continue}if(ev.type==='first_token'){setStatus('Generando... primer token en '+ev.first_token_ms+' ms');continue}if(ev.type==='token'){answer+=ev.text;bubble.innerHTML=md(answer);msgs.scrollTop=msgs.scrollHeight;continue}if(ev.type==='error'){throw new Error(ev.message||'No se pudo generar la respuesta')}if(ev.type==='done'){done=true;answer=ev.answer||answer;bubble.innerHTML=md(answer);const src=document.createElement('div');src.className='src';src.innerHTML=sourceHtml(ev);bubble.appendChild(src);hist.push({role:'user',content:m},{role:'assistant',content:answer});msgs.scrollTop=msgs.scrollHeight;continue}}}if(!done&&answer){const src=document.createElement('div');src.className='src';src.textContent='Respuesta parcial.';bubble.appendChild(src)}}catch(e){if(e.name==='AbortError'){if(answer){bubble.innerHTML=md(answer);const src=document.createElement('div');src.className='src';src.textContent='Generación detenida por el usuario.';bubble.appendChild(src)}else bubble.textContent='Generación detenida por el usuario.'}else{bubble.textContent='ERROR: '+e.message}}finally{activeController=null;btn.disabled=false;stop.style.display='none'}}
+function feedbackButtons(doneEvent,answer){const box=document.createElement('div');box.className='status';box.style.marginTop='8px';const ok=document.createElement('button');ok.className='btn ok';ok.textContent='👍 Correcto';ok.style.padding='5px 9px';const bad=document.createElement('button');bad.className='btn danger';bad.textContent='👎 Requiere corrección';bad.style.padding='5px 9px';box.append(ok,bad);ok.onclick=async()=>{ok.disabled=bad.disabled=true;await fetch('/api/enterprise/feedback',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({feedback_type:'CORRECTO',target_type:'chat',target_ref:doneEvent.request_id||null,original_text:answer,source_context:{sources:doneEvent.sources||[]}})});box.textContent='Feedback registrado.'};bad.onclick=async()=>{const correction=prompt('Indica la corrección. Se guardará como PROPUESTA, no como verdad validada:');if(!correction)return;const r=await fetch('/api/enterprise/feedback',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({feedback_type:'REQUIERE_CORRECCION',target_type:'chat',target_ref:doneEvent.request_id||null,original_text:answer,correction_text:correction,proposal_type:'auto',source_context:{sources:doneEvent.sources||[]}})});let d={};try{d=await r.json()}catch{}if(!r.ok){alert(d.detail||'No se pudo registrar la corrección');return}box.innerHTML='Corrección registrada como <b>'+escHtml(d.proposal_type||'propuesta')+'</b> / '+escHtml(d.proposal_status||'PROPUESTO')+'. ';if(d.proposal_object_id){const save=document.createElement('button');save.className='btn ok';save.textContent='Guardar / Validar';save.style.padding='5px 9px';const reject=document.createElement('button');reject.className='btn danger';reject.textContent='Rechazar';reject.style.padding='5px 9px';box.append(save,reject);save.onclick=async()=>{const vr=await fetch('/api/enterprise/feedback/'+encodeURIComponent(d.id)+'/validate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({replace_conflicts:false})});let vd={};try{vd=await vr.json()}catch{}if(vr.ok)box.textContent='Propuesta VALIDADA y guardada.';else alert(vd.detail||'No se pudo validar; puede existir un conflicto.')};reject.onclick=async()=>{const rr=await fetch('/api/enterprise/feedback/'+encodeURIComponent(d.id)+'/reject',{method:'POST',headers:{'Authorization':'Bearer '+token}});if(rr.ok)box.textContent='Propuesta rechazada.'}}};return box}\nfunction sourceHtml(d){let src=(d.sources||[]).map(x=>{if(x.type==='dataset')return 'Dataset: '+escHtml(x.file)+' | '+escHtml(x.sheet||'')+' | filas usadas: '+escHtml(x.rows_used??'N/D');if(x.type==='memory')return 'Memoria: '+escHtml(x.category)+' | '+escHtml(x.source_type||'fuente local');if(x.type==='model_knowledge')return 'Conocimiento general: '+escHtml(x.provider||'modelo local')+' / '+escHtml(x.model||'N/D');if(x.type==='system_capabilities')return 'Capacidades del sistema: configuración local verificada | '+escHtml(x.model||'N/D');return 'Documento: '+escHtml(x.file)+(x.page?' | pág. '+escHtml(x.page):'')+(x.sheet?' | hoja '+escHtml(x.sheet):'')+(x.rows?' | filas '+escHtml(x.rows):'')}).join('<br>');if(d.retrieval&&d.retrieval.response_profile){src+=(src?'<br>':'')+'Respuesta: '+escHtml(d.retrieval.response_profile);const cr=d.retrieval.completion_reason||'natural';if(cr==='natural')src+=' | finalización natural';else if(cr==='complete')src+=' | información del sistema completa';else if(cr==='continued_to_eos')src+=' | continuada automáticamente hasta completar';else if(cr==='repetition_guard_stop')src+=' | continuación detenida por repetición';else if(cr==='technical_context_stop')src+=' | límite técnico de contexto alcanzado';else if(cr==='operational_safety_stop')src+=' | detenida por salvaguarda operativa';if((d.retrieval.continuations||0)>0)src+=' | continuaciones: '+escHtml(d.retrieval.continuations);const cp=d.retrieval.context_plan;if(cp&&cp.num_ctx)src+=' | contexto dinámico: '+escHtml(cp.num_ctx);}if(d.timings_ms){if(d.timings_ms.first_token_ms!=null&&d.timings_ms.first_token_ms>0)src+=(src?'<br>':'')+'Primer token: '+escHtml(d.timings_ms.first_token_ms)+' ms';if(d.timings_ms.queue_ms!=null&&d.timings_ms.queue_ms>0)src+=(src?'<br>':'')+'Cola: '+escHtml(d.timings_ms.queue_ms)+' ms';src+=(src?'<br>':'')+'Tiempo total: '+escHtml(d.timings_ms.total_ms??'N/D')+' ms'}if(d.request_id)src+=(src?'<br>':'')+'Solicitud: '+escHtml(d.request_id);if(d.trace_id)src+=(src?'<br>':'')+'Trazabilidad: <a href="/api/enterprise/traces/'+encodeURIComponent(d.trace_id)+'/explain" target="_blank">¿Cómo obtuve este resultado?</a>';return src}
+async function send(){const q=document.getElementById('q');const m=q.value.trim();if(!m||!token||activeController)return;add('u',m);q.value='';const btn=document.getElementById('send'),stop=document.getElementById('stop');btn.disabled=true;stop.style.display='block';activeController=new AbortController();const bubble=add('a','Preparando respuesta...');let answer='',done=false;const t0=Date.now();const setStatus=t=>{if(!answer){bubble.textContent=t}else{let st=bubble.querySelector('.stream-status');if(!st){st=document.createElement('div');st.className='status stream-status';bubble.appendChild(st)}st.textContent=t}};try{const r=await fetch('/api/enterprise/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({message:m,history:hist.slice(-6)}),signal:activeController.signal});if(!r.ok){let d={};try{d=await r.json()}catch{}throw new Error(d.detail||d.error||'Error '+r.status)}const reader=r.body.getReader(),dec=new TextDecoder();let buf='';while(true){const x=await reader.read();if(x.done)break;buf+=dec.decode(x.value,{stream:true});let lines=buf.split('\n');buf=lines.pop();for(const line of lines){if(!line.trim())continue;const ev=JSON.parse(line);if(ev.type==='status'){setStatus(ev.message+' '+Math.floor((Date.now()-t0)/1000)+' s');continue}if(ev.type==='first_token'){setStatus('Generando... primer token en '+ev.first_token_ms+' ms');continue}if(ev.type==='token'){answer+=ev.text;bubble.innerHTML=md(answer);msgs.scrollTop=msgs.scrollHeight;continue}if(ev.type==='error'){throw new Error(ev.message||'No se pudo generar la respuesta')}if(ev.type==='done'){done=true;answer=ev.answer||answer;bubble.innerHTML=md(answer);const src=document.createElement('div');src.className='src';src.innerHTML=sourceHtml(ev);bubble.appendChild(src);bubble.appendChild(feedbackButtons(ev,answer));hist.push({role:'user',content:m},{role:'assistant',content:answer});msgs.scrollTop=msgs.scrollHeight;continue}}}if(!done&&answer){const src=document.createElement('div');src.className='src';src.textContent='Respuesta parcial.';bubble.appendChild(src)}}catch(e){if(e.name==='AbortError'){if(answer){bubble.innerHTML=md(answer);const src=document.createElement('div');src.className='src';src.textContent='Generación detenida por el usuario.';bubble.appendChild(src)}else bubble.textContent='Generación detenida por el usuario.'}else{bubble.textContent='ERROR: '+e.message}}finally{activeController=null;btn.disabled=false;stop.style.display='none'}}
 function stopGeneration(){if(activeController)activeController.abort()}
 async function confirmMem(id){const r=await fetch('/api/enterprise/memories/'+id+'/confirm',{method:'POST',headers:{'Authorization':'Bearer '+token}});alert(r.ok?'Memoria confirmada':'No se pudo confirmar')}
 document.getElementById('send').onclick=send;document.getElementById('stop').onclick=stopGeneration;document.getElementById('q').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')send()});
@@ -151,7 +215,7 @@ def install_enterprise_routes(app, root: str | Path):
 
     @router.get("/admin", response_class=HTMLResponse)
     def admin_page():
-        return ADMIN_HTML
+        return UNIFIED_ADMIN_HTML
 
     @router.get("/api/enterprise/health/live")
     def enterprise_live():
@@ -199,7 +263,11 @@ def install_enterprise_routes(app, root: str | Path):
     @router.post("/api/enterprise/chat")
     def enterprise_chat(body: ChatRequest, principal: Principal = Depends(principal_dependency)):
         try:
-            return components.service.chat(principal, body.message, body.history)
+            with components.traceability.scope(principal, trace_type="chat", prompt=body.message) as trace_id:
+                result = components.service.chat(principal, body.message, body.history)
+                components.traceability.add_step(trace_id, "response_delivery", engine=getattr(components.llm, "name", "local"), details={"sources_count": len(result.get("sources") or [])})
+                result["trace_id"] = trace_id
+                return result
         except Exception as exc:
             components.db.audit("chat.http_error", principal.company_id, principal.user_id, "query", outcome="error", details={"error_type": type(exc).__name__})
             components.logger.exception("chat http error", extra={"event": "chat.http_error", "company_id": principal.company_id, "user_id": principal.user_id, "error_type": type(exc).__name__})
@@ -209,17 +277,22 @@ def install_enterprise_routes(app, root: str | Path):
     def enterprise_chat_stream(body: ChatRequest, principal: Principal = Depends(principal_dependency)):
         def events():
             try:
-                streamed = False
-                for event in components.service.stream_general(principal, body.message, body.history):
-                    if event.get("type") == "fallback":
-                        break
-                    streamed = True
-                    yield json.dumps(event, ensure_ascii=False) + "\n"
-                if not streamed:
-                    yield json.dumps({"type": "status", "phase": "retrieval", "message": "Consultando evidencia empresarial..."}, ensure_ascii=False) + "\n"
-                    result = components.service.chat(principal, body.message, body.history)
-                    result = {**result, "type": "done"}
-                    yield json.dumps(result, ensure_ascii=False) + "\n"
+                with components.traceability.scope(principal, trace_type="chat_stream", prompt=body.message) as trace_id:
+                    streamed = False
+                    for event in components.service.stream_general(principal, body.message, body.history):
+                        if event.get("type") == "fallback":
+                            break
+                        streamed = True
+                        if event.get("type") == "done":
+                            event = {**event, "trace_id": trace_id}
+                            components.traceability.add_step(trace_id, "response_delivery", engine=getattr(components.llm, "name", "local"), details={"sources_count": len(event.get("sources") or [])})
+                        yield json.dumps(event, ensure_ascii=False) + "\n"
+                    if not streamed:
+                        yield json.dumps({"type": "status", "phase": "retrieval", "message": "Consultando evidencia empresarial..."}, ensure_ascii=False) + "\n"
+                        result = components.service.chat(principal, body.message, body.history)
+                        result = {**result, "type": "done", "trace_id": trace_id}
+                        components.traceability.add_step(trace_id, "response_delivery", engine=getattr(components.llm, "name", "local"), details={"sources_count": len(result.get("sources") or [])})
+                        yield json.dumps(result, ensure_ascii=False) + "\n"
             except GeneratorExit:
                 raise
             except Exception as exc:
@@ -314,9 +387,152 @@ def install_enterprise_routes(app, root: str | Path):
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+
+    @router.post("/api/enterprise/semantic/resolve")
+    def resolve_semantics(body: SemanticResolveRequest, principal: Principal = Depends(principal_dependency)):
+        return components.semantic.resolve(principal, body.columns, body.inferred_roles, on_date=body.on_date)
+
+    @router.post("/api/enterprise/rules/{rule_id}/bind")
+    def bind_analytic_rule(rule_id: str, body: RuleBindingRequest, principal: Principal = Depends(admin_dependency)):
+        try:
+            return components.analytics.bind_rule(principal, rule_id, rule_type=body.rule_type, target=body.target, priority=body.priority, scope=body.scope)
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.get("/api/enterprise/analytic-rules")
+    def list_analytic_rules(principal: Principal = Depends(principal_dependency)):
+        return {"bindings": components.analytics.applicable_bindings(principal)}
+
     @router.get("/api/enterprise/datasets")
     def list_datasets(principal: Principal = Depends(principal_dependency)):
         return {"datasets": components.datasets.list(principal)}
+
+    @router.get("/api/enterprise/feedback")
+    def list_feedback(limit: int = 100, principal: Principal = Depends(principal_dependency)):
+        return {"feedback": components.feedback.list(principal, limit=limit)}
+
+    @router.post("/api/enterprise/feedback")
+    def submit_feedback(body: FeedbackRequest, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.feedback.submit(principal, **body.model_dump())
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.post("/api/enterprise/feedback/{feedback_id}/validate")
+    def validate_feedback(feedback_id: str, body: FeedbackDecisionRequest, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.feedback.validate_proposal(principal, feedback_id, replace_conflicts=body.replace_conflicts)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.post("/api/enterprise/feedback/{feedback_id}/reject")
+    def reject_feedback(feedback_id: str, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.feedback.reject_proposal(principal, feedback_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.get("/api/enterprise/feedback/{feedback_id}/provenance")
+    def feedback_provenance(feedback_id: str, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.feedback.provenance(principal, feedback_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.get("/api/enterprise/traces")
+    def list_traces(limit: int = 100, principal: Principal = Depends(principal_dependency)):
+        return {"traces": components.traceability.list(principal, limit=limit)}
+
+    @router.get("/api/enterprise/traces/{trace_id}")
+    def get_trace(trace_id: str, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.traceability.get(principal, trace_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.get("/api/enterprise/traces/{trace_id}/explain")
+    def explain_trace(trace_id: str, principal: Principal = Depends(principal_dependency)):
+        try:
+            return components.traceability.explain(principal, trace_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.get("/api/enterprise/admin/overview")
+    def admin_overview(principal: Principal = Depends(principal_dependency)):
+        rules = components.governance.list_rules(principal, include_inactive=True) if hasattr(components, "governance") else []
+        sem = components.governance.list_semantic_definitions(principal, include_inactive=True) if hasattr(components, "governance") else []
+        feedback = components.feedback.list(principal, limit=500) if hasattr(components, "feedback") else []
+        traces = components.traceability.list(principal, limit=500) if hasattr(components, "traceability") else []
+        memories = components.memory.list(principal, include_inactive=True)
+        docs = components.documents.list(principal)
+        datasets = components.datasets.list(principal)
+        statuses=[]
+        for typ, rows in (("Regla", rules),("Definición", sem)):
+            counts={}
+            for row in rows: counts[row.get("status") or "N/D"]=counts.get(row.get("status") or "N/D",0)+1
+            statuses.extend({"type":typ,"status":k,"count":v} for k,v in sorted(counts.items()))
+        conflicts=0
+        if hasattr(components,"governance"):
+            for row in rules:
+                if row.get("status") == "PROPUESTO": conflicts += len(components.governance.detect_rule_conflicts(principal,row["id"]))
+            for row in sem:
+                if row.get("status") == "PROPUESTO": conflicts += len(components.governance.detect_semantic_conflicts(principal,row["id"]))
+        return {"counts":{"memories":len(memories),"documents":len(docs),"datasets":len(datasets),"rules":len(rules),"semantic_definitions":len(sem),"feedback_pending":sum(1 for x in feedback if x.get("proposal_status")=="PROPUESTO"),"traces":len(traces),"conflicts":conflicts},"statuses":statuses}
+
+    @router.get("/api/enterprise/business-rules")
+    def list_business_rules(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(principal_dependency)):
+        return {"items": components.governance.list_rules(principal,status=status,include_inactive=include_inactive)}
+
+    @router.post("/api/enterprise/business-rules")
+    def propose_business_rule(body: BusinessRuleCreateRequest, principal: Principal=Depends(principal_dependency)):
+        return components.governance.propose_rule(principal,name=body.name,expression=body.expression,area=body.area,description=body.description,scope=body.scope,valid_from=body.valid_from,valid_to=body.valid_to,source_type="admin_console")
+
+    @router.post("/api/enterprise/business-rules/{rule_id}/validate")
+    def validate_business_rule(rule_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(admin_dependency)):
+        return components.governance.validate_rule(principal,rule_id,replace_conflicts=body.replace_conflicts)
+
+    @router.post("/api/enterprise/business-rules/{rule_id}/reject")
+    def reject_business_rule(rule_id: str, principal: Principal=Depends(admin_dependency)):
+        return components.governance.reject_rule(principal,rule_id)
+
+    @router.post("/api/enterprise/business-rules/{rule_id}/obsolete")
+    def obsolete_business_rule(rule_id: str, principal: Principal=Depends(admin_dependency)):
+        return components.governance.obsolete_rule(principal,rule_id)
+
+    @router.get("/api/enterprise/semantic-definitions")
+    def list_semantic_definitions(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(principal_dependency)):
+        return {"items": components.governance.list_semantic_definitions(principal,status=status,include_inactive=include_inactive)}
+
+    @router.post("/api/enterprise/semantic-definitions")
+    def propose_semantic_definition(body: SemanticDefinitionCreateRequest, principal: Principal=Depends(principal_dependency)):
+        return components.governance.propose_semantic_definition(principal,physical_name=body.physical_name,semantic_name=body.semantic_name,data_type=body.data_type,unit=body.unit,area=body.area,description=body.description,scope=body.scope,valid_from=body.valid_from,valid_to=body.valid_to,source_type="admin_console")
+
+    @router.post("/api/enterprise/semantic-definitions/{item_id}/validate")
+    def validate_semantic_definition(item_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(admin_dependency)):
+        return components.governance.validate_semantic_definition(principal,item_id,replace_conflicts=body.replace_conflicts)
+
+    @router.post("/api/enterprise/semantic-definitions/{item_id}/reject")
+    def reject_semantic_definition(item_id: str, principal: Principal=Depends(admin_dependency)):
+        return components.governance.reject_semantic_definition(principal,item_id)
+
+    @router.get("/api/enterprise/analytic-rules")
+    def list_analytic_rules(principal: Principal=Depends(principal_dependency)):
+        if not hasattr(components,"analytic_rules"): return {"items":[]}
+        return {"items": components.analytic_rules.applicable_bindings(principal)}
+
+    @router.post("/api/enterprise/rules/{rule_id}/bind")
+    def bind_analytic_rule(rule_id: str, body: AnalyticBindRequest, principal: Principal=Depends(admin_dependency)):
+        return components.analytic_rules.bind_rule(principal,rule_id,rule_type=body.rule_type,target=body.target,priority=body.priority,scope=body.scope)
+
+    @router.get("/api/enterprise/knowledge/{object_type}/{object_id}/history")
+    def knowledge_history(object_type: str, object_id: str, principal: Principal=Depends(principal_dependency)):
+        if object_type not in {"business_rule","semantic_definition"}: raise HTTPException(status_code=400,detail="object_type no válido")
+        try: return components.governance.provenance(principal,object_type,object_id)
+        except KeyError as exc: raise HTTPException(status_code=404,detail=str(exc)) from exc
 
     @router.get("/api/enterprise/settings")
     def settings(principal: Principal = Depends(principal_dependency)):

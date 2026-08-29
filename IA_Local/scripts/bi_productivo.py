@@ -69,7 +69,7 @@ def _first_existing(df: pd.DataFrame, exact: Iterable[str], contains: Iterable[s
     return None
 
 
-def semantic_map(df: pd.DataFrame) -> Dict[str, Optional[str]]:
+def semantic_map(df: pd.DataFrame, semantic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Optional[str]]:
     """Mapeo semántico robusto para BI, sin usar cardinalidad como criterio dominante.
 
     La prioridad es el significado del encabezado. Esto evita clasificar importes/costos
@@ -99,7 +99,13 @@ def semantic_map(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     r['origin_city'] = _first_existing(df, ['Ciudad_Origen','Ciudad Origen','Origin City'], ['ciudad origen','origin city'])
     r['destination_city'] = _first_existing(df, ['Ciudad_Destino','Ciudad Destino','Destination City'], ['ciudad destino','destination city'])
     r['category'] = _first_existing(df, ['Categoria','Categoría','Category'], ['categoria','category'])
-    return r
+    try:
+        from enterprise_ai.semantic_registry import merge_context_roles, current_context
+        ctx = semantic_context if semantic_context is not None else current_context()
+        return merge_context_roles(r, ctx)
+    except Exception:
+        return r
+
 
 
 def _coverage_ratio(a: pd.Series, b: pd.Series) -> Tuple[float, float]:
@@ -113,10 +119,23 @@ def _coverage_ratio(a: pd.Series, b: pd.Series) -> Tuple[float, float]:
     return float(mask.mean()), float(rel.median())
 
 
-def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]]) -> Tuple[pd.DataFrame, Dict[str, Any], List[str]]:
+def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]], analytic_context: Optional[Dict[str, Any]] = None) -> Tuple[pd.DataFrame, Dict[str, Any], List[str]]:
     work = df.copy()
     notes: List[str] = []
     derived: Dict[str, Any] = {'roles_bi': roles.copy()}
+    try:
+        from enterprise_ai.analytic_rules import evaluate_analytic_context, current_analytic_context
+        actx = analytic_context if analytic_context is not None else current_analytic_context()
+        analytic_eval = evaluate_analytic_context(work, roles, actx) if actx else None
+        if analytic_eval:
+            ferr=[e for e in analytic_eval.get('errors',[]) if e.get('stage')=='row_filter']
+            if ferr: raise ValueError('Regla empresarial VALIDADA no aplicable: '+str(ferr))
+            work=analytic_eval['frame'].copy()
+            derived['reglas_filtro']=analytic_eval.get('applied_filters',[])
+            derived['filas_antes_reglas']=analytic_eval.get('rows_input')
+            derived['filas_despues_reglas']=analytic_eval.get('rows_output')
+    except ImportError:
+        actx=None; analytic_eval=None
 
     if roles.get('date'):
         work['_fecha'] = pd.to_datetime(work[roles['date']], errors='coerce')
@@ -175,6 +194,17 @@ def prepare_business(df: pd.DataFrame, roles: Dict[str, Optional[str]]) -> Tuple
     if '_ventas' in work.columns and '_costo' in work.columns:
         work['_utilidad'] = work['_ventas'] - work['_costo']
         derived['utilidad'] = 'ventas - costo total'
+    if actx:
+        from enterprise_ai.analytic_rules import evaluate_analytic_context
+        mctx={**actx,'bindings':[b for b in actx.get('bindings',[]) if b.get('rule_type')=='metric']}
+        mev=evaluate_analytic_context(work,roles,mctx)
+        merr=[e for e in mev.get('errors',[]) if e.get('stage')=='metric']
+        if merr:
+            raise ValueError('Regla empresarial VALIDADA no aplicable: '+str(merr))
+        cmap={'profit':'_utilidad','sales':'_ventas','cost':'_costo','freight':'_flete','quantity':'_cantidad','commission':'_comision'}
+        for target,values in mev.get('metrics',{}).items():
+            work[cmap.get(target,'_metric_'+target)]=values.reindex(work.index)
+        derived['reglas_metricas']=mev.get('applied_metrics',[])
     if '_cantidad' in work.columns:
         q = pd.to_numeric(work['_cantidad'], errors='coerce').replace(0, pd.NA)
         if '_ventas' in work.columns:

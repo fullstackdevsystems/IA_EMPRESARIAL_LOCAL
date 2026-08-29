@@ -132,6 +132,21 @@ class QdrantVectorStore(VectorStore):
         self._VectorParams = VectorParams
         self.client = QdrantClient(path=str(Path(path)))
 
+        # Cierre explicito antes del desmontaje del interprete.
+        import atexit
+        atexit.register(self.close)
+
+    def close(self) -> None:
+        client = getattr(self, "client", None)
+        if client is None:
+            return
+        try:
+            client.close()
+        except Exception:
+            pass
+        finally:
+            self.client = None
+
     def _collection(self, kind: str) -> str:
         return "ia_empresarial_" + "".join(c if c.isalnum() else "_" for c in kind)[:40]
 

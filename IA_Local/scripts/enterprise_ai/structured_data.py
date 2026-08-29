@@ -13,6 +13,7 @@ import pandas as pd
 from .database import Database, utcnow
 from .providers import LLMProvider
 from .security import Principal, scope_clause
+from .traceability import trace_step
 
 
 def norm(value: Any) -> str:
@@ -59,9 +60,12 @@ def hash_file(path: Path) -> str:
 
 
 class StructuredDataService:
-    def __init__(self, db: Database, llm: Optional[LLMProvider] = None):
+    def __init__(self, db: Database, llm: Optional[LLMProvider] = None, governance=None, precedence=None, analytics=None):
         self.db = db
         self.llm = llm
+        self.governance = governance
+        self.precedence = precedence
+        self.analytics = analytics
 
     def _inspect(self, path: Path) -> Tuple[List[str], Dict[str, Optional[str]], Dict[str, Any]]:
         ext = path.suffix.lower()
@@ -98,6 +102,8 @@ class StructuredDataService:
         path = Path(path).resolve()
         columns, inferred_roles, meta = self._inspect(path)
         roles = roles or inferred_roles
+        if self.precedence:
+            roles, _semantic_applied = self.precedence.semantic_overrides(principal, columns, roles)
         file_hash = file_hash or hash_file(path)
         owner = principal.user_id if scope == "user" else None
         dataset_name = name or path.name
@@ -255,7 +261,19 @@ class StructuredDataService:
         plan["filters"] = safe_filters
         df, sheet = self._load(dataset)
         roles = infer_roles(list(map(str, df.columns)))
+        semantic_applied = []
+        if self.precedence:
+            roles, semantic_applied = self.precedence.semantic_overrides(principal, list(map(str, df.columns)), roles)
         work = df.copy()
+        analytic_context = self.analytics.build_context(principal, roles) if self.analytics else None
+        analytic_eval = None
+        if analytic_context:
+            from .analytic_rules import evaluate_analytic_context
+            analytic_eval = evaluate_analytic_context(work, roles, analytic_context)
+            filter_errors = [e for e in analytic_eval.get("errors", []) if e.get("stage") == "row_filter"]
+            if filter_errors:
+                return {"error":"validated_rule_failed","details":filter_errors,"source":{"type":"dataset","file":dataset["name"],"sheet":sheet,"calculation":"python/pandas"}}
+            work = analytic_eval["frame"].copy()
         if roles.get("date"):
             work["__date"] = pd.to_datetime(work[roles["date"]], errors="coerce")
         if roles.get("sales"):
@@ -270,17 +288,43 @@ class StructuredDataService:
                 cost = cost * pd.to_numeric(work[roles["quantity"]], errors="coerce")
             work["__cost"] = cost
         rule_used = None
+        rule_error = None
         if plan.get("metric") == "profit":
-            for memory in memories or []:
-                c = norm(memory.get("content"))
-                if "utilidad" in c and "venta" in c and ("compra" in c or "costo" in c):
-                    rule_used = memory.get("content")
-                    break
-            if "__sales" in work and "__cost" in work:
-                profit = work["__sales"] - work["__cost"]
-                if roles.get("freight"):
-                    profit = profit - pd.to_numeric(work[roles["freight"]], errors="coerce").fillna(0)
-                work["__profit"] = profit
+            validated_rule = self.precedence.rule_for_metric(principal, "profit", question=prompt) if self.precedence else None
+            if validated_rule:
+                try:
+                    work["__profit"] = self.precedence.evaluate_rule(work, roles, validated_rule)
+                    rule_used = {
+                        "id": validated_rule.get("id"), "name": validated_rule.get("name"),
+                        "version": validated_rule.get("version"), "expression": validated_rule.get("expression"),
+                        "source_type": validated_rule.get("source_type"), "source_ref": validated_rule.get("source_ref"),
+                        "precedence": "validated_business_rule",
+                    }
+                except ValueError as exc:
+                    # Una regla VALIDADA tiene precedencia: si no puede ejecutarse con
+                    # columnas validadas, no degradamos silenciosamente a una fórmula inferida.
+                    rule_error = str(exc)
+            else:
+                for memory in memories or []:
+                    c = norm(memory.get("content"))
+                    if "utilidad" in c and "venta" in c and ("compra" in c or "costo" in c):
+                        rule_used = memory.get("content")
+                        break
+                if "__sales" in work and "__cost" in work:
+                    profit = work["__sales"] - work["__cost"]
+                    if roles.get("freight"):
+                        profit = profit - pd.to_numeric(work[roles["freight"]], errors="coerce").fillna(0)
+                    work["__profit"] = profit
+        if analytic_context:
+            from .analytic_rules import evaluate_analytic_context
+            metric_eval = evaluate_analytic_context(work, roles, {**analytic_context, "bindings":[b for b in analytic_context.get("bindings",[]) if b.get("rule_type")=="metric"]})
+            metric_errors = [e for e in metric_eval.get("errors", []) if e.get("stage") == "metric"]
+            bound_targets = {str((b.get("target") or "")).lower() for b in analytic_context.get("bindings",[]) if b.get("rule_type")=="metric"}
+            if metric_errors:
+                return {"error":"validated_rule_failed","details":metric_errors,"source":{"type":"dataset","file":dataset["name"],"sheet":sheet,"calculation":"python/pandas"}}
+            for target, vals in metric_eval.get("metrics", {}).items():
+                col={"profit":"__profit","sales":"__sales","cost":"__cost","quantity":"__quantity","freight":"__freight"}.get(target,"__metric_"+target)
+                work[col]=vals.reindex(work.index)
         if plan.get("year") and "__date" in work:
             work = work.loc[work["__date"].dt.year == int(plan["year"])]
         for item in plan["filters"]:
@@ -302,6 +346,20 @@ class StructuredDataService:
             "year": plan.get("year"),
             "calculation": "python/pandas",
         }
+        trace_step("structured_calculation", engine="python/pandas", source_type="dataset", source_ref=dataset.get("id") or dataset.get("dataset_id"), details={
+            "file": dataset.get("name"), "sheet": sheet, "rows_used": int(len(work)), "filters": plan.get("filters", []),
+            "year": plan.get("year"), "operation": plan.get("operation"), "metric": plan.get("metric"), "group_by": plan.get("group_by"),
+            "columns_used": [x for x in [roles.get("date"), roles.get("sales"), roles.get("quantity"), roles.get("cost"), roles.get("freight"), group_column] if x],
+            "calculation": "python/pandas",
+        })
+        if semantic_applied:
+            source["semantic_definitions"] = semantic_applied
+        if rule_used:
+            source["business_rule"] = rule_used
+        if rule_error:
+            source["rule_error"] = rule_error
+        if analytic_eval:
+            source["analytic_rules"]={"filters":analytic_eval.get("applied_filters",[]),"metrics":metric_eval.get("applied_metrics",[]) if analytic_context else [],"rows_input":analytic_eval.get("rows_input"),"rows_output":analytic_eval.get("rows_output")}
         if operation in {"sum", "mean"}:
             if not metric_column or metric_column not in work or not pd.to_numeric(work[metric_column], errors="coerce").notna().any():
                 return {"insufficient": True, "reason": f"No existe una metrica calculable para {metric} en {dataset['name']}.", "source": source, "plan": plan}

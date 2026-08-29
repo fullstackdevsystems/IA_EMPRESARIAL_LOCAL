@@ -19,3 +19,10 @@ _backup_r9_*/
 # Parches y respaldos locales R10.x
 R10_*_PATCH/
 _backup_r10_*/
+
+# R10.3+ - instaladores, payloads y respaldos locales
+IA_Local/updates/
+IA_Local/scripts/enterprise_ai/*.bak_*
+r10_*_release/
+r10_*_package/
+r10_universal/

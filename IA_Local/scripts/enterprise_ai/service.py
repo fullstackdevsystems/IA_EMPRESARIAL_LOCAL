@@ -13,6 +13,7 @@ from .database import Database, utcnow
 from .memory import MemoryManager
 from .providers import LLMProvider
 from .security import Principal
+from .traceability import current_trace_id
 
 INTERNAL_TERMS = (
     "venta", "ventas", "compra", "compras", "proveedor", "cliente", "empresa", "inventario",
@@ -59,6 +60,13 @@ SYSTEM_CAPABILITY_CUES = (
     "cómo funciona este asistente", "como funciona este asistente", "cómo funciona tu memoria", "como funciona tu memoria",
     "como asistente empresarial", "asistente empresarial",
 )
+
+
+def _attach_trace(payload: Dict[str, Any]) -> Dict[str, Any]:
+    tid = current_trace_id()
+    if tid:
+        payload["trace_id"] = tid
+    return payload
 
 
 class EnterpriseAIService:
