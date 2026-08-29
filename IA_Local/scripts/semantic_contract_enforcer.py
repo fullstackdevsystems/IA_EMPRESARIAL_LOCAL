@@ -5,6 +5,7 @@ import re
 import unicodedata
 
 from semantic_layer import resolve_semantic_map
+from legacy_semantic_cleanup import sanitize_legacy_semantic_roles
 
 VERSION = "r10.11.2"
 
@@ -51,6 +52,7 @@ def enforce_semantic_contract(plan: Dict[str, Any], df, prompt: str) -> Dict[str
             roles[role_key] = s[strict_key]
     if s.get("reference"):
         roles["transaction_id"] = s["reference"]
+    roles = sanitize_legacy_semantic_roles(roles, strict_usable=s)
     out["semantic_roles"] = roles
 
     broad = _has(p, "dashboard", "analiza completamente", "analisis completo", "kpis ejecutivos", "salida final")

@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 from universal_prompt_engine import compile_universal_plan
 from semantic_contract_enforcer import enforce_semantic_contract
+from dashboard_spec_builder import build_dashboard_spec
 
 
 def _component(key: str, name: str, requested: bool, status: str, detail: str, missing=None, renderer=None) -> Dict[str, Any]:
@@ -74,6 +75,12 @@ def build_prompt_execution_plan(df, prompt: str, sheet: str = "") -> Dict[str, A
     blocked = [c for c in requested if c["status"] in {"blocked", "unsupported"}]
     coverage = round((len(ready) + 0.5 * len(partial)) / len(requested) * 100, 1) if requested else 100.0
 
+    dashboard_spec = build_dashboard_spec(
+        df, prompt, sheet=sheet,
+        semantic_map=plan.get("strict_semantic_map"),
+        semantic_roles=roles,
+    )
+
     return {
         "version": "r10.11.3",
         "mode": "universal-prompt-driven+strict-semantic-contract",
@@ -86,4 +93,5 @@ def build_prompt_execution_plan(df, prompt: str, sheet: str = "") -> Dict[str, A
         "coverage_pct": coverage,
         "semantic_roles": roles,
         "components": components,
+        "dashboard_spec": dashboard_spec,
     }

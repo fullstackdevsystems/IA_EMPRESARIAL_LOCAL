@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-VERSION = "8.5.5-r10.11.1-data-contract-hotfix"
+VERSION = "8.5.5-r10.11.4-universal-prompt-contract"
 
 class DataContractError(ValueError):
     def __init__(self, message: str, *, code: str = "DATA_CONTRACT_ERROR", details: Optional[Dict[str, Any]] = None):
@@ -25,18 +25,18 @@ def norm(value: Any) -> str:
 def extract_explicit_sheet(prompt: str) -> Optional[str]:
     raw = str(prompt or "")
     patterns = [
-        r"(?is)\bla\s+hoja\s*:\s*[\r\n ]*([A-Za-z0-9_. -]{1,60}?)[\r\n ]+(?:es\s+)?(?:la\s+)?(?:base\s+de\s+datos\s+principal|[úu]nica\s+fuente\s+de\s+verdad|fuente\s+[úu]nica)",
-        r"(?is)\bhoja\s+([A-Za-z0-9_. -]{1,60}?)\s+(?:es\s+)?(?:la\s+)?(?:fuente|base\s+de\s+datos\s+principal|[úu]nica\s+fuente)",
-        r"(?is)\busar\s+(?:la\s+)?hoja\s+([A-Za-z0-9_. -]{1,60}?)(?:[\r\n.,;]|$)",
+        r"(?is)\bla\s+hoja\s*:\s*[\r\n ]*(?P<sheet>[A-Za-z0-9_. -]{1,60}?)[\r\n ]+(?:es\s+)?(?:la\s+)?(?:base\s+de\s+datos\s+principal|[úu]nica\s+fuente\s+de\s+verdad|fuente\s+[úu]nica|fuente\s+principal)\b",
+        r"(?is)\bla\s+hoja\s+(?P<sheet>[A-Za-z0-9_. -]{1,60}?)\s+es\s+(?:la\s+)?(?:fuente(?:\s+principal|\s+[úu]nica)?|base\s+de\s+datos\s+principal|[úu]nica\s+fuente(?:\s+de\s+verdad)?)\b",
+        r"(?is)\b(?:usa|usar|utiliza|utilizar|toma|tomar)\s+(?:como\s+fuente\s+principal\s+)?(?:la\s+)?hoja\s+(?P<sheet>[A-Za-z0-9_. -]{1,60}?)(?=\s*(?:[\r\n,.;:]|$))",
+        r"(?im)^\s*(?:fuente\s+principal|hoja\s+principal|hoja\s+fuente)\s*:\s*(?P<sheet>[A-Za-z0-9_. -]{1,60}?)\s*$",
     ]
     for pattern in patterns:
         m = re.search(pattern, raw)
         if m:
-            value = re.sub(r"\s+", " ", m.group(1)).strip(" .:-\t\r\n")
+            value = re.sub(r"\s+", " ", m.group("sheet")).strip(" .:-\t\r\n")
             if value:
                 return value
-    m = re.search(r"(?is)\bla\s+hoja\s*:\s*[\r\n]+(?:\s*[\r\n]+)*([^\r\n]{1,60})[\r\n]+(?:\s*[\r\n]+)*es\s+la\s+base\s+de\s+datos\s+principal", raw)
-    return m.group(1).strip() if m else None
+    return None
 
 def extract_declared_columns(prompt: str) -> List[str]:
     raw = str(prompt or "")
@@ -70,21 +70,24 @@ def match_sheet(sheet_names: List[str], requested: str) -> Optional[str]:
 def validate_workbook_contract(path: str | Path, prompt: str) -> Dict[str, Any]:
     path = Path(path)
     if path.suffix.lower() not in {".xlsx", ".xlsm", ".xls", ".xlsb"}:
-        return {"ok": True, "explicit_sheet": None, "available_sheets": ["TABULAR"], "declared_columns": [], "missing_columns": []}
+        return {"ok": True, "mode": "auto_discovery", "explicit_sheet": None, "available_sheets": ["TABULAR"], "declared_columns": [], "missing_columns": []}
 
     xls = pd.ExcelFile(path)
     try:
         sheets = [str(x) for x in xls.sheet_names]
         requested = extract_explicit_sheet(prompt)
+
         if not requested:
-            return {"ok": True, "explicit_sheet": None, "available_sheets": sheets, "declared_columns": [], "missing_columns": []}
+            return {"ok": True, "mode": "auto_discovery", "explicit_sheet": None, "available_sheets": sheets, "declared_columns": [], "missing_columns": []}
+
         matched = match_sheet(sheets, requested)
         if not matched:
             raise DataContractError(
-                f'El prompt establece la hoja "{requested}" como fuente única, pero el archivo no la contiene. Hojas disponibles: {", ".join(sheets)}.',
+                f'El prompt establece explícitamente la hoja "{requested}" como fuente, pero el archivo no la contiene. Hojas disponibles: {", ".join(sheets)}.',
                 code="SOURCE_SHEET_NOT_FOUND",
-                details={"requested_sheet": requested, "available_sheets": sheets},
+                details={"requested_sheet": requested, "available_sheets": sheets, "contract_mode": "explicit_sheet"},
             )
+
         declared = extract_declared_columns(prompt)
         header = pd.read_excel(xls, sheet_name=matched, nrows=0)
         actual = [str(c).strip() for c in header.columns]
@@ -92,13 +95,19 @@ def validate_workbook_contract(path: str | Path, prompt: str) -> Dict[str, Any]:
         missing = [c for c in declared if norm(c) not in amap]
         if missing:
             raise DataContractError(
-                f'La hoja "{matched}" existe, pero faltan {len(missing)} columnas declaradas por el prompt: {", ".join(missing[:20])}.',
+                f'La hoja "{matched}" existe, pero faltan {len(missing)} columnas declaradas explícitamente por el prompt: {", ".join(missing[:20])}.',
                 code="DECLARED_COLUMNS_MISSING",
-                details={"requested_sheet": matched, "missing_columns": missing, "actual_columns": actual},
+                details={"requested_sheet": matched, "missing_columns": missing, "actual_columns": actual, "contract_mode": "explicit_sheet"},
             )
+
         return {
-            "ok": True, "explicit_sheet": matched, "available_sheets": sheets,
-            "declared_columns": declared, "missing_columns": [], "actual_columns": actual,
+            "ok": True,
+            "mode": "explicit_sheet",
+            "explicit_sheet": matched,
+            "available_sheets": sheets,
+            "declared_columns": declared,
+            "missing_columns": [],
+            "actual_columns": actual,
         }
     finally:
         try:
