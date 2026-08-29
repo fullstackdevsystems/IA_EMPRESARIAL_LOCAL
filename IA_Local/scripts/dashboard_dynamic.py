@@ -342,8 +342,11 @@ def build_dashboard_plan(df: pd.DataFrame, prompt: str, filename: str = '', shee
     return compiled
 
 
-def _prepare_rows(df: pd.DataFrame, limit: int = 20000) -> List[Dict[str, Any]]:
-    x = df.head(limit).copy()
+def _prepare_rows(df: pd.DataFrame, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    # R10.13B.2 correctness rule: the interactive dashboard must not silently
+    # calculate on a truncated sample. Embed the full selected dataset unless an
+    # explicit caller limit is provided.
+    x = (df if limit is None else df.head(limit)).copy()
     for c in x.columns:
         kind = _series_kind(x[c])
         if kind == 'date':
@@ -402,16 +405,20 @@ def _safe_inline_json(obj: Any) -> str:
 
 def generate_dynamic_dashboard(output_path: Path, df: pd.DataFrame, prompt: str, filename: str, sheet: str = '', semantic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     plan = build_dashboard_plan(df, prompt, filename, sheet, semantic_context)
+    from dynamic_renderer import attach_dynamic_renderer
+    plan = attach_dynamic_renderer(plan)
     kinds = {str(c): _series_kind(df[c]) for c in df.columns}
     payload = {
         'plan': plan,
         'rows': _prepare_rows(df),
-        'meta': {'file': filename, 'sheet': sheet, 'rows': int(len(df)), 'embedded_rows': int(min(len(df), 20000)), 'prompt': prompt, 'column_kinds': kinds},
+        'meta': {'file': filename, 'sheet': sheet, 'rows': int(len(df)), 'embedded_rows': int(len(df)), 'prompt': prompt, 'column_kinds': kinds},
         'brand': {'company': 'PRIMOS & COUSINS', 'logo': _logo_data_uri()},
     }
     data = _safe_inline_json(payload)
     title = html.escape(plan.get('title') or 'Dashboard Ejecutivo')
     page = _HTML.replace('__TITLE__', title).replace('__PAYLOAD__', data)
+    from dynamic_renderer import runtime_markup
+    page = page.replace('</body>', runtime_markup() + '\n</body>')
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(page, encoding='utf-8')
     return plan
@@ -532,7 +539,8 @@ function donut(c,rows){let a=group(rows,c.dimension,c.measure,c.op||'sum').sort(
 function renderCharts(rows){const charts=(P.charts||[]),visible=showAllCharts?charts:charts.slice(0,4);$('charts').innerHTML=visible.map(c=>c.type==='comparison_bar'?comp(c,rows):c.type==='line'?line(c,rows):c.type==='donut'?donut(c,rows):bar(c,rows)).join('')||'<article class="card" style="grid-column:span 12"><div class="empty">No hay gráficas válidas para la solicitud y los datos disponibles.</div></article>';const b=$('toggleCharts');if(b){b.hidden=charts.length<=4;b.textContent=showAllCharts?'Ver solo principales':`Ver todas las gráficas (${charts.length})`}document.querySelectorAll('[data-chart-dim][data-chart-value]').forEach(el=>el.onclick=()=>applyChartFilter(el.dataset.chartDim,el.dataset.chartValue))}
 let tablePage=1,tablePageSize=20,tableSort='',tableAsc=true;function renderTable(rows){const t=P.table||{},cols=(t.columns||Object.keys(rows[0]||{})),all=[...rows];if(tableSort)all.sort((a,b)=>{const x=a[tableSort],y=b[tableSort];return (typeof x==='number'&&typeof y==='number'?(x-y):String(x??'').localeCompare(String(y??''),'es'))*(tableAsc?1:-1)});const pages=Math.max(1,Math.ceil(all.length/tablePageSize));tablePage=Math.min(tablePage,pages);const start=(tablePage-1)*tablePageSize,view=all.slice(start,start+tablePageSize);$('tableTitle').textContent=t.title||'Detalle';$('thead').innerHTML='<tr>'+cols.map(c=>`<th data-sort="${esc(c)}">${esc(c)}${tableSort===c?(tableAsc?' ▲':' ▼'):''}</th>`).join('')+'</tr>';$('tbody').innerHTML=view.map(r=>'<tr>'+cols.map(c=>`<td data-col="${esc(c)}" data-client="${esc(r.Cliente??'')}" data-client-id="${esc(r.Cod_Cliente??'')}" data-product="${esc(r.ctrl_alm??r.Articulo??'')}" data-ref="${esc(r.Refer??'')}">${esc(r[c]??'')}</td>`).join('')+'</tr>').join('');$('rownote').innerHTML=`Mostrando ${view.length.toLocaleString('es-MX')} de ${all.length.toLocaleString('es-MX')} registros filtrados. <span class="pager"><button class="btn" id="prevPage">Anterior</button> Página ${tablePage} de ${pages} <button class="btn" id="nextPage">Siguiente</button> <select id="pageSize"><option value="10" ${tablePageSize===10?'selected':''}>10</option><option value="20" ${tablePageSize===20?'selected':''}>20</option><option value="50" ${tablePageSize===50?'selected':''}>50</option><option value="999999" ${tablePageSize===999999?'selected':''}>Todos</option></select></span>`;document.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const c=th.dataset.sort;if(tableSort===c)tableAsc=!tableAsc;else{tableSort=c;tableAsc=true}renderTable(rows)});document.getElementById('prevPage').onclick=()=>{if(tablePage>1){tablePage--;renderTable(rows)}};document.getElementById('nextPage').onclick=()=>{if(tablePage<pages){tablePage++;renderTable(rows)}};document.getElementById('pageSize').onchange=e=>{tablePageSize=Number(e.target.value)||25;tablePage=1;renderTable(rows)};document.querySelectorAll('#tbody td').forEach(td=>td.ondblclick=()=>{const c=td.dataset.col||'';if(c==='Cliente'||c==='Cod_Cliente')openDrill('client',td.dataset.clientId||td.dataset.client);else if(c==='Articulo'||c==='ctrl_alm'||c==='Cod_Articulo')openDrill('product',td.dataset.product);else if(td.dataset.ref)openDrill('operation',td.dataset.ref);else if(td.dataset.client)openDrill('client_name',td.dataset.client)})}
 function warnings(){const w=[...(P.warnings||[])];if(P.status==='insufficient_data'&&!w.length)w.push('Los datos disponibles no contienen todos los campos necesarios para responder fielmente al prompt.');if(w.length){$('auditoria').hidden=false;$('warnings').innerHTML=w.map(x=>`<li>${esc(x)}</li>`).join('')}}
-function render(){const r=filtered();renderKpis(r);renderCharts(r);renderTable(r);renderAdvanced(r);renderDynamicComponents(r)}
+function render(){const r=filtered();renderKpis(r);renderCharts(r);renderTable(r);renderAdvanced(r);renderDynamicComponents(r);window.dispatchEvent(new CustomEvent('ia-dashboard-filter-change',{detail:{rows:r.length}}))}
+window.__IA_DASHBOARD_API__={filteredRows:()=>filtered(),allRows:()=>ALL,semanticColumns:()=>({...S})};
 $('toggleCharts').onclick=()=>{showAllCharts=!showAllCharts;renderCharts(filtered())};
 $('toggleKpis').onclick=()=>{showAllKpis=!showAllKpis;renderKpis(filtered())};
 $('toggleFilters').onclick=()=>{showExtraFilters=!showExtraFilters;filterRoot.classList.toggle('show-extra-filters',showExtraFilters);$('toggleFilters').textContent=showExtraFilters?'Menos filtros':'Más filtros'};
