@@ -1,0 +1,13 @@
+IA EMPRESARIAL LOCAL - R10.10 ADMINISTRACION EMPRESARIAL UNIFICADA
+
+1) Descomprima este ZIP.
+2) Abra PowerShell en la carpeta descomprimida.
+3) Ejecute:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\r10_10_release\Aplicar_R10_10_Admin_Unificado.ps1
+
+Ruta opcional:
+   .\r10_10_release\Aplicar_R10_10_Admin_Unificado.ps1 -Root "C:\IA_EMPRESARIAL_LOCAL\IA_Local"
+
+El paquete es acumulativo respecto a R10.9.
+No valida propuestas automáticamente.

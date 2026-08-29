@@ -1,0 +1,14 @@
+IA EMPRESARIAL LOCAL - R10.9 TRAZABILIDAD COMPLETA
+
+1. Descomprima este paquete.
+2. Abra PowerShell en la carpeta descomprimida.
+3. Ejecute:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\r10_9_release\Aplicar_R10_9_Trazabilidad.ps1
+
+Ruta explicita opcional:
+   .\r10_9_release\Aplicar_R10_9_Trazabilidad.ps1 -Root "C:\IA_EMPRESARIAL_LOCAL\IA_Local"
+
+Si R10.8 no esta instalado, el instalador utiliza el payload acumulativo incluido.
+La instalacion crea respaldo antes de modificar archivos.
+Version final: 8.5.5-r10.9-traceability

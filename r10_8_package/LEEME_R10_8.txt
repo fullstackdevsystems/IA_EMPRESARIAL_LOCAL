@@ -1,0 +1,9 @@
+IA EMPRESARIAL LOCAL - R10.8 FEEDBACK Y APRENDIZAJE CONTROLADO
+
+1. Requiere una instalación R10.6 o superior.
+2. Si R10.7 no está instalado, el instalador R10.8 incluye y aplica R10.7 automáticamente.
+3. Ejecutar desde PowerShell:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\r10_8_release\Aplicar_R10_8_Feedback.ps1
+
+Principio: ninguna corrección se convierte automáticamente en conocimiento VALIDADO.
