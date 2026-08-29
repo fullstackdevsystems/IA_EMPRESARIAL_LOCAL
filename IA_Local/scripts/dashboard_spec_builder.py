@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import re, unicodedata
 import pandas as pd
 from prompt_intelligence import parse_prompt_intelligence
+from capability_rules import RULESET_VERSION, select_rule, rule_public_metadata
 
 SCHEMA_VERSION="r10.13a"
 SUPPORTED="SUPPORTED"
@@ -96,25 +97,21 @@ def _direct_metric(key,roles,sources):
     role=DIRECT.get(key); col=roles.get(role) if role else None
     return _cap(key,"kpi",SUPPORTED,role=role,columns=[col],source=sources.get(role,"direct_column")) if col else None
 
-def _derived_metric(key,roles):
-    rev,cost,profit,qty=roles.get("revenue"),roles.get("cost"),roles.get("profit"),roles.get("quantity")
-    if key=="profit" and rev and cost:
-        return _cap(key,"kpi",DERIVABLE,columns=[rev,cost],formula="revenue - cost",source="derived_metric_rule",dependencies=["revenue","cost"])
-    if key=="margin_pct":
-        if profit and rev: return _cap(key,"kpi",DERIVABLE,columns=[profit,rev],formula="profit / revenue * 100",source="derived_metric_rule",dependencies=["profit","revenue"])
-        if rev and cost: return _cap(key,"kpi",DERIVABLE,columns=[rev,cost],formula="(revenue - cost) / revenue * 100",source="derived_metric_rule",dependencies=["profit","revenue"])
-    if key=="profit_per_unit":
-        if profit and qty: return _cap(key,"kpi",DERIVABLE,columns=[profit,qty],formula="profit / quantity",source="derived_metric_rule",dependencies=["profit","quantity"])
-        if rev and cost and qty: return _cap(key,"kpi",DERIVABLE,columns=[rev,cost,qty],formula="(revenue - cost) / quantity",source="derived_metric_rule",dependencies=["profit","quantity"])
-    if key=="price_per_unit" and rev and qty: return _cap(key,"kpi",DERIVABLE,columns=[rev,qty],formula="revenue / quantity",source="derived_metric_rule",dependencies=["revenue","quantity"])
-    if key=="cost_per_unit" and cost and qty: return _cap(key,"kpi",DERIVABLE,columns=[cost,qty],formula="cost / quantity",source="derived_metric_rule",dependencies=["cost","quantity"])
-    if key=="operations" and roles.get("transaction_id"): return _cap(key,"kpi",DERIVABLE,columns=[roles["transaction_id"]],formula="nunique(transaction_id)",source="derived_metric_rule",dependencies=["transaction_id"])
-    if key=="ticket_avg" and rev and roles.get("transaction_id"): return _cap(key,"kpi",DERIVABLE,columns=[rev,roles["transaction_id"]],formula="revenue / nunique(transaction_id)",source="derived_metric_rule",dependencies=["revenue","transaction_id"])
-    if key=="active_customers" and (roles.get("customer_id") or roles.get("customer")):
-        c=roles.get("customer_id") or roles.get("customer"); return _cap(key,"kpi",DERIVABLE,columns=[c],formula="nunique(customer)",source="derived_metric_rule",dependencies=["customer"])
-    if key=="active_sellers" and roles.get("seller"): return _cap(key,"kpi",DERIVABLE,columns=[roles["seller"]],formula="nunique(seller)",source="derived_metric_rule",dependencies=["seller"])
-    if key=="products_sold" and roles.get("product"): return _cap(key,"kpi",DERIVABLE,columns=[roles["product"]],formula="nunique(product)",source="derived_metric_rule",dependencies=["product"])
-    return None
+def _derived_metric(key,roles,sources=None):
+    governed_roles={r for r,src in dict(sources or {}).items() if src in {"governed_semantic_definition","validated_analytic_rule"}}
+    rule, missing = select_rule(key, roles, governed_roles)
+    if not rule:
+        return None
+    deps=list(rule.get("dependencies") or [])
+    cols=[roles.get(dep) for dep in deps if roles.get(dep)]
+    cap=_cap(
+        key,"kpi",DERIVABLE,columns=cols,formula=rule.get("formula"),
+        source="capability_rule_registry",dependencies=deps,
+    )
+    cap["rule"]=rule_public_metadata(rule)
+    cap["output_format"]=rule.get("format") or "number"
+    cap["execution"]={"operator":rule.get("operator"),"dependency_roles":deps,"zero_division":"N/D"}
+    return cap
 
 def _authorized_freight(analytic_context=None):
     ctx=dict(analytic_context or _analytic_context())
@@ -131,9 +128,13 @@ def resolve_metric(key,roles,sources,analytic_context=None):
     if key=="freight":
         auth=_authorized_freight(analytic_context)
         if auth:return auth
-    d=_derived_metric(key,roles)
+    d=_derived_metric(key,roles,sources)
     if d:return d
-    return _cap(key,"kpi",BLOCKED,reason=f"No direct semantic role or safe deterministic derivation exists for '{key}'.")
+    rule, missing = select_rule(key, roles, {r for r,src in sources.items() if src in {"governed_semantic_definition","validated_analytic_rule"}})
+    reason=f"No direct semantic role or safe deterministic derivation exists for '{key}'."
+    if missing:
+        reason += " Missing dependencies: " + ", ".join(missing)
+    return _cap(key,"kpi",BLOCKED,reason=reason,dependencies=[x.replace("governed:","") for x in missing])
 
 def resolve_dimension(key,roles,sources):
     role=DIMS.get(key,key); col=roles.get(role)
@@ -254,6 +255,7 @@ def build_dashboard_spec(df,prompt,*,sheet="",semantic_map=None,semantic_roles=N
       "tables":[c for c in caps if c["type"]=="table"],"analyses":[c for c in caps if c["type"]=="analysis"],"components":caps,"blocked":blocked_items,
       "coverage":{"requested":requested,"supported":supported,"derivable":derivable,"blocked":blocked,"fulfilled":fulfilled,"percent":percent},
       "provenance":{"policy":"governed_semantics > validated_business_rule > direct_semantic_contract > safe_derivation > fallback_semantics > BLOCKED","semantic_roles":roles,"role_sources":sources,
-                    "derived":[{"id":c["id"],"formula":c.get("formula"),"inputs":c.get("source_columns"),"source":c["provenance"]["source"]} for c in derived],
+                    "ruleset_version":RULESET_VERSION,
+                    "derived":[{"id":c["id"],"formula":c.get("formula"),"inputs":c.get("source_columns"),"dependencies":c.get("dependencies"),"rule":c.get("rule"),"execution":c.get("execution"),"source":c["provenance"]["source"]} for c in derived],
                     "blocked":[{"id":c["id"],"reason":c.get("reason")} for c in blocked_items]}
     }

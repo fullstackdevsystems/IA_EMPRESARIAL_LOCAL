@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import hashlib
 import json
 import math
 import os
@@ -11,6 +12,7 @@ import traceback
 import sys
 import time
 import unicodedata
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -919,17 +921,30 @@ textarea{min-height:120px;resize:vertical}.btn{background:#2563eb;color:white;bo
 @media(max-width:760px){.grid{grid-template-columns:1fr}.full{grid-column:1}.toplinks{float:none;display:block;margin-top:10px}}
 </style></head><body><div class="wrap"><div class="card">
 <div class="toplinks"><a href="http://127.0.0.1:8080" target="_blank">Chat Open WebUI</a></div>
-<h1>Analizador Empresarial de Excel / CSV</h1><div class="sub">Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.</div>
+<h1>Analizador Empresarial de Excel / CSV</h1><div style="font-size:11px;color:#64748b;margin-bottom:8px">R10.13C.2 V9 · Verified Prompt Transport</div><div class="sub">Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.</div>
 <div class="note"><b>Importante:</b> para Excel grandes usa esta pantalla en lugar de adjuntarlos directamente al chat de Open WebUI. Aqui el archivo se calcula con Python y el modelo recibe solo resultados resumidos.</div>
-<form id="f"><div class="grid"><div class="full"><label>Archivo</label><input id="file" name="file" type="file" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt" required></div>
-<div class="full"><label>Que quieres analizar</label><textarea id="prompt" name="prompt" required>Analiza completamente el archivo. Calcula ventas netas, unidades, operaciones, ticket promedio, principales productos, clientes y paises, tendencia mensual y cancelaciones/devoluciones. Detecta limitaciones de los datos. Si no existe costo, indicalo y no inventes utilidad ni margen.</textarea></div>
+<form id="f" autocomplete="off"><div class="grid"><div class="full"><label>Archivo</label><input id="file" name="file" type="file" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt" required></div>
+<div class="full"><label>Que quieres analizar</label><textarea id="prompt" name="prompt" required autocomplete="off" spellcheck="false" placeholder="Escribe o pega aquí la solicitud exacta para este análisis."></textarea></div>
 <div class="full"><button class="btn" id="go">Analizar y generar Excel/PDF</button></div></div></form>
 <div id="status"></div><div id="out" class="result" style="display:none"></div><div id="links" class="links"></div>
 </div></div><script>
 const f=document.getElementById('f'),go=document.getElementById('go'),out=document.getElementById('out'),status=document.getElementById('status'),links=document.getElementById('links');
+// r10c2PromptFreshGuard
+window.addEventListener('pageshow',()=>{const p=document.getElementById('prompt');if(p){p.value='';p.setAttribute('autocomplete','off');}});
 f.addEventListener('submit',async(e)=>{e.preventDefault();go.disabled=true;out.style.display='block';out.textContent='Procesando archivo... En Excel grandes puede tardar varios minutos.';links.innerHTML='';status.innerHTML='';
-const fd=new FormData();fd.append('file',document.getElementById('file').files[0]);fd.append('prompt',document.getElementById('prompt').value);
-try{const r=await fetch('/api/analyze',{method:'POST',body:fd});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.detail||d.error||'Error');
+const promptEl=document.getElementById('prompt');
+const requestPrompt=(promptEl.value||'').trim();
+if(!requestPrompt){throw new Error('Escribe o pega el prompt que quieres analizar.');}
+const enc=new TextEncoder().encode(requestPrompt);
+const digest=await crypto.subtle.digest('SHA-256',enc);
+const promptHash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+const requestId=(crypto.randomUUID?crypto.randomUUID():('req-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
+const fd=new FormData();
+fd.append('file',document.getElementById('file').files[0]);
+fd.append('prompt',requestPrompt);
+fd.append('prompt_sha256',promptHash);
+fd.append('request_id',requestId);
+try{const r=await fetch('/api/analyze',{method:'POST',body:fd});const d=await r.json();if(!r.ok||!d.ok){const detail=d.detail;let msg=d.error||'Error';if(Array.isArray(detail)){msg=detail.map(x=>((x.loc||[]).join('.')+': '+(x.msg||JSON.stringify(x)))).join(' | ');}else if(detail){msg=(typeof detail==='string'?detail:JSON.stringify(detail));}throw new Error(msg);}
 out.textContent=d.narrativa;
 const details=document.createElement('details');details.style.marginTop='12px';const sm=document.createElement('summary');sm.textContent='Ver detalles tecnicos';details.appendChild(sm);const pre=document.createElement('pre');pre.textContent='Plan: '+JSON.stringify(d.plan,null,2)+'\n\nSecciones: '+JSON.stringify(Object.keys(d.secciones||{}),null,2);details.appendChild(pre);out.appendChild(details);
 status.innerHTML='<div class="note ok">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.</div>';
@@ -940,8 +955,16 @@ links.innerHTML='<a href="/download/'+encodeURIComponent(d.excel)+'">Descargar E
 
 
 @app.get("/", response_class=HTMLResponse)
-def home() -> str:
-    return INDEX_HTML
+def home() -> HTMLResponse:
+    return HTMLResponse(
+        INDEX_HTML,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-IA-Prompt-Transport": "r10.13c.2-v9",
+        },
+    )
 
 
 @app.get("/health")
@@ -950,7 +973,7 @@ def health() -> Dict[str, Any]:
 
 
 @app.post("/api/analyze")
-async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...)):
+async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), prompt_sha256: Optional[str] = Form(None), request_id: Optional[str] = Form(None)):
     try:
         filename = safe_name(file.filename or "archivo.xlsx")
         ext = Path(filename).suffix.lower()
@@ -959,7 +982,30 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...)):
         dest = unique_path(ENTRADA, filename)
         with dest.open("wb") as out:
             shutil.copyfileobj(file.file, out, length=1024*1024)
-        result = analyze_file(dest, prompt.strip() or "Analiza completamente este archivo sin inventar datos.")
+        request_prompt = str(prompt or "").strip()
+
+        # R10.13C.2 DEBUG TRACE: confirma el prompt exacto recibido por /api/analyze.
+        print("\n=== PROMPT TRACE API ===")
+        print("REQUEST_ID:", request_id)
+        print("PROMPT_SHA256:", hashlib.sha256(request_prompt.encode("utf-8")).hexdigest())
+        print("PROMPT_PREVIEW:", " ".join(request_prompt.split())[:500])
+        print("========================\n")
+
+        if not request_prompt:
+            raise HTTPException(status_code=400, detail="El prompt no puede estar vacío.")
+        actual_hash = hashlib.sha256(request_prompt.encode("utf-8")).hexdigest()
+        supplied_hash = str(prompt_sha256 or "").strip().lower()
+        if supplied_hash and supplied_hash != actual_hash:
+            raise HTTPException(status_code=409, detail="PROMPT_INTEGRITY_MISMATCH: el prompt recibido no coincide con su SHA-256.")
+        rid = str(request_id or "").strip() or f"server-{uuid.uuid4()}"
+        transport_mode = "client-verified" if supplied_hash and request_id else "server-fallback"
+        result = analyze_file(dest, request_prompt)
+        if isinstance(result, dict):
+            result["request_id"] = rid
+            result["request_prompt_sha256"] = actual_hash
+            result["request_prompt_preview"] = " ".join(request_prompt.split())[:240]
+            result["prompt_integrity"] = "r10.13c.2-verified-transport"
+            result["prompt_transport_mode"] = transport_mode
         return JSONResponse(result)
     except HTTPException:
         raise

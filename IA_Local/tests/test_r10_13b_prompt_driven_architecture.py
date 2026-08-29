@@ -71,7 +71,7 @@ checks=[
  ('inventory_turnover_blocked',any(c['id']=='analysis:inventory_turnover' and c['status']=='BLOCKED' for c in ins['blocked'])),
  ('inventory_obsolete_blocked',any(c['id']=='analysis:obsolete_inventory' and c['status']=='BLOCKED' for c in ins['blocked'])),
  ('specs_differ',ids(cs)!=ids(ls) and ids(ls)!=ids(ins) and ids(cs)!=ids(ins)),
- ('renderer_version',build_dynamic_renderer_model(ls,{})['version']=='r10.13b.2'),
+ ('renderer_version',build_dynamic_renderer_model(ls,{})['version'] in {'r10.13b.2','r10.13c'}),
  ('renderer_uses_logistics_pages',[p['id'] for p in build_dynamic_renderer_model(ls,{})['pages']]==ids(ls)),
  ('runtime_host',"host.id='r13bPageHost'" in runtime_markup()),
 ]

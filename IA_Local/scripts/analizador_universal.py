@@ -16,6 +16,8 @@ import json
 import math
 import os
 import re
+
+import hashlib
 import unicodedata
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -844,6 +846,20 @@ def _ensure_commercial_report_sections(work: pd.DataFrame, roles: Dict[str, Opti
 
 
 def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    # R10.13C.2: request prompt is immutable authority for this execution.
+    request_prompt = str(prompt or "").strip()
+    if not request_prompt:
+        raise ValueError("PROMPT_REQUIRED")
+    prompt = request_prompt
+    request_prompt_sha256 = hashlib.sha256(request_prompt.encode("utf-8")).hexdigest()
+    request_prompt_preview = " ".join(request_prompt.split())[:240]
+    # R10.13C.1: el prompt de ESTA solicitud es la unica autoridad.
+    prompt = str(prompt or "").strip()
+    if not prompt:
+        prompt = "Analiza completamente este archivo sin inventar datos."
+    prompt_sha256 = hashlib.sha256(prompt.encode("utf-8", errors="strict")).hexdigest()
+    prompt_preview = " ".join(prompt.split())[:220]
+
     started = base.time.time()
     original, meta = load_tabular(path, prompt)
     original.columns = _dedupe_columns(original.columns)
@@ -888,6 +904,10 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
+            if isinstance(dynamic_plan, dict):
+                dynamic_plan["request_prompt_sha256"] = prompt_sha256
+                dynamic_plan["request_prompt_preview"] = prompt_preview
+                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
@@ -939,6 +959,10 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
+            if isinstance(dynamic_plan, dict):
+                dynamic_plan["request_prompt_sha256"] = prompt_sha256
+                dynamic_plan["request_prompt_preview"] = prompt_preview
+                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
@@ -1009,6 +1033,10 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
+            if isinstance(dynamic_plan, dict):
+                dynamic_plan["request_prompt_sha256"] = prompt_sha256
+                dynamic_plan["request_prompt_preview"] = prompt_preview
+                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("excel"):
@@ -1031,6 +1059,12 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
 
     return {
         "ok": True,
+        "request_prompt_sha256": request_prompt_sha256,
+        "request_prompt_preview": request_prompt_preview,
+        "prompt_integrity": "r10.13c.2-request-authority",
+        "prompt_sha256": prompt_sha256,
+        "prompt_preview": prompt_preview,
+        "prompt_integrity": "r10.13c.2-request-authority",
         "archivo": path.name,
         "filas": int(len(original)),
         "columnas": [str(c) for c in original.columns],
@@ -1099,6 +1133,16 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     """links.innerHTML=''; if(d.html) { links.innerHTML+='<a href="/view/'+encodeURIComponent(d.html)+'" target="_blank">Abrir Dashboard HTML</a>'; links.innerHTML+='<a href="/download/'+encodeURIComponent(d.html)+'" download>Descargar Dashboard HTML</a>'; } if(d.pdf) links.innerHTML+='<a href="/download/'+encodeURIComponent(d.pdf)+'">Descargar PDF</a>'; if(d.excel) links.innerHTML+='<a href="/download/'+encodeURIComponent(d.excel)+'">Descargar Excel</a>';""",
 )
 
+# R10.13C.1 UI prompt authority
+base.INDEX_HTML = base.INDEX_HTML.replace(
+    '<textarea id="prompt" name="prompt" required>',
+    '<textarea id="prompt" name="prompt" required autocomplete="off" data-r1013c1="prompt-authority">',
+)
+base.INDEX_HTML = base.INDEX_HTML.replace(
+    "status.innerHTML='<div class=\"note ok\">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.</div>';",
+    "status.innerHTML='<div class=\"note ok\">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.<br><small>Prompt recibido: '+(d.prompt_preview||'')+'<br>SHA-256: '+(d.prompt_sha256||'N/D')+'</small></div>';",
+)
+
 @base.app.get("/view/{filename}")
 def view_html_report(filename: str):
     """Abre dashboards HTML en el navegador; otros formatos siguen usando /download."""
@@ -1111,7 +1155,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"prompt_integrity": "r10.13c.2-request-authority", "version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:
@@ -1136,4 +1180,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

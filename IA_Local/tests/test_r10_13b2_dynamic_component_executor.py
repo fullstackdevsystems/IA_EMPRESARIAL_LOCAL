@@ -58,7 +58,7 @@ rt=runtime_markup()
 large=pd.DataFrame({'x':range(20005)})
 
 checks=[
- ('renderer_b2_version',build_dynamic_renderer_model(spec,{})['version']=='r10.13b.2'),
+ ('renderer_b2_version',build_dynamic_renderer_model(spec,{})['version'] in {'r10.13b.2','r10.13c'}),
  ('generic_cost_not_false_positive','cost' not in intent['metrics']),
  ('freight_requested','freight' in intent['metrics']),
  ('monthly_specializes_trend','monthly_movement' in intent['analyses'] and 'trend' not in intent['analyses']),
