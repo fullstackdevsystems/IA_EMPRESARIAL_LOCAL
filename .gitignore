@@ -1,4 +1,4 @@
-.venv/
+﻿.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -12,12 +12,10 @@ IA_Local/config/enterprise.secret
 IA_Local/config/local-user.token
 IA_Local/.webui_secret_key
 # Parches y respaldos locales de releases R9.x
-R9_*_PATCH/
 _backup_r9_*/
 *.backup_*
 *.backup_r951
 # Parches y respaldos locales R10.x
-R10_*_PATCH/
 _backup_r10_*/
 
 # R10.3+ - instaladores, payloads y respaldos locales

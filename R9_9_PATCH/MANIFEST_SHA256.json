@@ -1,0 +1,45 @@
+{
+  "version": "8.5.5-r9.9",
+  "files": [
+    {
+      "path": "APLICAR_R9_9.ps1",
+      "sha256": "89d37e17e542421ff26417f0d679780bf960c18b2ab1a8afe49a7ad9a6635668",
+      "size": 1514
+    },
+    {
+      "path": "LEEME_R9_9.md",
+      "sha256": "2036e3bd408425215d10de76078d88f016ae982c7967d408e1f5be41e7b3c04b",
+      "size": 507
+    },
+    {
+      "path": "files/IA_Local/VERSION.txt",
+      "sha256": "fcdcef2cd54304c8ad07400236ac367facddb38255b50594df4964fbf121f12f",
+      "size": 11
+    },
+    {
+      "path": "files/IA_Local/scripts/analizador_universal.py",
+      "sha256": "ff96b5e49a4b4da09ebf2880846d62575b99208520337382dba2abb86e778ec5",
+      "size": 53439
+    },
+    {
+      "path": "files/IA_Local/scripts/dashboard_dynamic.py",
+      "sha256": "cf23d64da1e6aa08cd2bbc96d58d97d9bb7aaf235380f807a52bbff2428e23ad",
+      "size": 73891
+    },
+    {
+      "path": "files/IA_Local/scripts/enterprise_prompt_compiler.py",
+      "sha256": "e6e1bc2498659f6878eaeb354611ae9c69ee03a7d92415849aeb5483c49546d9",
+      "size": 9110
+    },
+    {
+      "path": "files/IA_Local/scripts/prompt_execution_plan.py",
+      "sha256": "ca4a0bf71a25fb173ac9475ab285475caf84ed75a6fb1fae4603d938d1ac4a2d",
+      "size": 8406
+    },
+    {
+      "path": "files/IA_Local/tests/test_bi_productivo.py",
+      "sha256": "80553f12a5fdeb27bcc9e49c90a3af0ae1c7e4e7805071f06aec7c415bb5b239",
+      "size": 28700
+    }
+  ]
+}

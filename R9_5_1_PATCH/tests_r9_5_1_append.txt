@@ -1,0 +1,23 @@
+def test_r9_5_1_renderer_recomputes_advanced_from_filtered_rows():
+    from pathlib import Path
+    s=(Path(__file__).resolve().parents[1]/"scripts"/"dashboard_dynamic.py").read_text(encoding="utf-8")
+    assert "renderAdvanced(r)" in s
+    assert "function advGroup(rows,dims)" in s
+    assert "function dynamicFindings(rows,clients,products,routes,neg)" in s
+    assert "function dynamicValidation(rows)" in s
+    assert "operaciones negativas en la selección actual" in s
+
+def test_r9_5_1_negative_count_is_not_detail_cap():
+    import os, pandas as pd
+    from enterprise_analytics import build_advanced_analytics
+    old=os.environ.get("IA_EXECUTIVE_SUMMARY_LLM")
+    os.environ["IA_EXECUTIVE_SUMMARY_LLM"]="0"
+    try:
+        rows=[{"Utilidad":-1.0,"Importe_Venta":0.0,"Costo":1.0,"Toneladas_Vendidas":0.0,"Costo_Flete":0.0,"Refer":f"R{i}","Cliente":f"C{i}","Cod_Cliente":f"C{i}"} for i in range(55)]
+        a=build_advanced_analytics(pd.DataFrame(rows))
+        assert len(a["negative_operations"]) == 40
+        assert a["facts"]["operaciones_negativas"] == 55
+        assert a["facts"]["impacto_negativo"] == -55.0
+    finally:
+        if old is None: os.environ.pop("IA_EXECUTIVE_SUMMARY_LLM",None)
+        else: os.environ["IA_EXECUTIVE_SUMMARY_LLM"]=old

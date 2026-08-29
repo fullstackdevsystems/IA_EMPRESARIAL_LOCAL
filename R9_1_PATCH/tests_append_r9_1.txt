@@ -1,0 +1,59 @@
+def test_r9_1_prompt_contract_blocks_fake_budget_and_previous():
+    import os
+    import dashboard_dynamic as dd
+    old = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
+    try:
+        df = pd.DataFrame([
+            {"Cod_Cliente":"C1","Cliente":"A","Vendedor":"Ana","Articulo":"Maiz","Zona":"Norte",
+             "Toneladas_Vendidas":100.0,"Importe_Venta":1000.0,"Utilidad":100.0,"Costo":900.0},
+            {"Cod_Cliente":"C2","Cliente":"B","Vendedor":"Beto","Articulo":"Sorgo","Zona":"Sur",
+             "Toneladas_Vendidas":50.0,"Importe_Venta":600.0,"Utilidad":50.0,"Costo":550.0},
+        ])
+        plan = dd.build_dashboard_plan(
+            df,
+            "Genera un dashboard ejecutivo centrado en clientes perdidos, presupuesto sin venta, recuperación de clientes y cumplimiento. Prioriza riesgos y oportunidades.",
+            "detalle.xlsx",
+            "BD",
+        )
+        assert plan["status"] == "insufficient_data"
+        assert plan["kpis"] == []
+        assert plan["charts"] == []
+        assert plan["semantic_columns_strict"]["budget"] is None
+        assert plan["semantic_columns_strict"]["previous"] is None
+        assert "compliance" in plan["missing_requirements"]
+        assert "lost_customers" in plan["missing_requirements"]
+        assert "prompt-contract-blocked" in plan["planner"]
+    finally:
+        if old is None:
+            os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
+        else:
+            os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
+
+
+def test_r9_1_prompt_contract_allows_real_actual_budget_previous():
+    import os
+    import dashboard_dynamic as dd
+    old = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
+    try:
+        df = pd.DataFrame([
+            {"Cod_Cliente":"C1","Cliente":"A","Actual":100.0,"Presupuesto":120.0,"Anterior":80.0,"Zona":"Norte"},
+            {"Cod_Cliente":"C2","Cliente":"B","Actual":0.0,"Presupuesto":40.0,"Anterior":60.0,"Zona":"Sur"},
+        ])
+        plan = dd.build_dashboard_plan(
+            df,
+            "Dashboard de clientes perdidos, recuperación, cumplimiento y presupuesto",
+            "clientes.xlsx",
+            "BDO",
+        )
+        assert plan["status"] == "ready"
+        assert plan["semantic_columns_strict"]["actual"] == "Actual"
+        assert plan["semantic_columns_strict"]["budget"] == "Presupuesto"
+        assert plan["semantic_columns_strict"]["previous"] == "Anterior"
+        assert "prompt-contract-ok" in plan["planner"]
+    finally:
+        if old is None:
+            os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
+        else:
+            os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old

@@ -1,0 +1,10 @@
+{
+  "APLICAR_R10_1_1.ps1": "eb7c339dc830521a8f5994f2652e49dc4f450f3bc8bb878a9367c8e005b8abaa",
+  "IA_Local/VERSION.txt": "582a746c9cd80a08dc718cd552e9b5134fdbce8fab2cd190c70a27a466fc58a8",
+  "IA_Local/scripts/analizador_universal.py": "03edf2e6861f8496b857d178fa6707f76e15c1d2e3f03966e496f633f3225344",
+  "IA_Local/scripts/dashboard_dynamic.py": "2d53c86ad38f67c489a6f186b4c552542ae0e3bab844f2332dd8de5f7eb23d7e",
+  "IA_Local/scripts/enterprise_prompt_compiler.py": "0ae8b6ab308369197580011537bd8dab345c28168fd85408d02133a01801ac7f",
+  "IA_Local/scripts/prompt_execution_plan.py": "c2b6befc550be864fb8de07e4c061a0ca2f0e5a418ffe01c40c69328b1766f87",
+  "IA_Local/tests/test_bi_productivo.py": "b4aca049ba7d1dee4cba5e9d2d391e4eb5e6f59e498d9e62bedbfa6c599fda2f",
+  "LEEME_R10_1_1.txt": "d76386a1fdf0af657c05290e89dfa337d09ed1c81f2af2a098f5b7fbba9ff136"
+}

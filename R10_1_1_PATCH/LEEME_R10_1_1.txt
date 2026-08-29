@@ -1,0 +1,34 @@
+IA EMPRESARIAL LOCAL - R10.1.1 EXECUTIVE DASHBOARD UX POLISH
+=============================================================
+
+OBJETIVO
+Reducir la saturación visual de R10.1 y hacer que cada gráfica sea entendible a simple vista.
+
+CAMBIOS PRINCIPALES
+- Portada con 6 KPIs ejecutivos prioritarios; el resto se abre con "Ver todos los indicadores".
+- Filtros principales visibles: periodo/fecha, Zona, Vendedor, Producto/Grupo y búsqueda de Cliente.
+- Filtros secundarios ocultos bajo "Más filtros".
+- Las primeras 4 gráficas siguen siendo la lectura ejecutiva inicial.
+- Cada gráfica indica métrica, cálculo, agrupación, unidad y Top N.
+- La cobertura deja de medir solamente número de categorías y calcula la proporción del VALOR mostrado frente al total.
+- Para métricas con positivos/negativos se usa cobertura del valor absoluto para evitar porcentajes engañosos.
+- Valores y ranking permanecen visibles junto a las barras.
+- Alertas y validaciones ya no se abren automáticamente al cargar el dashboard.
+- Navegación más clara: Resumen, Ventas, Rentabilidad, Logística, Análisis avanzado, Detalle, Preguntar y Datos/validación.
+- Conserva tabla 10/20/50/Todos, XLSX real, filtros reactivos, drilldown y consulta natural.
+
+VERSION
+8.5.5-r10.1.1
+
+INSTALACION
+1. Manténgase en la rama feature/r10-dashboard-intelligence.
+2. Descomprima este ZIP como C:\IA_EMPRESARIAL_LOCAL\R10_1_1_PATCH
+3. Ejecute PowerShell desde C:\IA_EMPRESARIAL_LOCAL:
+
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\R10_1_1_PATCH\APLICAR_R10_1_1.ps1
+
+4. Ejecute las pruebas BI y Enterprise antes de generar un nuevo dashboard.
+
+IMPORTANTE
+No aplicar directamente sobre main.

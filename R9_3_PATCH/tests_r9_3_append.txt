@@ -1,0 +1,42 @@
+def test_r9_3_names_previous_does_not_trigger_previous_comparison():
+    import dashboard_prompt_guard as g
+    p = "NO dependas exclusivamente de los nombres anteriores. Detecta automáticamente todos los valores únicos de ctrl_alm."
+    intents = g.requested_intents(p)
+    assert "previous_comparison" not in intents
+
+
+def test_r9_3_real_previous_period_does_trigger_previous_comparison():
+    import dashboard_prompt_guard as g
+    p = "Compara las ventas del periodo actual contra el periodo anterior."
+    intents = g.requested_intents(p)
+    assert "previous_comparison" in intents
+
+
+def test_r9_3_partial_fulfillment_keeps_valid_content():
+    import os
+    import pandas as pd
+    import dashboard_dynamic as dd
+    old = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
+    try:
+        df = pd.DataFrame([
+            {"Cod_Cliente":"C1","Cliente":"A","Vendedor":"Ana","Zona":"Norte","Articulo":"Maiz",
+             "Toneladas_Vendidas":100.0,"Importe_Venta":1000.0,"Costo":900.0,"Utilidad":100.0},
+            {"Cod_Cliente":"C2","Cliente":"B","Vendedor":"Beto","Zona":"Sur","Articulo":"Sorgo",
+             "Toneladas_Vendidas":50.0,"Importe_Venta":600.0,"Costo":550.0,"Utilidad":50.0},
+        ])
+        plan = dd.build_dashboard_plan(
+            df,
+            "Genera ventas, utilidad y riesgos. Además compara contra el periodo anterior.",
+            "demo.xlsx","BD"
+        )
+        assert plan["status"] == "partial"
+        assert plan["kpis"]
+        assert plan["charts"]
+        assert "previous_comparison" in plan["missing_requirements"]
+        assert "prompt-contract-partial" in plan["planner"]
+    finally:
+        if old is None:
+            os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
+        else:
+            os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old

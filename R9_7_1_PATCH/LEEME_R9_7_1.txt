@@ -1,0 +1,7 @@
+IA Empresarial Local R9.7.1
+Corrección puntual de filtros:
+- Todos los filtros muestran "Todos".
+- Zona, Categoría, Vendedor, Producto/Grupo y Proveedor conservan selección múltiple.
+- En filtros múltiples, "Todos" limpia las selecciones específicas.
+- Limpiar filtros restaura "Todos".
+- No cambia cálculos, fuente BD ni plan de ejecución R9.7.

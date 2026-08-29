@@ -1,0 +1,30 @@
+def test_r9_5_advanced_analytics_payload():
+    import os, pandas as pd, dashboard_dynamic as dd
+    old1=os.environ.get("IA_DYNAMIC_DASHBOARD_LLM"); old2=os.environ.get("IA_EXECUTIVE_SUMMARY_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"]="0"; os.environ["IA_EXECUTIVE_SUMMARY_LLM"]="0"
+    try:
+        df=pd.DataFrame([
+          {"Fecha":"2026-08-01","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C1","Cliente":"CLIENTE 1","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"GDL","Cliente_Recoge":"N","Refer":"R1","Toneladas_Vendidas":10.0,"Importe_Venta":1000.0,"Costo":900.0,"Utilidad":100.0,"Costo_Producto":800.0,"Costo_Flete":80.0,"Otros_Costos":20.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"},
+          {"Fecha":"2026-08-02","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C2","Cliente":"CLIENTE 2","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"MTY","Cliente_Recoge":"N","Refer":"R2","Toneladas_Vendidas":0.0,"Importe_Venta":0.0,"Costo":50.0,"Utilidad":-50.0,"Costo_Producto":0.0,"Costo_Flete":50.0,"Otros_Costos":0.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"}])
+        p=dd.build_dashboard_plan(df,"Genera dashboard ejecutivo completo de ventas, rentabilidad, fletes, clientes, proveedores, rutas, operaciones con utilidad negativa, margen por tonelada, KPIs ejecutivos y evolución por fecha.","demo.xlsx","BD")
+        assert p["prompt_compiler"]["version"]=="r9.5"
+        assert p["advanced"]["negative_operations"]
+        assert p["advanced"]["clients"]
+        assert p["advanced"]["routes"]
+        assert p["advanced"]["executive_findings"]
+        assert p["advanced"]["validation"]["checks"]
+    finally:
+        if old1 is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM",None)
+        else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"]=old1
+        if old2 is None: os.environ.pop("IA_EXECUTIVE_SUMMARY_LLM",None)
+        else: os.environ["IA_EXECUTIVE_SUMMARY_LLM"]=old2
+
+def test_r9_5_renderer_has_advanced_features():
+    from pathlib import Path
+    s=(Path(__file__).resolve().parents[1]/"scripts"/"dashboard_dynamic.py").read_text(encoding="utf-8")
+    assert "Buscar cliente" in s
+    assert "Fecha desde / hasta" in s
+    assert "tablePageSize" in s
+    assert "Operaciones con Utilidad Negativa" in s
+    assert "Rutas Origen → Destino" in s
+    assert "negative" in s

@@ -1,0 +1,33 @@
+IA EMPRESARIAL LOCAL — R10.2 CAPA SEMÁNTICA GENÉRICA
+
+OBJETIVO
+Detectar conceptos empresariales aunque los Excel/CSV usen nombres distintos.
+Ejemplos: Importe_Venta / Revenue / Sales Amount / Monto Facturado.
+
+REGLA DE SEGURIDAD
+La detección usa nombre + tipo de dato + contenido + contexto.
+Confianzas: EXACT, STRONG, INFERRED, AMBIGUOUS, MISSING.
+AMBIGUOUS nunca se utiliza automáticamente para calcular.
+
+MEJORAS
+- Nuevo semantic_layer.py centralizado y auditable.
+- Mapeo genérico de ventas, costo, utilidad, cantidad, clientes, productos, vendedores,
+  zonas, proveedores, almacenes, fletes, rutas, fechas, referencias, mermas, etc.
+- Evita confundir Costo_Flete con Costo_FleteXTon / Freight Cost con Freight Rate.
+- Prompt compiler, execution plan, filtros y preguntas del dashboard consumen el mapa semántico.
+- El dashboard incluye una tabla visible "Mapa Semántico R10.2" en Análisis avanzado.
+- Se conserva la fuente original: no se renombran ni modifican columnas del archivo cargado.
+
+APLICACIÓN
+1. Debe estar en feature/r10-dashboard-intelligence.
+2. Extraiga este ZIP directamente en:
+   C:\IA_EMPRESARIAL_LOCAL\R10_2_PATCH
+3. Ejecute:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\R10_2_PATCH\APLICAR_R10_2.ps1
+
+PRUEBAS ESPERADAS
+42/42 PASS en test_bi_productivo.py
+30/30 OK en run_enterprise_tests.py
+
+No haga commit hasta generar y revisar el dashboard real.

@@ -1,0 +1,46 @@
+def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
+    import os
+    import pandas as pd
+    import dashboard_dynamic as dd
+    old = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
+    os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
+    try:
+        df = pd.DataFrame([{
+            "Fecha":"2026-08-01","Semana":"Semana 1-8","Zona":"PACIFICO",
+            "Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C1","Cliente":"CLIENTE 1",
+            "Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"PROV 1","Almacen":"ALM 1",
+            "Ciudad_Origen":"CULIACAN","Ciudad_Destino":"GUADALAJARA","Cliente_Recoge":"N",
+            "Refer":"A1","Toneladas_Vendidas":10.0,"Importe_Venta":1000.0,"Costo":900.0,
+            "Utilidad":100.0,"Costo_Producto":800.0,"Costo_Flete":80.0,"Otros_Costos":20.0,
+            "Toneladas_Mermadas":0.1,"cod_linea":"GRANO"
+        }])
+        prompt = """Genera un dashboard ejecutivo de ventas, costos, logística, fletes y rentabilidad.
+        KPIs ejecutivos: toneladas vendidas, venta total, costo total, utilidad total, margen %,
+        utilidad por tonelada, costo por tonelada, precio promedio por tonelada, costo de producto,
+        costo de fletes, otros costos, toneladas mermadas, clientes únicos y operaciones/referencias.
+        Analiza productos, clientes, vendedores, zonas, categorías, proveedores, almacenes,
+        fletes, origen destino, evolución por fecha, comparación por semana y alertas."""
+        plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
+        assert plan["title"] == "Dashboard Ejecutivo de Ventas y Rentabilidad"
+        assert plan["prompt_compiler"]["version"] == "r9.4"
+        assert plan["prompt_compiler"]["kpi_count"] >= 14
+        assert plan["prompt_compiler"]["filter_count"] >= 10
+        assert plan["prompt_compiler"]["chart_count"] >= 10
+        labels = {x["label"] for x in plan["kpis"]}
+        assert "Margen %" in labels
+        assert "Utilidad por Tonelada" in labels
+        assert "Costo de Fletes" in labels
+        assert any(x.get("column") == "ctrl_alm" for x in plan["filters"])
+        assert "enterprise-prompt-compiler-r9.4" in plan["planner"]
+    finally:
+        if old is None:
+            os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
+        else:
+            os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
+
+
+def test_r9_4_ratio_kpi_renderer_present():
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[1] / "scripts" / "dashboard_dynamic.py"
+    s = p.read_text(encoding="utf-8")
+    assert "if(op==='ratio')" in s

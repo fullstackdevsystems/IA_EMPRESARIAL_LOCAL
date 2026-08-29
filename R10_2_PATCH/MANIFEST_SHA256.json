@@ -1,0 +1,11 @@
+{
+  "APLICAR_R10_2.ps1": "a7ca8f4e8e6a2e80ad5c036d86c593c2db2b3c4692470971862c1ea9f256a456",
+  "IA_Local/VERSION.txt": "cb39b0ea424415139313ef83948f58f28a295dc3142269086a41befc9675c301",
+  "IA_Local/scripts/analizador_universal.py": "ba59e636de04c72024aa90472ac146e70010bf40ad4f7cf2e2b249431f1243b8",
+  "IA_Local/scripts/dashboard_dynamic.py": "601153ddf0e0f2ee421e70848355d4a28852a71007c7f710c57d0ff9ed4b408f",
+  "IA_Local/scripts/enterprise_prompt_compiler.py": "a90a5cbf2aca50966684a8cbf1cc69b42ad238a0c786bc4fae958da5cc6d732f",
+  "IA_Local/scripts/prompt_execution_plan.py": "a45e0d4e2d00b0cd53856b276f6328ac3d6782f312172cea6205c092414f1889",
+  "IA_Local/scripts/semantic_layer.py": "6580c5829851580bf12231795f3804f6e564d24f62da04094077dd8e4c321f96",
+  "IA_Local/tests/test_bi_productivo.py": "86c6ec6b4c166ae0bf0fce340b6c927c00085bfe726a0f9968777b331aef492a",
+  "LEEME_R10_2.txt": "d422ec46d7c57c213fcd2b0071a47a41c39669284230c1247edc9893ad5d53fa"
+}

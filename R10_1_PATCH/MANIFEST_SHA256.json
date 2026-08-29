@@ -1,0 +1,45 @@
+{
+  "version": "8.5.5-r10.1",
+  "files": [
+    {
+      "path": "APLICAR_R10_1.ps1",
+      "sha256": "2e82db49edb6e9052716293821755340a25508fc6abd41065cb1b81e1a968026",
+      "size": 1782
+    },
+    {
+      "path": "IA_Local/VERSION.txt",
+      "sha256": "74b58a83ee941042b3f806228b994ebbeffa4835cac4a3fbf1c67e42e9a14883",
+      "size": 12
+    },
+    {
+      "path": "IA_Local/scripts/analizador_universal.py",
+      "sha256": "1c635f01b493ffa6e0fc44d13197ed02db337c6f29a07ce4a00179c984bb0d73",
+      "size": 53438
+    },
+    {
+      "path": "IA_Local/scripts/dashboard_dynamic.py",
+      "sha256": "0e122888400d1437680d58262e9b24bcac8cb4db22723a271087f1fff73e00de",
+      "size": 80943
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_prompt_compiler.py",
+      "sha256": "c515521b09fb4a0af045d9ebb6a0ceea792b563e07f7631fd39301d1646a534f",
+      "size": 9113
+    },
+    {
+      "path": "IA_Local/scripts/prompt_execution_plan.py",
+      "sha256": "05ab9d7875fd95b37e84a56488354747fda35806f29c1a3a19a13959e50fc629",
+      "size": 8407
+    },
+    {
+      "path": "IA_Local/tests/test_bi_productivo.py",
+      "sha256": "16b38e93e11bb3907904d7d0945e3988f779d90729e7bbb69f4440731eba48a1",
+      "size": 29422
+    },
+    {
+      "path": "LEEME_R10_1.txt",
+      "sha256": "eca731266f574987d086df318340dc0d57bf1b28007706d7b849f3c08a5ccc8e",
+      "size": 1098
+    }
+  ]
+}

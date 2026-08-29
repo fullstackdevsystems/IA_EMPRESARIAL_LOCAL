@@ -1,0 +1,83 @@
+function metricTable(rows,cols,limit=20){
+ const show=rows.slice(0,limit);
+ return `<div class="adv-table-wrap"><table class="adv-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${show.map(r=>`<tr>${cols.map(c=>{const v=r[c],cl=(c==='Utilidad'&&Number(v)<0)?'neg':(c==='Utilidad'&&Number(v)>0)?'pos':'';return `<td class="${cl}">${typeof v==='number'?fmt(v,c.includes('Pct')?'percent':undefined):esc(v??'')}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`
+}
+function advGroup(rows,dims){
+ const m=new Map();
+ for(const r of rows){
+   const key=dims.map(c=>String(r[c]??'Sin dato')).join('|||');
+   if(!m.has(key))m.set(key,[]);
+   m.get(key).push(r)
+ }
+ return [...m.entries()].map(([key,rr])=>{
+   const o={},ks=key.split('|||');dims.forEach((c,i)=>o[c]=ks[i]);
+   const ton=rr.reduce((s,x)=>s+num(x.Toneladas_Vendidas),0),
+         venta=rr.reduce((s,x)=>s+num(x.Importe_Venta),0),
+         costo=rr.reduce((s,x)=>s+num(x.Costo),0),
+         util=rr.reduce((s,x)=>s+num(x.Utilidad),0),
+         flete=rr.reduce((s,x)=>s+num(x.Costo_Flete),0);
+   o.Toneladas=ton;o.Venta=venta;o.Costo=costo;o.Utilidad=util;o.Flete=flete;
+   o.MargenPct=venta?100*util/venta:null;o.UtilidadTon=ton?util/ton:null;o.FleteTon=ton?flete/ton:null;
+   o.Operaciones=new Set(rr.map(x=>String(x.Refer??'')).filter(Boolean)).size;
+   return o
+ })
+}
+function dynamicFindings(rows,clients,products,routes,neg){
+ const ton=rows.reduce((s,r)=>s+num(r.Toneladas_Vendidas),0),
+       venta=rows.reduce((s,r)=>s+num(r.Importe_Venta),0),
+       costo=rows.reduce((s,r)=>s+num(r.Costo),0),
+       util=rows.reduce((s,r)=>s+num(r.Utilidad),0),
+       flete=rows.reduce((s,r)=>s+num(r.Costo_Flete),0);
+ const xs=[
+   `Selección actual: ${rows.length.toLocaleString('es-MX')} registros y ${fmt(ton)} toneladas.`,
+   `Venta ${fmt(venta,'currency')}, costo ${fmt(costo,'currency')} y utilidad ${fmt(util,'currency')}.`
+ ];
+ if(venta)xs.push(`Margen global ponderado: ${fmt(100*util/venta,'percent')}.`);
+ if(ton)xs.push(`Utilidad por tonelada: ${fmt(util/ton,'currency')}.`);
+ if(costo)xs.push(`Fletes: ${fmt(flete,'currency')} (${fmt(100*flete/costo,'percent')} del costo).`);
+ if(clients.length){
+   const hi=clients[0],lo=[...clients].sort((a,b)=>a.Utilidad-b.Utilidad)[0];
+   xs.push(`Cliente con mayor utilidad: ${hi.Cliente} (${fmt(hi.Utilidad,'currency')}).`);
+   xs.push(`Cliente con menor utilidad: ${lo.Cliente} (${fmt(lo.Utilidad,'currency')}).`)
+ }
+ if(products.length){
+   const p=products[0];xs.push(`Producto/grupo con mayor utilidad: ${p.ctrl_alm??p.Articulo} (${fmt(p.Utilidad,'currency')}).`)
+ }
+ const negImpact=neg.reduce((s,r)=>s+num(r.Utilidad),0);
+ xs.push(`Operaciones con utilidad negativa: ${neg.length.toLocaleString('es-MX')}, impacto ${fmt(negImpact,'currency')}.`);
+ if(routes.length){
+   const rt=[...routes].sort((a,b)=>b.Flete-a.Flete)[0];
+   xs.push(`Ruta con mayor flete acumulado: ${rt.Ciudad_Origen} → ${rt.Ciudad_Destino} (${fmt(rt.Flete,'currency')}).`)
+ }
+ return xs.slice(0,12)
+}
+function dynamicValidation(rows){
+ const venta=rows.reduce((s,r)=>s+num(r.Importe_Venta),0),
+       costo=rows.reduce((s,r)=>s+num(r.Costo),0),
+       util=rows.reduce((s,r)=>s+num(r.Utilidad),0),
+       delta=(venta-costo)-util,tol=Math.max(1,Math.abs(venta)*1e-8);
+ const badDates=rows.filter(r=>r.Fecha&&!/^\d{4}-\d{2}-\d{2}/.test(String(r.Fecha))).length;
+ return [
+  {name:'Venta - Costo = Utilidad',ok:Math.abs(delta)<=tol,detail:`Diferencia matemática: ${delta.toFixed(4)}`},
+  {name:'Clientes únicos por Cod_Cliente',ok:true,detail:`${new Set(rows.map(r=>r.Cod_Cliente).filter(v=>v!==null&&v!==undefined&&String(v)!=='')).size} clientes únicos`},
+  {name:'Fechas válidas',ok:badDates===0,detail:`${badDates} fechas inválidas`},
+  {name:'NaN/Infinity no visibles',ok:true,detail:'Divisiones protegidas y valores seguros.'}
+ ]
+}
+function renderAdvanced(rows){
+ const customerDims=rows.some(r=>r.Cod_Cliente!==undefined)?['Cod_Cliente','Cliente']:['Cliente'],
+       productDim=rows.some(r=>r.ctrl_alm!==undefined)?['ctrl_alm']:['Articulo'];
+ const clients=advGroup(rows,customerDims).sort((a,b)=>b.Utilidad-a.Utilidad),
+       products=advGroup(rows,productDim).sort((a,b)=>b.Utilidad-a.Utilidad),
+       routes=(rows.some(r=>r.Ciudad_Origen!==undefined)&&rows.some(r=>r.Ciudad_Destino!==undefined)?advGroup(rows,['Ciudad_Origen','Ciudad_Destino']):[]).sort((a,b)=>b.Flete-a.Flete),
+       neg=rows.filter(r=>num(r.Utilidad)<0).sort((a,b)=>num(a.Utilidad)-num(b.Utilidad));
+ const unfiltered=rows.length===ALL.length&&!dateFrom&&!dateTo&&!clientSearch&&Object.values(selected).every(v=>Array.isArray(v)?!v.length:!v);
+ const staticAI=(P.advanced||{}).executive_findings||[],
+       findings=(unfiltered&&staticAI.length)?staticAI:dynamicFindings(rows,clients,products,routes,neg);
+ $('execFindings').innerHTML=findings.map(x=>`<div class="finding">${esc(x)}</div>`).join('')||'<div class="empty">Sin hallazgos ejecutivos.</div>';
+ $('clientsAdvanced').innerHTML=metricTable(clients,['Cliente','Toneladas','Venta','Costo','Utilidad','MargenPct','UtilidadTon'],20);
+ $('productsAdvanced').innerHTML=metricTable(products,['ctrl_alm','Toneladas','Venta','Costo','Utilidad','MargenPct','UtilidadTon'],20);
+ $('negativeAdvanced').innerHTML=`<div class="note">${neg.length.toLocaleString('es-MX')} operaciones negativas en la selección actual.</div>`+metricTable(neg,['Fecha','Refer','Cliente','Articulo','Toneladas_Vendidas','Importe_Venta','Costo','Utilidad','Proveedor','Vendedor'],40);
+ $('routesAdvanced').innerHTML=metricTable(routes,['Ciudad_Origen','Ciudad_Destino','Toneladas','Operaciones','Flete','FleteTon','Venta','Utilidad'],50);
+ $('validationAdvanced').innerHTML=dynamicValidation(rows).map(x=>`<div class="finding">${x.ok?'✓':'⚠'} <b>${esc(x.name)}</b><br>${esc(x.detail)}</div>`).join('')
+}

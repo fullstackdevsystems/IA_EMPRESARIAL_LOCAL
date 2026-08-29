@@ -1,0 +1,21 @@
+IA EMPRESARIAL LOCAL — R10.1 Executive Dashboard UX & Data Reference
+
+Objetivo:
+- Reducir saturación visual del dashboard.
+- Mostrar solo 4 gráficas principales al abrir; las demás quedan disponibles con "Ver todas las gráficas".
+- Mostrar valores numéricos directamente sobre barras y una lista-resumen por categoría.
+- Mostrar métrica, cálculo, agrupación, unidad y cobertura visual en cada gráfica.
+- Agregar máximo, mínimo y promedio a series temporales.
+- Mantener Detalle, Análisis, Preguntar y Analítica como vistas secundarias que se abren desde el menú.
+- Tabla con 10 / 20 / 50 / Todos.
+- Top de gráficas inicia en 10 para mejorar legibilidad.
+- Corregir semántica del filtro multiselección "Todos".
+- Todos los cálculos siguen usando filtered() como única selección actual.
+
+Aplicación:
+1) Crear/cambiar a feature/r10-dashboard-intelligence.
+2) Descomprimir este ZIP en C:\IA_EMPRESARIAL_LOCAL\R10_1_PATCH
+3) Ejecutar desde PowerShell:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\R10_1_PATCH\APLICAR_R10_1.ps1
+4) Ejecutar las pruebas indicadas por ChatGPT.
