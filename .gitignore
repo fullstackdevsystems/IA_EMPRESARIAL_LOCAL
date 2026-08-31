@@ -43,3 +43,9 @@ IA_Local/workspace/Entrada/
 # Local R10.13D.8 / D.9 applicators
 /Aplicar_R10_13D8_Interactive_Dimension_Metrics.py
 /Aplicar_R10_13D9_Interactive_Dimension_Chart_Controls.py
+
+# Local R10.13D.10 applicator
+/Aplicar_R10_13D10_Cross_Filter_Drilldown.py
+
+# Local R10.13D.10 applicator
+/Aplicar_R10_13D10_Cross_Filter_Drilldown.py
