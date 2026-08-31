@@ -377,6 +377,79 @@ def runtime_markup() -> str:
     cursor:pointer
 }
 
+.r13b-chart-controls{
+    grid-column:span 12;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:wrap;
+    padding:0 12px 8px
+}
+
+.r13b-chart-controls label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:#61768b;
+    font-size:10px;
+    font-weight:800;
+    text-transform:uppercase
+}
+
+.r13b-chart-controls select{
+    border:1px solid #cfe1e8;
+    border-radius:9px;
+    padding:6px 8px;
+    background:#fff;
+    color:#102540;
+    font-weight:700
+}
+
+.r13b-ranking-list{
+    display:grid;
+    gap:8px;
+    margin-top:10px
+}
+
+.r13b-ranking-row{
+    display:grid;
+    grid-template-columns:34px minmax(150px,1.3fr) minmax(120px,2fr) auto;
+    gap:8px;
+    align-items:center;
+    font-size:11px
+}
+
+.r13b-ranking-pos{
+    width:28px;
+    height:28px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    background:#eef8fa;
+    color:#087f8e;
+    font-weight:900
+}
+
+.r13b-ranking-name{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap
+}
+
+.r13b-ranking-track{
+    height:8px;
+    background:#edf3f6;
+    border-radius:999px;
+    overflow:hidden
+}
+
+.r13b-ranking-track i{
+    display:block;
+    height:100%;
+    background:linear-gradient(90deg,#0a93a4,#19b8c4);
+    border-radius:999px
+}
+
 .r13b-share{
     color:#61768b;
     font-weight:600;
@@ -2075,6 +2148,83 @@ try{
      */
     const dimensionMetricSelection={};
 
+    /*
+     * =====================================================
+     * R10.13D.9
+     * INTERACTIVE DIMENSION CHART CONTROLS
+     * =====================================================
+     *
+     * Estado independiente por componente:
+     * - top_n
+     * - sort_order
+     * - chart_view
+     */
+    const dimensionChartControls={};
+
+
+    function rankingListCard(
+        title,
+        chartData,
+        format='number'
+    ){
+
+        const maxAbs=Math.max(
+            1,
+            ...chartData.map(
+                item=>Math.abs(
+                    Number(item.value)||0
+                )
+            )
+        );
+
+        return `
+        <article class="r13b-card full">
+            <h3>${esc(title)}</h3>
+
+            <div class="r13b-ranking-list">
+                ${
+                    chartData
+                        .map(
+                            (item,index)=>{
+                                const value=
+                                    Number(item.value)||0;
+
+                                const width=
+                                    Math.max(
+                                        2,
+                                        Math.round(
+                                            Math.abs(value)
+                                            /maxAbs
+                                            *100
+                                        )
+                                    );
+
+                                return `
+                                <div class="r13b-ranking-row">
+                                    <span class="r13b-ranking-pos">
+                                        ${index+1}
+                                    </span>
+                                    <span class="r13b-ranking-name">
+                                        ${esc(
+                                            (item.labels||[])[0]
+                                            ??'Sin dato'
+                                        )}
+                                    </span>
+                                    <span class="r13b-ranking-track">
+                                        <i style="width:${width}%"></i>
+                                    </span>
+                                    <strong>
+                                        ${fmt(value,format)}
+                                    </strong>
+                                </div>`;
+                            }
+                        )
+                        .join('')
+                }
+            </div>
+        </article>`;
+    }
+
 
     function dimensionProfitabilityCard(c,rr){
 
@@ -2310,7 +2460,7 @@ try{
                 </div>`
                 :'';
 
-        const chartTopN=
+        const defaultChartTopN=
             Math.max(
                 1,
                 Math.min(
@@ -2321,6 +2471,52 @@ try{
                     50
                 )
             );
+
+        const chartControlState=
+            (
+                dimensionChartControls[c.id]
+                &&typeof dimensionChartControls[c.id]==='object'
+            )
+                ?dimensionChartControls[c.id]
+                :{};
+
+        const chartTopN=
+            Math.max(
+                1,
+                Math.min(
+                    Number(
+                        chartControlState.top_n
+                        ||defaultChartTopN
+                    ),
+                    50
+                )
+            );
+
+        const chartSortOrder=
+            (
+                String(
+                    chartControlState.sort_order
+                    ||'desc'
+                )==='asc'
+            )
+                ?'asc'
+                :'desc';
+
+        const chartView=
+            (
+                String(
+                    chartControlState.chart_view
+                    ||'bars'
+                )==='list'
+            )
+                ?'list'
+                :'bars';
+
+        dimensionChartControls[c.id]={
+            top_n:chartTopN,
+            sort_order:chartSortOrder,
+            chart_view:chartView
+        };
 
         let chartHtml='';
 
@@ -2361,29 +2557,106 @@ try{
                         }
                     )
                     .sort(
-                        (a,b)=>b.value-a.value
+                        (a,b)=>
+                            chartSortOrder==='asc'
+                                ?a.value-b.value
+                                :b.value-a.value
                     )
                     .slice(
                         0,
                         chartTopN
                     );
 
-            chartHtml=
-                barsCard(
-                    (
-                        chartMetricDef.label
-                        +' por '
-                        +dimensionRole
-                    ),
-                    chartData,
-                    {
-                        full:true
-                    }
+            const chartTitle=
+                (
+                    chartMetricDef.label
+                    +' por '
+                    +dimensionRole
                 );
+
+            chartHtml=
+                chartView==='list'
+                    ?rankingListCard(
+                        chartTitle,
+                        chartData,
+                        chartMetricDef.format
+                    )
+                    :barsCard(
+                        chartTitle,
+                        chartData,
+                        {
+                            full:true
+                        }
+                    );
         }
+
+        const chartControlsHtml=`
+        <div class="r13b-chart-controls">
+            <label>
+                Top
+                <select
+                    data-r13b-dimension-topn="${esc(c.id)}"
+                >
+                    ${
+                        [5,10,15,20,30,50]
+                            .map(
+                                n=>`
+                                <option
+                                    value="${n}"
+                                    ${n===chartTopN?'selected':''}
+                                >
+                                    ${n}
+                                </option>`
+                            )
+                            .join('')
+                    }
+                </select>
+            </label>
+
+            <label>
+                Orden
+                <select
+                    data-r13b-dimension-order="${esc(c.id)}"
+                >
+                    <option
+                        value="desc"
+                        ${chartSortOrder==='desc'?'selected':''}
+                    >
+                        Mayor → menor
+                    </option>
+                    <option
+                        value="asc"
+                        ${chartSortOrder==='asc'?'selected':''}
+                    >
+                        Menor → mayor
+                    </option>
+                </select>
+            </label>
+
+            <label>
+                Vista
+                <select
+                    data-r13b-dimension-view="${esc(c.id)}"
+                >
+                    <option
+                        value="bars"
+                        ${chartView==='bars'?'selected':''}
+                    >
+                        Barras
+                    </option>
+                    <option
+                        value="list"
+                        ${chartView==='list'?'selected':''}
+                    >
+                        Ranking
+                    </option>
+                </select>
+            </label>
+        </div>`;
 
         return `
         ${metricSelectorHtml}
+        ${chartControlsHtml}
         ${chartHtml}
         <article class="r13b-card full">
             <h3>${esc(
@@ -3727,6 +4000,69 @@ try{
                             select.value
                             ||''
                         );
+
+                        renderPages();
+                    };
+                }
+            );
+
+        /*
+         * R10.13D.9
+         * Top N / orden / vista.
+         */
+        document
+            .querySelectorAll(
+                'select[data-r13b-dimension-topn],'
+                +'select[data-r13b-dimension-order],'
+                +'select[data-r13b-dimension-view]'
+            )
+            .forEach(
+                select=>{
+                    select.onchange=()=>{
+                        const componentId=String(
+                            select.dataset.r13bDimensionTopn
+                            ||select.dataset.r13bDimensionOrder
+                            ||select.dataset.r13bDimensionView
+                            ||''
+                        );
+
+                        if(!componentId){
+                            return;
+                        }
+
+                        const state={
+                            ...(
+                                dimensionChartControls[
+                                    componentId
+                                ]
+                                ||{}
+                            )
+                        };
+
+                        if(
+                            select.dataset.r13bDimensionTopn
+                        ){
+                            state.top_n=
+                                Number(select.value)||15;
+                        }
+
+                        if(
+                            select.dataset.r13bDimensionOrder
+                        ){
+                            state.sort_order=
+                                String(select.value||'desc');
+                        }
+
+                        if(
+                            select.dataset.r13bDimensionView
+                        ){
+                            state.chart_view=
+                                String(select.value||'bars');
+                        }
+
+                        dimensionChartControls[
+                            componentId
+                        ]=state;
 
                         renderPages();
                     };
