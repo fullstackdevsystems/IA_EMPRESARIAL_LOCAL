@@ -58,9 +58,11 @@ SPECS: Tuple[ConceptSpec, ...] = (
     ConceptSpec("customer", "Cliente", ("cliente", "customer", "customer name", "nombre cliente", "razon social", "razón social", "account name"), ("text",), ("cliente", "customer", "razon", "account"), ("codigo", "cod", "id")),
     ConceptSpec("customer_id", "Código cliente", ("cod cliente", "cod_cliente", "codigo cliente", "código cliente", "customer id", "customerid", "client id", "id cliente", "account id"), ("text", "number"), ("cliente", "customer", "client", "account", "id", "codigo", "cod")),
     ConceptSpec("product", "Producto", ("articulo", "artículo", "producto", "product", "product name", "descripcion producto", "descripción producto", "item", "item description", "sku description"), ("text",), ("producto", "product", "articulo", "item", "sku"), ("codigo", "cod", "id", "grupo")),
+    ConceptSpec("product_id", "Código producto", ("cod articulo", "cod_articulo", "codigo articulo", "código artículo", "product id", "product_id", "productid", "item id", "item_id", "sku", "sku id", "sku_id"), ("text", "number"), ("producto", "product", "articulo", "item", "sku", "id", "codigo", "cod")),
     ConceptSpec("product_group", "Grupo de producto", ("ctrl alm", "ctrl_alm", "grupo producto", "product group", "familia producto", "agrupador producto"), ("text",), ("grupo", "group", "familia", "agrupador", "ctrl")),
     ConceptSpec("category", "Categoría", ("categoria", "categoría", "category", "familia", "segmento producto", "product category"), ("text",), ("categoria", "category", "familia", "segmento")),
     ConceptSpec("seller", "Vendedor", ("vendedor", "ejecutivo", "asesor", "sales rep", "salesrep", "seller", "account executive", "representante"), ("text",), ("vendedor", "ejecutivo", "asesor", "sales", "seller", "representante"), ("codigo", "cod", "id")),
+    ConceptSpec("seller_id", "Código vendedor", ("cod vendedor", "cod_vendedor", "codigo vendedor", "código vendedor", "seller id", "seller_id", "sales rep id", "salesrep id", "salesperson id", "employee seller id"), ("text", "number"), ("vendedor", "seller", "sales", "id", "codigo", "cod")),
     ConceptSpec("zone", "Zona", ("zona", "region", "región", "territorio", "territory", "sales region"), ("text",), ("zona", "region", "territorio", "territory"), ("codigo", "cod", "id")),
     ConceptSpec("line", "Línea", ("linea", "línea", "cod linea", "cod_linea", "business line", "line"), ("text", "number"), ("linea", "line")),
     ConceptSpec("reference", "Referencia", ("refer", "referencia", "reference", "folio", "factura", "invoice", "transaction id", "operation id"), ("text", "number"), ("refer", "referencia", "folio", "invoice", "factura", "operation")),
@@ -99,6 +101,8 @@ def _name_score(col: str, spec: ConceptSpec) -> Tuple[float, str]:
         "previous": {"anterior", "previous"},
         "freight_per_unit": {"rate", "ton", "xton", "unitario", "unidad"},
         "customer_id": {"id", "codigo", "cod"},
+        "product_id": {"id", "codigo", "cod", "sku"},
+        "seller_id": {"id", "codigo", "cod"},
         "product_group": {"grupo", "group", "familia", "agrupador", "ctrl"},
     }
     if spec.key in anchors and not (ct & anchors[spec.key]):

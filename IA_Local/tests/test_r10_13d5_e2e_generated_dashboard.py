@@ -153,14 +153,20 @@ def main() -> int:
     check(
         "products_grouped_spec",
         '"semantic_role":"products"' in text
-        and '"grain_roles":["product"]' in text
+        and (
+            '"grain_roles":["product_id"]' in text
+            or '"grain_roles":["product"]' in text
+        )
         and '"label_roles":["product"]' in text,
     )
 
     check(
         "sellers_grouped_spec",
         '"semantic_role":"sellers"' in text
-        and '"grain_roles":["seller"]' in text
+        and (
+            '"grain_roles":["seller_id"]' in text
+            or '"grain_roles":["seller"]' in text
+        )
         and '"label_roles":["seller"]' in text,
     )
 
