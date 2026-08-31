@@ -450,6 +450,75 @@ def runtime_markup() -> str:
     border-radius:999px
 }
 
+.r13b-drill-filter-host{
+    display:none;
+    margin:0 0 12px
+}
+
+.r13b-drill-filter-host.is-active{
+    display:block
+}
+
+.r13b-drill-filter-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    border:1px solid #bfe8ec;
+    background:linear-gradient(135deg,#f7fcfd,#eef9fa);
+    border-radius:12px;
+    padding:9px 10px;
+    box-shadow:0 4px 14px rgba(18,52,77,.04)
+}
+
+.r13b-drill-filter-title{
+    color:#31516a;
+    font-size:10px;
+    font-weight:900;
+    text-transform:uppercase;
+    margin-right:2px
+}
+
+.r13b-drill-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border:1px solid #cde6ea;
+    background:#fff;
+    color:#31516a;
+    border-radius:999px;
+    padding:6px 8px 6px 10px;
+    font-size:10px;
+    font-weight:700
+}
+
+.r13b-drill-chip b{
+    color:#087f8e
+}
+
+.r13b-drill-chip button,
+.r13b-drill-clear-all{
+    border:0;
+    background:transparent;
+    color:#087f8e;
+    cursor:pointer;
+    font-weight:900
+}
+
+.r13b-drill-clear-all{
+    margin-left:auto;
+    border:1px solid #cde6ea;
+    background:#fff;
+    border-radius:8px;
+    padding:6px 9px
+}
+
+.r13b-drill-count{
+    color:#61768b;
+    font-size:10px;
+    font-weight:700
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -814,6 +883,26 @@ try{
 
         wrap.appendChild(toolbar);
     }
+
+    /*
+     * =====================================================
+     * R10.13D.11
+     * GLOBAL ANALYTICAL FILTER BAR
+     * =====================================================
+     */
+    const drillFilterHost=
+        document.createElement('div');
+
+    drillFilterHost.id=
+        'r13bDrillFilterHost';
+
+    drillFilterHost.className=
+        'r13b-drill-filter-host';
+
+    host.parentNode.insertBefore(
+        drillFilterHost,
+        host
+    );
 
 
     /*
@@ -4038,6 +4127,154 @@ try{
 
     /*
      * =====================================================
+     * R10.13D.11
+     * MULTIDIMENSIONAL ANALYTICAL FILTER SUMMARY
+     * =====================================================
+     */
+    function renderDrillFilterBar(){
+
+        if(!drillFilterHost){
+            return;
+        }
+
+        const active=
+            Object.values(
+                dimensionDrillFilters
+            )
+                .filter(
+                    item=>
+                        item
+                        &&item.column
+                        &&item.value!==undefined
+                        &&item.value!==null
+                );
+
+        if(!active.length){
+
+            drillFilterHost.classList.remove(
+                'is-active'
+            );
+
+            drillFilterHost.innerHTML='';
+            return;
+        }
+
+        drillFilterHost.classList.add(
+            'is-active'
+        );
+
+        drillFilterHost.innerHTML=`
+        <div class="r13b-drill-filter-bar">
+            <span class="r13b-drill-filter-title">
+                Filtros analíticos
+            </span>
+
+            <span class="r13b-drill-count">
+                ${active.length}
+                activo${active.length===1?'':'s'}
+            </span>
+
+            ${
+                active
+                    .map(
+                        item=>`
+                        <span
+                            class="r13b-drill-chip"
+                            title="${esc(
+                                item.column
+                                +' = '
+                                +item.value
+                            )}"
+                        >
+                            <b>${esc(item.column)}</b>
+                            <span>
+                                ${esc(
+                                    item.label
+                                    ||item.value
+                                )}
+                            </span>
+                            <button
+                                type="button"
+                                aria-label="Quitar filtro ${esc(
+                                    item.label
+                                    ||item.value
+                                )}"
+                                data-r13b-clear-global-drill="${esc(item.column)}"
+                            >
+                                ×
+                            </button>
+                        </span>`
+                    )
+                    .join('')
+            }
+
+            ${
+                active.length>1
+                    ?`
+                    <button
+                        type="button"
+                        class="r13b-drill-clear-all"
+                        data-r13b-clear-all-drills
+                    >
+                        Limpiar todos
+                    </button>`
+                    :''
+            }
+        </div>`;
+
+        drillFilterHost
+            .querySelectorAll(
+                '[data-r13b-clear-global-drill]'
+            )
+            .forEach(
+                button=>{
+                    button.onclick=()=>{
+
+                        const column=String(
+                            button.dataset.r13bClearGlobalDrill
+                            ||''
+                        );
+
+                        if(!column){
+                            return;
+                        }
+
+                        delete dimensionDrillFilters[
+                            column
+                        ];
+
+                        renderPages();
+                    };
+                }
+            );
+
+        const clearAll=
+            drillFilterHost.querySelector(
+                '[data-r13b-clear-all-drills]'
+            );
+
+        if(clearAll){
+            clearAll.onclick=()=>{
+
+                for(
+                    const column
+                    of Object.keys(
+                        dimensionDrillFilters
+                    )
+                ){
+                    delete dimensionDrillFilters[
+                        column
+                    ];
+                }
+
+                renderPages();
+            };
+        }
+    }
+
+
+    /*
+     * =====================================================
      * RENDER PAGES
      * =====================================================
      */
@@ -4045,6 +4282,8 @@ try{
     function renderPages(){
 
         const rr=rows();
+
+        renderDrillFilterBar();
 
         model.pages.forEach(page=>{
 
@@ -4202,6 +4441,11 @@ try{
                             return;
                         }
 
+                        /*
+                         * R10.13D.11
+                         * Misma dimensión => reemplaza.
+                         * Otra dimensión => se acumula.
+                         */
                         dimensionDrillFilters[
                             column
                         ]={
