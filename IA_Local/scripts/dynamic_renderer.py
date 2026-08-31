@@ -336,6 +336,7 @@ def runtime_markup() -> str:
 }
 
 .r13b-bar-fill{
+    display:block;
     height:100%;
     background:linear-gradient(90deg,#0a93a4,#19b8c4);
     border-radius:999px
@@ -709,6 +710,29 @@ try{
 
     if(!legacyMode&&toggleFilters){
         toggleFilters.style.display='none';
+    }
+
+
+    /*
+     * R10.13D.7.1.2
+     * LEGACY CHART TOGGLE CLEANUP
+     */
+
+    const toggleCharts=
+        $('toggleCharts');
+
+    if(!legacyMode&&toggleCharts){
+
+        const chartHeader=
+            toggleCharts.closest(
+                '.section-head'
+            );
+
+        if(chartHeader){
+            chartHeader.style.display='none';
+        }
+
+        toggleCharts.style.display='none';
     }
 
 
@@ -1545,29 +1569,41 @@ try{
 
 
         /*
-         * COMMERCIAL PROFITABILITY
-         */
-                /*
          * =====================================================
-         * R10.13D.2
-         * GENERIC DIMENSION ANALYSIS EXECUTOR
+         * R10.13D.7
+         * OPERATOR-DRIVEN CANONICAL DIMENSION PROFITABILITY
          * =====================================================
          */
 
-        if(id.startsWith('analysis:dimension_')){
+        const execution=c.execution||{};
+        const operator=String(
+            execution.operator
+            ||''
+        );
 
-            const dimensionRole=
-                String(
-                    (c.execution||{}).dimension_role
-                    ||c.semantic_role
-                    ||''
-                );
+        if(operator==='dimension_profitability'){
+            return dimensionProfitabilityCard(
+                c,
+                rr
+            );
+        }
+
+        /*
+         * Compatibilidad R10.13D.2.
+         * El dispatch depende del operator, no del ID.
+         */
+        if(operator==='group_by_dimension'){
+
+            const dimensionRole=String(
+                execution.dimension_role
+                ||c.semantic_role
+                ||''
+            );
 
             const dimensionCol=
                 role(dimensionRole);
 
             if(!dimensionCol){
-
                 return blockedCard({
                     ...c,
                     status:'BLOCKED',
@@ -1577,17 +1613,15 @@ try{
                 });
             }
 
-            const measureRole=
-                String(
-                    (c.execution||{}).measure_role
-                    ||'quantity'
-                );
+            const measureRole=String(
+                execution.measure_role
+                ||'quantity'
+            );
 
             const measureCol=
                 role(measureRole);
 
             if(!measureCol){
-
                 return blockedCard({
                     ...c,
                     status:'BLOCKED',
@@ -1597,15 +1631,9 @@ try{
                 });
             }
 
-            const title=
-                c.title
-                ||(
-                    'Análisis por '
-                    +dimensionRole
-                );
-
             return barsCard(
-                title,
+                c.title
+                ||('Análisis por '+dimensionRole),
                 group(
                     rr,
                     [dimensionCol],
@@ -1616,6 +1644,13 @@ try{
                 }
             );
         }
+
+        /*
+         * COMMERCIAL PROFITABILITY LEGACY
+         */
+
+
+
         if(id==='analysis:profitability'){
 
             const revenue=
@@ -1996,6 +2031,333 @@ try{
                     item.component
                     &&item.component.status!=='BLOCKED'
             );
+    }
+
+
+    function dimensionProfitabilityCard(c,rr){
+
+        const execution=c.execution||{};
+
+        const dimensionRole=String(
+            execution.dimension_role
+            ||c.semantic_role
+            ||''
+        );
+
+        const identityRole=String(
+            execution.identity_role
+            ||dimensionRole
+        );
+
+        const labelRole=String(
+            execution.label_role
+            ||dimensionRole
+        );
+
+        const identityCol=
+            role(identityRole)
+            ||role(dimensionRole);
+
+        const labelCol=role(labelRole);
+
+        if(!identityCol){
+            return blockedCard({
+                ...c,
+                status:'BLOCKED',
+                reason:
+                    'No existe una columna semántica válida '
+                    +'para la dimensión solicitada.'
+            });
+        }
+
+        const requestedMetricIds=
+            Array.isArray(execution.measure_kpis)
+                ?execution.measure_kpis
+                :[];
+
+        const metricDefs=
+            businessMetricDefinitions()
+                .filter(
+                    item=>
+                        !requestedMetricIds.length
+                        ||requestedMetricIds.includes(item.id)
+                );
+
+        if(!metricDefs.length){
+            return blockedCard({
+                ...c,
+                status:'BLOCKED',
+                reason:
+                    'No existen KPIs canónicos soportados '
+                    +'para ejecutar la rentabilidad por dimensión.'
+            });
+        }
+
+        const groups=aggregateGroups(
+            rr,
+            [identityCol]
+        );
+
+        const sortMetric=String(
+            execution.sort_metric
+            ||'kpi:revenue'
+        );
+
+        const topN=Math.max(
+            1,
+            Math.min(
+                Number(execution.top_n||15),
+                250
+            )
+        );
+
+        const rowsAgg=groups.map(
+            group=>{
+
+                const metrics={};
+
+                for(const metric of metricDefs){
+                    metrics[metric.id]=
+                        aggregateMetric(
+                            metric.component,
+                            group.rows
+                        );
+                }
+
+                const firstRow=group.rows[0]||{};
+
+                const labelValue=
+                    (
+                        labelCol
+                        &&labelCol!==identityCol
+                    )
+                        ?String(
+                            firstRow[labelCol]
+                            ??'Sin dato'
+                        )
+                        :null;
+
+                return {
+                    identity:
+                        group.labels[0]
+                        ??'Sin dato',
+                    label:labelValue,
+                    count:group.count,
+                    metrics
+                };
+            }
+        );
+
+        rowsAgg.sort(
+            (a,b)=>{
+
+                const av=Number(
+                    a.metrics[sortMetric]
+                );
+                const bv=Number(
+                    b.metrics[sortMetric]
+                );
+
+                if(
+                    Number.isFinite(av)
+                    ||Number.isFinite(bv)
+                ){
+                    return (
+                        (Number.isFinite(bv)?bv:0)
+                        -
+                        (Number.isFinite(av)?av:0)
+                    );
+                }
+
+                return b.count-a.count;
+            }
+        );
+
+        const view=rowsAgg.slice(0,topN);
+
+        const showLabel=Boolean(
+            labelCol
+            &&labelCol!==identityCol
+        );
+
+        /*
+         * =====================================================
+         * R10.13D.7.1
+         * GENERIC DIMENSION CHART EXECUTOR
+         * =====================================================
+         */
+
+        const chartSpec=
+            (
+                execution.chart
+                &&typeof execution.chart==='object'
+            )
+                ?execution.chart
+                :{};
+
+        const chartOperator=
+            String(
+                chartSpec.operator
+                ||'dimension_bar_chart'
+            );
+
+        const chartMetricId=
+            String(
+                chartSpec.metric
+                ||sortMetric
+                ||'kpi:revenue'
+            );
+
+        const chartMetricDef=
+            metricDefs.find(
+                item=>
+                    item.id===chartMetricId
+            )
+            ||metricDefs[0]
+            ||null;
+
+        const chartTopN=
+            Math.max(
+                1,
+                Math.min(
+                    Number(
+                        chartSpec.top_n
+                        ||topN
+                    ),
+                    50
+                )
+            );
+
+        let chartHtml='';
+
+        if(
+            chartOperator==='dimension_bar_chart'
+            &&chartMetricDef
+        ){
+
+            const chartData=
+                rowsAgg
+                    .map(
+                        item=>{
+
+                            const value=
+                                Number(
+                                    item.metrics[
+                                        chartMetricDef.id
+                                    ]
+                                );
+
+                            const label=
+                                (
+                                    item.label
+                                    &&item.label!=='Sin dato'
+                                )
+                                    ?item.label
+                                    :item.identity;
+
+                            return {
+                                labels:[
+                                    String(label)
+                                ],
+                                value:
+                                    Number.isFinite(value)
+                                        ?value
+                                        :0
+                            };
+                        }
+                    )
+                    .sort(
+                        (a,b)=>b.value-a.value
+                    )
+                    .slice(
+                        0,
+                        chartTopN
+                    );
+
+            chartHtml=
+                barsCard(
+                    (
+                        chartMetricDef.label
+                        +' por '
+                        +dimensionRole
+                    ),
+                    chartData,
+                    {
+                        full:true
+                    }
+                );
+        }
+
+        return `
+        ${chartHtml}
+        <article class="r13b-card full">
+            <h3>${esc(
+                c.title
+                ||('Rentabilidad por '+dimensionRole)
+            )}</h3>
+
+            <div class="r13b-small">
+                ${groups.length.toLocaleString('es-MX')}
+                entidades únicas sobre
+                ${rr.length.toLocaleString('es-MX')}
+                registros filtrados.
+                Mostrando
+                ${view.length.toLocaleString('es-MX')}.
+            </div>
+
+            <div class="r13b-table-wrap">
+                <table class="r13b-table">
+                    <thead>
+                        <tr>
+                            <th>${esc(identityRole)}</th>
+                            ${
+                                showLabel
+                                    ?`<th>${esc(labelRole)}</th>`
+                                    :''
+                            }
+                            ${
+                                metricDefs
+                                    .map(
+                                        metric=>
+                                            `<th>${esc(metric.label)}</th>`
+                                    )
+                                    .join('')
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${
+                            view.map(
+                                item=>`
+                                <tr>
+                                    <td>${esc(item.identity)}</td>
+                                    ${
+                                        showLabel
+                                            ?`<td>${esc(item.label)}</td>`
+                                            :''
+                                    }
+                                    ${
+                                        metricDefs
+                                            .map(
+                                                metric=>`
+                                                <td>${
+                                                    fmt(
+                                                        item.metrics[
+                                                            metric.id
+                                                        ],
+                                                        metric.format
+                                                    )
+                                                }</td>`
+                                            )
+                                            .join('')
+                                    }
+                                </tr>`
+                            ).join('')
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </article>`;
     }
 
 

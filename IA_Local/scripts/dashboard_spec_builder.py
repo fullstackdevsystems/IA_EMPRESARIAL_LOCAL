@@ -777,96 +777,92 @@ def _dimension_analysis_caps(
     roles,
 ):
     """
-    R10.13D.2
-
-    Genera componentes visuales internos para dimensiones solicitadas
-    por el prompt.
-
-    IMPORTANTE:
-    - requested_by_prompt = False
-    - no aumenta la cobertura del prompt
-    - no inventa columnas
-    - no inventa métricas
-    - usa exclusivamente roles semánticos resueltos
+    R10.13D.7 - Canonical Dimension Profitability Planner.
+    Componentes internos, no alteran coverage.
     """
 
     out = []
+    dimensions = list(intent.get("dimensions") or [])
 
-    dimensions = list(
-        intent.get("dimensions")
-        or []
-    )
+    measure_kpis = [
+        "kpi:revenue",
+        "kpi:cost",
+        "kpi:profit",
+        "kpi:margin_pct",
+        "kpi:quantity",
+        "kpi:operations",
+        "kpi:ticket_avg",
+        "kpi:price_per_unit",
+        "kpi:cost_per_unit",
+        "kpi:profit_per_unit",
+    ]
 
-    supported = {
-        "customer": "Análisis por cliente",
-        "product": "Análisis por producto",
-        "seller": "Análisis por vendedor",
-        "warehouse": "Análisis por almacén",
+    identity_roles = {
+        "customer": "customer_id",
+        "product": "product_id",
+        "seller": "seller_id",
+    }
+
+    title_labels = {
+        "customer": "cliente",
+        "product": "producto",
+        "seller": "vendedor",
+        "warehouse": "almacén",
+        "zone": "zona",
+        "line": "línea",
+        "category": "categoría",
+        "supplier": "proveedor",
+        "origin_city": "ciudad origen",
+        "destination_city": "ciudad destino",
     }
 
     for key in dimensions:
-
-        if key not in supported:
+        if not roles.get(key):
             continue
 
-        column = roles.get(key)
+        identity_role = identity_roles.get(key, key)
+        if not roles.get(identity_role):
+            identity_role = key
 
-        if not column:
-            continue
+        source_columns = []
+        for role_key in (identity_role, key):
+            col = roles.get(role_key)
+            if col and col not in source_columns:
+                source_columns.append(col)
 
-        # Para la visualización dimensional actual
-        # necesitamos quantity como medida gobernada/directa.
-        quantity_column = roles.get(
-            "quantity"
+        label = title_labels.get(
+            key,
+            key.replace("_", " "),
         )
 
-        if not quantity_column:
-            continue
-
         out.append({
-            "id": (
-                f"analysis:dimension_{key}"
-            ),
+            "id": f"analysis:dimension_{key}",
             "type": "analysis",
-
-            # IMPORTANTE:
-            # componente interno de presentación.
             "requested_by_prompt": False,
-
             "status": SUPPORTED,
-
             "semantic_role": key,
-
-            "source_columns": [
-                column,
-                quantity_column,
-            ],
-
+            "source_columns": source_columns,
             "formula": None,
-
-            "title": supported[key],
-
+            "title": f"Rentabilidad por {label}",
             "reason": None,
-
             "provenance": {
-                "source": (
-                    "dimension_analysis_planner"
-                ),
+                "source": "canonical_dimension_profitability_planner",
                 "confidence": 1.0,
             },
-
-            "dependencies": [
-                key,
-                "quantity",
-            ],
-
+            "dependencies": [key],
             "execution": {
-                "operator": (
-                    "group_by_dimension"
-                ),
+                "operator": "dimension_profitability",
                 "dimension_role": key,
-                "measure_role": "quantity",
+                "identity_role": identity_role,
+                "label_role": key,
+                "measure_kpis": measure_kpis,
+                "sort_metric": "kpi:revenue",
                 "top_n": 15,
+                "chart": {
+                    "operator": "dimension_bar_chart",
+                    "metric": "kpi:revenue",
+                    "top_n": 15,
+                },
             },
         })
 
