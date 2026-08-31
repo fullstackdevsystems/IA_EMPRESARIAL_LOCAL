@@ -39,3 +39,7 @@ IA_Local/workspace/Entrada/
 /Aplicar_R10_13D7_1_1_Visible_Bars.py
 /IA_EMPRESARIAL_LOCAL_R10_13D4_UPDATE.zip
 /release_build/
+
+# Local R10.13D.8 / D.9 applicators
+/Aplicar_R10_13D8_Interactive_Dimension_Metrics.py
+/Aplicar_R10_13D9_Interactive_Dimension_Chart_Controls.py
