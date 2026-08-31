@@ -31,3 +31,11 @@ IA_Local/workspace/Entrada/
 /r10_*_package/
 /r10_*_package_v*/
 /r10_*_v*_package/
+
+# Local R10 release/apply artifacts
+/Aplicar_R10_13D6_Semantic_Entity_IDs.py
+/Aplicar_R10_13D7_Canonical_Dimension_Profitability.py
+/Aplicar_R10_13D7_1_Generic_Dimension_Charts.py
+/Aplicar_R10_13D7_1_1_Visible_Bars.py
+/IA_EMPRESARIAL_LOCAL_R10_13D4_UPDATE.zip
+/release_build/
