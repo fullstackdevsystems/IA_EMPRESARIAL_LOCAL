@@ -450,6 +450,47 @@ def runtime_markup() -> str:
     border-radius:999px
 }
 
+.r13b-drillable{
+    cursor:pointer;
+    transition:background .15s ease,transform .15s ease
+}
+
+.r13b-drillable:hover,
+.r13b-drillable:focus{
+    background:#eef9fa;
+    outline:1px solid #bfe8ec;
+    border-radius:9px
+}
+
+.r13b-drillable:active{
+    transform:scale(.995)
+}
+
+.r13b-drill-status{
+    grid-column:span 12;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    border:1px solid #bfe8ec;
+    background:#eef9fa;
+    border-radius:10px;
+    padding:8px 11px;
+    color:#31516a;
+    font-size:11px
+}
+
+.r13b-drill-status button{
+    border:1px solid #cde6ea;
+    background:#fff;
+    color:#087f8e;
+    border-radius:8px;
+    padding:6px 9px;
+    font-weight:800;
+    cursor:pointer
+}
+
 .r13b-share{
     color:#61768b;
     font-weight:600;
@@ -663,16 +704,54 @@ try{
         window.__IA_DASHBOARD_API__
         || null;
 
+    /*
+     * =====================================================
+     * R10.13D.10
+     * CROSS-FILTER / DRILL-DOWN STATE
+     * =====================================================
+     *
+     * Se aplica DESPUÉS de los filtros globales existentes.
+     * Nunca reemplaza ni modifica la autoridad del filtro base.
+     */
+    const dimensionDrillFilters={};
+
     const rows=()=>{
 
         const a=api();
 
-        return (
+        const baseRows=(
             a
             && typeof a.filteredRows==='function'
         )
             ? a.filteredRows()
             : (DATA.rows||[]);
+
+        const activeDrills=
+            Object.values(
+                dimensionDrillFilters
+            )
+                .filter(
+                    item=>
+                        item
+                        &&item.column
+                        &&item.value!==undefined
+                        &&item.value!==null
+                );
+
+        if(!activeDrills.length){
+            return baseRows;
+        }
+
+        return baseRows.filter(
+            row=>
+                activeDrills.every(
+                    item=>
+                        String(
+                            row[item.column]
+                            ??'Sin dato'
+                        )===String(item.value)
+                )
+        );
     };
 
     const role=r=>
@@ -1125,8 +1204,33 @@ try{
                             ? 100*x.value/total
                             : 0;
 
+                    const drillable=
+                        Boolean(
+                            x.drill_column
+                            &&x.drill_value!==undefined
+                            &&x.drill_value!==null
+                        );
+
                     return `
-                    <div class="r13b-bar-row">
+                    <div
+                        class="r13b-bar-row ${
+                            drillable
+                                ?'r13b-drillable'
+                                :''
+                        }"
+                        ${
+                            drillable
+                                ?`data-r13b-drill-column="${esc(x.drill_column)}"
+                                  data-r13b-drill-value="${esc(x.drill_value)}"
+                                  data-r13b-drill-label="${esc(label)}"`
+                                :''
+                        }
+                        ${
+                            drillable
+                                ?'role="button" tabindex="0"'
+                                :''
+                        }
+                    >
 
                         <span
                             class="r13b-bar-name"
@@ -2199,8 +2303,33 @@ try{
                                         )
                                     );
 
+                                const drillable=
+                                    Boolean(
+                                        item.drill_column
+                                        &&item.drill_value!==undefined
+                                        &&item.drill_value!==null
+                                    );
+
                                 return `
-                                <div class="r13b-ranking-row">
+                                <div
+                                    class="r13b-ranking-row ${
+                                        drillable
+                                            ?'r13b-drillable'
+                                            :''
+                                    }"
+                                    ${
+                                        drillable
+                                            ?`data-r13b-drill-column="${esc(item.drill_column)}"
+                                              data-r13b-drill-value="${esc(item.drill_value)}"
+                                              data-r13b-drill-label="${esc((item.labels||[])[0]??'Sin dato')}"`
+                                            :''
+                                    }
+                                    ${
+                                        drillable
+                                            ?'role="button" tabindex="0"'
+                                            :''
+                                    }
+                                >
                                     <span class="r13b-ranking-pos">
                                         ${index+1}
                                     </span>
@@ -2552,7 +2681,11 @@ try{
                                 value:
                                     Number.isFinite(value)
                                         ?value
-                                        :0
+                                        :0,
+                                drill_column:
+                                    identityCol,
+                                drill_value:
+                                    item.identity
                             };
                         }
                     )
@@ -2654,9 +2787,38 @@ try{
             </label>
         </div>`;
 
+        const activeDrill=
+            dimensionDrillFilters[
+                identityCol
+            ]
+            ||null;
+
+        const drillStatusHtml=
+            activeDrill
+                ?`
+                <div class="r13b-drill-status">
+                    <span>
+                        Filtro analítico:
+                        <strong>
+                            ${esc(
+                                activeDrill.label
+                                ||activeDrill.value
+                            )}
+                        </strong>
+                    </span>
+                    <button
+                        type="button"
+                        data-r13b-clear-drill="${esc(identityCol)}"
+                    >
+                        Quitar filtro
+                    </button>
+                </div>`
+                :'';
+
         return `
         ${metricSelectorHtml}
         ${chartControlsHtml}
+        ${drillStatusHtml}
         ${chartHtml}
         <article class="r13b-card full">
             <h3>${esc(
@@ -4000,6 +4162,91 @@ try{
                             select.value
                             ||''
                         );
+
+                        renderPages();
+                    };
+                }
+            );
+
+        /*
+         * =====================================================
+         * R10.13D.10
+         * CLICK-TO-FILTER / DRILL-DOWN
+         * =====================================================
+         */
+        document
+            .querySelectorAll(
+                '[data-r13b-drill-column]'
+            )
+            .forEach(
+                node=>{
+
+                    const applyDrill=()=>{
+
+                        const column=String(
+                            node.dataset.r13bDrillColumn
+                            ||''
+                        );
+
+                        const value=String(
+                            node.dataset.r13bDrillValue
+                            ??''
+                        );
+
+                        const label=String(
+                            node.dataset.r13bDrillLabel
+                            ||value
+                        );
+
+                        if(!column){
+                            return;
+                        }
+
+                        dimensionDrillFilters[
+                            column
+                        ]={
+                            column,
+                            value,
+                            label
+                        };
+
+                        renderPages();
+                    };
+
+                    node.onclick=applyDrill;
+
+                    node.onkeydown=event=>{
+                        if(
+                            event.key==='Enter'
+                            ||event.key===' '
+                        ){
+                            event.preventDefault();
+                            applyDrill();
+                        }
+                    };
+                }
+            );
+
+        document
+            .querySelectorAll(
+                '[data-r13b-clear-drill]'
+            )
+            .forEach(
+                button=>{
+                    button.onclick=()=>{
+
+                        const column=String(
+                            button.dataset.r13bClearDrill
+                            ||''
+                        );
+
+                        if(!column){
+                            return;
+                        }
+
+                        delete dimensionDrillFilters[
+                            column
+                        ];
 
                         renderPages();
                     };
