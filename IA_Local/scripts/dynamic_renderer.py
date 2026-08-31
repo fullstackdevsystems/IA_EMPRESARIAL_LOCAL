@@ -519,6 +519,97 @@ def runtime_markup() -> str:
     font-weight:700
 }
 
+.r13b-drill-through-btn{
+    border:1px solid #cde6ea;
+    background:#fff;
+    color:#087f8e;
+    border-radius:8px;
+    padding:6px 9px;
+    font-size:10px;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap
+}
+
+.r13b-drill-through-btn:hover,
+.r13b-drill-through-btn:focus{
+    background:#eef9fa;
+    outline:1px solid #bfe8ec
+}
+
+.r13b-drill-through-modal{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:80;
+    padding:20px;
+    background:rgba(7,24,37,.48)
+}
+
+.r13b-drill-through-modal.open{
+    display:flex
+}
+
+.r13b-drill-through-box{
+    width:min(1280px,96vw);
+    max-height:90vh;
+    overflow:auto;
+    background:#fff;
+    border-radius:16px;
+    border:1px solid #dce7ef;
+    box-shadow:0 24px 70px rgba(18,52,77,.22);
+    padding:16px
+}
+
+.r13b-drill-through-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:10px
+}
+
+.r13b-drill-through-head h3{
+    margin:0 0 3px;
+    font-size:16px
+}
+
+.r13b-drill-through-close{
+    border:1px solid #dce7ef;
+    background:#f8fbfd;
+    color:#31516a;
+    border-radius:9px;
+    padding:7px 10px;
+    font-weight:800;
+    cursor:pointer
+}
+
+.r13b-drill-through-meta{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+    margin:8px 0 12px
+}
+
+.r13b-drill-through-meta span{
+    border:1px solid #dce7ef;
+    background:#f8fbfd;
+    border-radius:999px;
+    padding:5px 8px;
+    font-size:10px;
+    color:#4d6478;
+    font-weight:700
+}
+
+.r13b-drill-through-empty{
+    padding:20px;
+    text-align:center;
+    color:#61768b;
+    font-size:12px
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -902,6 +993,58 @@ try{
     host.parentNode.insertBefore(
         drillFilterHost,
         host
+    );
+
+    /*
+     * =====================================================
+     * R10.13D.12
+     * CONTEXTUAL DRILL-THROUGH MODAL
+     * =====================================================
+     */
+    const drillThroughModal=
+        document.createElement('div');
+
+    drillThroughModal.id=
+        'r13bDrillThroughModal';
+
+    drillThroughModal.className=
+        'r13b-drill-through-modal';
+
+    drillThroughModal.setAttribute(
+        'aria-hidden',
+        'true'
+    );
+
+    drillThroughModal.innerHTML=`
+        <div
+            class="r13b-drill-through-box"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="r13bDrillThroughTitle"
+        >
+            <div class="r13b-drill-through-head">
+                <div>
+                    <h3 id="r13bDrillThroughTitle">
+                        Detalle transaccional
+                    </h3>
+                    <div
+                        class="r13b-small"
+                        id="r13bDrillThroughSubtitle"
+                    ></div>
+                </div>
+                <button
+                    type="button"
+                    class="r13b-drill-through-close"
+                    data-r13b-drill-through-close
+                >
+                    Cerrar
+                </button>
+            </div>
+            <div id="r13bDrillThroughBody"></div>
+        </div>`;
+
+    document.body.appendChild(
+        drillThroughModal
     );
 
 
@@ -2942,6 +3085,7 @@ try{
                                     )
                                     .join('')
                             }
+                            <th>Detalle</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2970,6 +3114,20 @@ try{
                                             )
                                             .join('')
                                     }
+                                    <td>
+                                        <button
+                                            type="button"
+                                            class="r13b-drill-through-btn"
+                                            data-r13b-drill-through-column="${esc(identityCol)}"
+                                            data-r13b-drill-through-value="${esc(item.identity)}"
+                                            data-r13b-drill-through-label="${esc(
+                                                item.label
+                                                ||item.identity
+                                            )}"
+                                        >
+                                            Ver detalle
+                                        </button>
+                                    </td>
                                 </tr>`
                             ).join('')
                         }
@@ -4127,6 +4285,323 @@ try{
 
     /*
      * =====================================================
+     * R10.13D.12
+     * CONTEXTUAL DRILL-THROUGH
+     * =====================================================
+     */
+
+    function drillThroughColumns(){
+
+        const components=
+            Object.values(
+                model.components
+                ||{}
+            );
+
+        const tx=
+            components.find(
+                c=>
+                    c
+                    &&c.type==='table'
+                    &&c.execution
+                    &&String(
+                        c.execution.operator
+                        ||''
+                    )==='transaction_table'
+            )
+            ||null;
+
+        const requestedRoles=
+            tx
+            &&Array.isArray(
+                tx.execution.columns
+            )
+                ?tx.execution.columns
+                :[
+                    'transaction_id',
+                    'date',
+                    'customer',
+                    'product',
+                    'seller',
+                    'warehouse',
+                    'revenue',
+                    'cost',
+                    'quantity',
+                    'origin_city',
+                    'destination_city'
+                ];
+
+        return [
+            ...new Set(
+                requestedRoles
+                    .map(
+                        r=>({
+                            role:r,
+                            column:role(r)
+                        })
+                    )
+                    .filter(
+                        item=>item.column
+                    )
+                    .map(
+                        item=>item.column
+                    )
+            )
+        ];
+    }
+
+
+    function activeDrillSummary(){
+
+        return Object.values(
+            dimensionDrillFilters
+        )
+            .filter(
+                item=>
+                    item
+                    &&item.column
+                    &&item.value!==undefined
+                    &&item.value!==null
+            );
+    }
+
+
+    function closeDrillThrough(){
+
+        if(!drillThroughModal){
+            return;
+        }
+
+        drillThroughModal.classList.remove(
+            'open'
+        );
+
+        drillThroughModal.setAttribute(
+            'aria-hidden',
+            'true'
+        );
+    }
+
+
+    function openDrillThrough(
+        column,
+        value,
+        label
+    ){
+
+        if(
+            !drillThroughModal
+            ||!column
+        ){
+            return;
+        }
+
+        const contextualRows=
+            rows().filter(
+                row=>
+                    String(
+                        row[column]
+                        ??'Sin dato'
+                    )===String(value)
+            );
+
+        const cols=
+            drillThroughColumns();
+
+        const limit=500;
+
+        const visibleRows=
+            contextualRows.slice(
+                0,
+                limit
+            );
+
+        const title=
+            drillThroughModal.querySelector(
+                '#r13bDrillThroughTitle'
+            );
+
+        const subtitle=
+            drillThroughModal.querySelector(
+                '#r13bDrillThroughSubtitle'
+            );
+
+        const body=
+            drillThroughModal.querySelector(
+                '#r13bDrillThroughBody'
+            );
+
+        if(title){
+            title.textContent=
+                'Detalle transaccional · '
+                +String(
+                    label
+                    ||value
+                );
+        }
+
+        if(subtitle){
+            subtitle.textContent=
+                contextualRows.length
+                    .toLocaleString(
+                        'es-MX'
+                    )
+                +' registros bajo el contexto analítico actual.';
+        }
+
+        const active=
+            activeDrillSummary();
+
+        const contextHtml=`
+            <div class="r13b-drill-through-meta">
+                <span>
+                    Entidad:
+                    ${esc(column)}
+                    =
+                    ${esc(value)}
+                </span>
+                ${
+                    active
+                        .map(
+                            item=>`
+                            <span>
+                                ${esc(item.column)}
+                                =
+                                ${esc(
+                                    item.label
+                                    ||item.value
+                                )}
+                            </span>`
+                        )
+                        .join('')
+                }
+                <span>
+                    Registros:
+                    ${contextualRows.length.toLocaleString('es-MX')}
+                </span>
+            </div>`;
+
+        if(!body){
+            return;
+        }
+
+        if(
+            !contextualRows.length
+            ||!cols.length
+        ){
+            body.innerHTML=
+                contextHtml
+                +`
+                <div class="r13b-drill-through-empty">
+                    No existen registros transaccionales
+                    para este contexto.
+                </div>`;
+        }else{
+            body.innerHTML=
+                contextHtml
+                +`
+                <div class="r13b-table-wrap">
+                    <table class="r13b-table">
+                        <thead>
+                            <tr>
+                                ${
+                                    cols
+                                        .map(
+                                            col=>
+                                                `<th>${esc(col)}</th>`
+                                        )
+                                        .join('')
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${
+                                visibleRows
+                                    .map(
+                                        row=>`
+                                        <tr>
+                                            ${
+                                                cols
+                                                    .map(
+                                                        col=>`
+                                                        <td>
+                                                            ${esc(
+                                                                row[col]
+                                                                ??'Sin dato'
+                                                            )}
+                                                        </td>`
+                                                    )
+                                                    .join('')
+                                            }
+                                        </tr>`
+                                    )
+                                    .join('')
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                ${
+                    contextualRows.length>limit
+                        ?`
+                        <div class="r13b-small">
+                            Mostrando los primeros
+                            ${limit.toLocaleString('es-MX')}
+                            de
+                            ${contextualRows.length.toLocaleString('es-MX')}
+                            registros.
+                        </div>`
+                        :''
+                }`;
+        }
+
+        drillThroughModal.classList.add(
+            'open'
+        );
+
+        drillThroughModal.setAttribute(
+            'aria-hidden',
+            'false'
+        );
+    }
+
+
+    drillThroughModal
+        .querySelector(
+            '[data-r13b-drill-through-close]'
+        )
+        ?.addEventListener(
+            'click',
+            closeDrillThrough
+        );
+
+    drillThroughModal.addEventListener(
+        'click',
+        event=>{
+            if(
+                event.target===drillThroughModal
+            ){
+                closeDrillThrough();
+            }
+        }
+    );
+
+    document.addEventListener(
+        'keydown',
+        event=>{
+            if(
+                event.key==='Escape'
+                &&drillThroughModal.classList.contains(
+                    'open'
+                )
+            ){
+                closeDrillThrough();
+            }
+        }
+    );
+
+
+    /*
+     * =====================================================
      * R10.13D.11
      * MULTIDIMENSIONAL ANALYTICAL FILTER SUMMARY
      * =====================================================
@@ -4403,6 +4878,39 @@ try{
                         );
 
                         renderPages();
+                    };
+                }
+            );
+
+        /*
+         * =====================================================
+         * R10.13D.12
+         * DRILL-THROUGH BUTTON BINDING
+         * =====================================================
+         */
+        document
+            .querySelectorAll(
+                '[data-r13b-drill-through-column]'
+            )
+            .forEach(
+                button=>{
+                    button.onclick=()=>{
+
+                        openDrillThrough(
+                            String(
+                                button.dataset.r13bDrillThroughColumn
+                                ||''
+                            ),
+                            String(
+                                button.dataset.r13bDrillThroughValue
+                                ??''
+                            ),
+                            String(
+                                button.dataset.r13bDrillThroughLabel
+                                ||button.dataset.r13bDrillThroughValue
+                                ||''
+                            )
+                        );
                     };
                 }
             );
