@@ -887,8 +887,37 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
     xlsx_path = REPORTES / f"Reporte_{base}_{stamp}.xlsx"
     pdf_path = REPORTES / f"Reporte_{base}_{stamp}.pdf"
+    dashboard_path = REPORTES / f"Dashboard_{base}_{stamp}.html"
+
     excel_report(xlsx_path, prompt, profile, plan, sections, notes, narrative, original)
     pdf_report(pdf_path, prompt, profile, sections, notes, narrative)
+
+    # R10.13D.5: conecta el Analizador Universal con el pipeline dinámico real.
+    # El mismo prompt íntegro y el mismo DataFrame seleccionado alimentan el
+    # Dashboard Specification -> Execution Plan -> Operator-Driven Renderer.
+    from dashboard_dynamic import generate_dynamic_dashboard
+
+    dashboard_plan = generate_dynamic_dashboard(
+        dashboard_path,
+        original,
+        prompt,
+        path.name,
+        sheet=str(meta.get("hoja_analizada") or ""),
+        semantic_context=None,
+    )
+
+    dynamic_renderer = dict(
+        (dashboard_plan or {}).get("dynamic_renderer") or {}
+    )
+
+    dashboard_pages = [
+        {
+            "id": str(page.get("id") or ""),
+            "title": str(page.get("title") or ""),
+        }
+        for page in list(dynamic_renderer.get("pages") or [])
+        if isinstance(page, dict)
+    ]
 
     return {
         "ok": True,
@@ -903,6 +932,10 @@ def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
         "narrativa": narrative,
         "excel": xlsx_path.name,
         "pdf": pdf_path.name,
+        "dashboard": dashboard_path.name,
+        "dashboard_renderer_version": dynamic_renderer.get("version"),
+        "dashboard_domain": dynamic_renderer.get("domain"),
+        "dashboard_pages": dashboard_pages,
         "segundos": round(time.time() - started, 2),
     }
 
@@ -916,16 +949,16 @@ body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f7fb;color:#17
 h1{margin:0 0 8px;font-size:28px}.sub{color:#5d6b80;margin-bottom:22px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 label{font-weight:600;display:block;margin:8px 0}.full{grid-column:1/-1}input[type=file],textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:12px;background:#fff}
 textarea{min-height:120px;resize:vertical}.btn{background:#2563eb;color:white;border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer}.btn:disabled{opacity:.6}
-.links a{display:inline-block;margin-right:10px;margin-top:10px;color:#1d4ed8}.result{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:18px;min-height:90px;margin-top:20px;overflow:auto}
+.links a{display:inline-block;margin-right:10px;margin-top:10px;color:#1d4ed8}.links a.dashboard{background:#0a93a4;color:#fff;text-decoration:none;font-weight:700;padding:10px 14px;border-radius:10px}.result{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:18px;min-height:90px;margin-top:20px;overflow:auto}
 .note{background:#fff7ed;border:1px solid #fed7aa;padding:12px;border-radius:10px;margin-top:14px}.ok{background:#ecfdf5;border-color:#a7f3d0}.toplinks{float:right;font-size:14px}.toplinks a{margin-left:12px}
 @media(max-width:760px){.grid{grid-template-columns:1fr}.full{grid-column:1}.toplinks{float:none;display:block;margin-top:10px}}
 </style></head><body><div class="wrap"><div class="card">
 <div class="toplinks"><a href="http://127.0.0.1:8080" target="_blank">Chat Open WebUI</a></div>
-<h1>Analizador Empresarial de Excel / CSV</h1><div style="font-size:11px;color:#64748b;margin-bottom:8px">R10.13C.2 V9 · Verified Prompt Transport</div><div class="sub">Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.</div>
+<h1>Analizador Empresarial de Excel / CSV</h1><div style="font-size:11px;color:#64748b;margin-bottom:8px">R10.13C.2 V9 · Verified Prompt Transport · R10.13D.5 Dashboard Integrated</div><div class="sub">Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.</div>
 <div class="note"><b>Importante:</b> para Excel grandes usa esta pantalla en lugar de adjuntarlos directamente al chat de Open WebUI. Aqui el archivo se calcula con Python y el modelo recibe solo resultados resumidos.</div>
 <form id="f" autocomplete="off"><div class="grid"><div class="full"><label>Archivo</label><input id="file" name="file" type="file" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt" required></div>
 <div class="full"><label>Que quieres analizar</label><textarea id="prompt" name="prompt" required autocomplete="off" spellcheck="false" placeholder="Escribe o pega aquí la solicitud exacta para este análisis."></textarea></div>
-<div class="full"><button class="btn" id="go">Analizar y generar Excel/PDF</button></div></div></form>
+<div class="full"><button class="btn" id="go">Analizar y generar Dashboard / PDF / Excel</button></div></div></form>
 <div id="status"></div><div id="out" class="result" style="display:none"></div><div id="links" class="links"></div>
 </div></div><script>
 const f=document.getElementById('f'),go=document.getElementById('go'),out=document.getElementById('out'),status=document.getElementById('status'),links=document.getElementById('links');
@@ -952,9 +985,9 @@ fd.append('prompt_sha256',promptHash);
 fd.append('request_id',requestId);
 try{const r=await fetch('/api/analyze',{method:'POST',body:fd});const d=await r.json();if(!r.ok||!d.ok){const detail=d.detail;let msg=d.error||'Error';if(Array.isArray(detail)){msg=detail.map(x=>((x.loc||[]).join('.')+': '+(x.msg||JSON.stringify(x)))).join(' | ');}else if(detail){msg=(typeof detail==='string'?detail:JSON.stringify(detail));}throw new Error(msg);}
 out.textContent=d.narrativa;
-const details=document.createElement('details');details.style.marginTop='12px';const sm=document.createElement('summary');sm.textContent='Ver detalles tecnicos';details.appendChild(sm);const pre=document.createElement('pre');pre.textContent='Plan: '+JSON.stringify(d.plan,null,2)+'\n\nSecciones: '+JSON.stringify(Object.keys(d.secciones||{}),null,2);details.appendChild(pre);out.appendChild(details);
-status.innerHTML='<div class="note ok">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.</div>';
-links.innerHTML='<a href="/download/'+encodeURIComponent(d.excel)+'">Descargar Excel</a><a href="/download/'+encodeURIComponent(d.pdf)+'">Descargar PDF</a>';
+const details=document.createElement('details');details.style.marginTop='12px';const sm=document.createElement('summary');sm.textContent='Ver detalles tecnicos';details.appendChild(sm);const pre=document.createElement('pre');pre.textContent='Plan legacy: '+JSON.stringify(d.plan,null,2)+'\n\nSecciones: '+JSON.stringify(Object.keys(d.secciones||{}),null,2)+'\n\nDashboard renderer: '+String(d.dashboard_renderer_version||'N/D')+'\nDashboard domain: '+String(d.dashboard_domain||'N/D')+'\nDashboard pages: '+JSON.stringify(d.dashboard_pages||[],null,2);details.appendChild(pre);out.appendChild(details);
+status.innerHTML='<div class="note ok">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.<br><b>Prompt SHA-256:</b> '+String(d.request_prompt_sha256||'N/D')+'</div>';
+links.innerHTML='<a class="dashboard" target="_blank" rel="noopener" href="/dashboard/'+encodeURIComponent(d.dashboard)+'">Abrir Dashboard</a><a href="/download/'+encodeURIComponent(d.dashboard)+'">Descargar Dashboard HTML</a><a href="/download/'+encodeURIComponent(d.excel)+'">Descargar Excel</a><a href="/download/'+encodeURIComponent(d.pdf)+'">Descargar PDF</a>';
 }catch(err){out.textContent='ERROR: '+err.message;status.innerHTML='<div class="note">Revisa C:\\IA_Local\\logs\\analizador.err.log si el problema continua.</div>';}finally{go.disabled=false;}});
 </script></body></html>
 """
@@ -1036,6 +1069,26 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), pro
             pass
         status = 422 if code in {"SOURCE_SHEET_NOT_FOUND","DECLARED_COLUMNS_MISSING","SOURCE_SHEET_UNREADABLE","DATA_CONTRACT_ERROR"} else 500
         return JSONResponse(payload, status_code=status)
+
+
+@app.get("/dashboard/{filename}")
+def open_dashboard(filename: str):
+    name = Path(filename).name
+    if Path(name).suffix.lower() != ".html":
+        raise HTTPException(status_code=404, detail="Dashboard no encontrado")
+    path = REPORTES / name
+    if not path.exists() or path.parent.resolve() != REPORTES.resolve():
+        raise HTTPException(status_code=404, detail="Dashboard no encontrado")
+    return FileResponse(
+        path,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-IA-Dashboard-Renderer": "R10.13D.5",
+        },
+    )
 
 
 @app.get("/download/{filename}")

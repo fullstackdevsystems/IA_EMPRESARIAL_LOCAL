@@ -103,77 +103,62 @@ check(
 
 
 # ============================================================
-# CLIENTES
+# EXECUCIÓN AGRUPADA AHORA ES OPERATOR-DRIVEN
 # ============================================================
 
 check(
-    "customers_dispatch",
-    "id==='table:customers'" in rt,
+    "grouped_business_dispatch",
+    "if(operator==='grouped_business_table')" in rt,
 )
 
 check(
-    "customer_id_role",
-    "role('customer_id')" in rt,
+    "grain_roles_supported",
+    "execution.grain_roles" in rt,
 )
 
 check(
-    "customer_role",
-    "role('customer')" in rt,
+    "fallback_grain_roles_supported",
+    "execution.fallback_grain_roles" in rt,
 )
 
 check(
-    "customers_aggregated",
-    "aggregatedTableCard(\n                'Clientes'" in rt,
-)
-
-
-# ============================================================
-# PRODUCTOS
-# ============================================================
-
-check(
-    "products_dispatch",
-    "id==='table:products'" in rt,
+    "label_roles_supported",
+    "execution.label_roles" in rt,
 )
 
 check(
-    "product_id_role",
-    "role('product_id')" in rt,
+    "grouped_uses_aggregate_groups",
+    "aggregateGroups(" in rt,
 )
 
 check(
-    "product_role",
-    "role('product')" in rt,
+    "grouped_uses_business_metrics",
+    "businessMetricDefinitions()" in rt,
 )
 
 check(
-    "products_aggregated",
-    "aggregatedTableCard(\n                'Productos'" in rt,
+    "grouped_uses_canonical_metric_executor",
+    "aggregateMetric(" in rt,
 )
 
 
 # ============================================================
-# VENDEDORES
+# DEDUPLICACIÓN DE GRAIN / LABEL
 # ============================================================
 
 check(
-    "sellers_dispatch",
-    "id==='table:sellers'" in rt,
+    "active_grain_roles",
+    "activeGrainRoles" in rt,
 )
 
 check(
-    "seller_id_role",
-    "role('seller_id')" in rt,
+    "effective_label_roles",
+    "effectiveLabelRoles" in rt,
 )
 
 check(
-    "seller_role",
-    "role('seller')" in rt,
-)
-
-check(
-    "sellers_aggregated",
-    "aggregatedTableCard(\n                'Vendedores'" in rt,
+    "duplicate_label_protection",
+    "!activeGrainRoles.includes(r)" in rt,
 )
 
 
@@ -181,24 +166,61 @@ check(
 # DETALLE DEBE SEGUIR TRANSACCIONAL
 # ============================================================
 
+transaction_pos = rt.find(
+    "if(operator==='transaction_table')"
+)
+raw_pos = rt.find(
+    "if(operator==='raw_table')"
+)
+
+transaction_block = rt[
+    transaction_pos:
+    raw_pos if raw_pos > transaction_pos else len(rt)
+]
+
 check(
-    "operations_dispatch",
-    "id==='table:operations'" in rt,
+    "operations_dispatch_by_operator",
+    transaction_pos >= 0,
 )
 
 check(
-    "operations_keeps_refer",
-    "'Refer'" in rt,
+    "operations_resolves_requested_roles",
+    "execution.columns" in transaction_block,
 )
 
 check(
     "operations_uses_table_card",
-    "tableCard(\n                'Operaciones'" in rt,
+    "tableCard(" in transaction_block,
 )
 
 check(
     "operations_not_aggregated",
-    "aggregatedTableCard(\n                'Operaciones'" not in rt,
+    "aggregateGroups(" not in transaction_block,
+)
+
+
+# ============================================================
+# NO DEPENDENCIA DE IDS DE TABLA LEGACY
+# ============================================================
+
+check(
+    "customers_id_dispatch_removed",
+    "id==='table:customers'" not in rt,
+)
+
+check(
+    "products_id_dispatch_removed",
+    "id==='table:products'" not in rt,
+)
+
+check(
+    "sellers_id_dispatch_removed",
+    "id==='table:sellers'" not in rt,
+)
+
+check(
+    "operations_id_dispatch_removed",
+    "id==='table:operations'" not in rt,
 )
 
 

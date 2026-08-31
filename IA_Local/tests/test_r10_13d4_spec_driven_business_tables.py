@@ -263,43 +263,54 @@ check(
     in renderer_text,
 )
 
+transaction_pos = renderer_text.find(
+    "if(operator==='transaction_table')"
+)
+raw_pos = renderer_text.find(
+    "if(operator==='raw_table')"
+)
+
+transaction_block = renderer_text[
+    transaction_pos:
+    raw_pos if raw_pos > transaction_pos else len(renderer_text)
+]
+
 check(
     "transaction_table_not_grouped",
     (
-        "if(operator==='transaction_table')"
-        in renderer_text
+        transaction_pos >= 0
         and "aggregateGroups("
-        in renderer_text
+        not in transaction_block
     ),
 )
 
 
 # ============================================================
-# COMPATIBILITY
+# D.5 ARCHITECTURE: LEGACY TABLE IDS REMOVED
 # ============================================================
 
 check(
-    "legacy_customers_still_present",
+    "legacy_customers_removed",
     "if(id==='table:customers')"
-    in renderer_text,
+    not in renderer_text,
 )
 
 check(
-    "legacy_products_still_present",
+    "legacy_products_removed",
     "if(id==='table:products')"
-    in renderer_text,
+    not in renderer_text,
 )
 
 check(
-    "legacy_sellers_still_present",
+    "legacy_sellers_removed",
     "if(id==='table:sellers')"
-    in renderer_text,
+    not in renderer_text,
 )
 
 check(
-    "legacy_operations_still_present",
+    "legacy_operations_removed",
     "if(id==='table:operations')"
-    in renderer_text,
+    not in renderer_text,
 )
 
 check(
@@ -309,8 +320,8 @@ check(
 )
 
 check(
-    "d4_runtime_marker",
-    "R10.13D.4 · Spec-Driven Table Executor"
+    "d5_runtime_marker",
+    "R10.13D.5 · Operator-Driven Table Executor"
     in renderer_text,
 )
 

@@ -2274,12 +2274,6 @@ try{
                 ||''
             );
 
-        const id=
-            String(
-                c.id
-                ||''
-            );
-
         /*
         * =====================================================
         * R10.13D.4
@@ -2868,183 +2862,17 @@ try{
 
 
         /*
-         * LEGACY COMPATIBILITY
+         * =====================================================
+         * R10.13D.5
+         * OPERATOR-DRIVEN TABLE INDEPENDENCE
+         * =====================================================
          *
-         * Se conserva temporalmente para specs anteriores
-         * que todavía no incluyan execution.operator.
-         */
-        /*
-         * CLIENTES
-         */
-
-        if(id==='table:customers'){
-
-            const customerId=
-                role('customer_id');
-
-            const customer=
-                role('customer');
-
-            const keys=[];
-
-
-            if(customerId){
-
-                keys.push({
-                    column:customerId,
-                    label:'Código Cliente'
-                });
-            }
-
-
-            if(customer){
-
-                keys.push({
-                    column:customer,
-                    label:'Cliente'
-                });
-            }
-
-
-            return aggregatedTableCard(
-                'Clientes',
-                rr,
-                keys,
-                {
-                    limit:100,
-                    sortMetric:'kpi:revenue'
-                }
-            );
-        }
-
-
-        /*
-         * PRODUCTOS
-         */
-
-        if(id==='table:products'){
-
-            const productId=
-                role('product_id');
-
-            const product=
-                role('product');
-
-            const keys=[];
-
-
-            if(productId){
-
-                keys.push({
-                    column:productId,
-                    label:'Código Producto'
-                });
-            }
-
-
-            if(product){
-
-                keys.push({
-                    column:product,
-                    label:'Producto'
-                });
-            }
-
-
-            return aggregatedTableCard(
-                'Productos',
-                rr,
-                keys,
-                {
-                    limit:100,
-                    sortMetric:'kpi:revenue'
-                }
-            );
-        }
-
-
-        /*
-         * VENDEDORES
-         */
-
-        if(id==='table:sellers'){
-
-            const sellerId=
-                role('seller_id');
-
-            const seller=
-                role('seller');
-
-            const keys=[];
-
-
-            if(sellerId){
-
-                keys.push({
-                    column:sellerId,
-                    label:'Código Vendedor'
-                });
-            }
-
-
-            if(seller){
-
-                keys.push({
-                    column:seller,
-                    label:'Vendedor'
-                });
-            }
-
-
-            return aggregatedTableCard(
-                'Vendedores',
-                rr,
-                keys,
-                {
-                    limit:100,
-                    sortMetric:'kpi:revenue'
-                }
-            );
-        }
-
-
-        /*
-         * DETALLE / OPERACIONES
+         * La ejecución de tablas ya no depende de IDs fijos como:
+         * table:customers, table:products, table:sellers o
+         * table:operations.
          *
-         * Se conserva transaccional.
-         * Una fila por registro / Refer.
+         * La autoridad de ejecución es execution.operator.
          */
-
-        if(id==='table:operations'){
-
-            const cols=[
-                'Refer',
-                role('date'),
-                role('customer'),
-                role('product'),
-                role('seller'),
-                role('warehouse'),
-                role('revenue'),
-                role('cost'),
-                qtyCol(),
-                role('origin_city'),
-                role('destination_city'),
-                role('customer_pickup')
-            ];
-
-
-            return tableCard(
-                'Operaciones',
-                rr,
-                [
-                    ...new Set(
-                        cols.filter(Boolean)
-                    )
-                ],
-                250
-            );
-        }
-
 
         /*
          * FALLBACK
@@ -3507,7 +3335,7 @@ try{
 
                                 legacyMode
                                     ?'R10.13C · Compatibilidad comercial'
-                                    :'R10.13D.4 · Spec-Driven Table Executor'
+                                    :'R10.13D.5 · Operator-Driven Table Executor'
                             }
 
                             ·
@@ -3767,7 +3595,7 @@ try{
 }catch(err){
 
     console.error(
-        'R10.13D.4 spec-driven renderer fallback:',
+        'R10.13D.5 operator-driven renderer fallback:',
         err
     );
 }
