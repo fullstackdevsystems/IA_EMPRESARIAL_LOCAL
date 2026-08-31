@@ -48,3 +48,6 @@ IA_Local/workspace/Entrada/
 /Aplicar_R10_13D10_Cross_Filter_Drilldown.py
 
 # Local R10.13D.10 applicator
+
+# Local R10.13D.11 applicator
+/Aplicar_R10_13D11_Multidimensional_Drill_Filters.py
