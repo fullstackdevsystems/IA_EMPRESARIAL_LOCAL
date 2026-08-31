@@ -54,3 +54,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.13D.12 applicator
 /Aplicar_R10_13D12_Contextual_Drill_Through.py
+
+# Local R10.13D.13 applicator
+/Aplicar_R10_13D13_Drill_Through_KPI_CSV.py
