@@ -935,7 +935,13 @@ f.addEventListener('submit',async(e)=>{e.preventDefault();go.disabled=true;out.s
 const promptEl=document.getElementById('prompt');
 const requestPrompt=(promptEl.value||'').trim();
 if(!requestPrompt){throw new Error('Escribe o pega el prompt que quieres analizar.');}
-const enc=new TextEncoder().encode(requestPrompt);
+
+// Canonicaliza los saltos de línea antes de calcular SHA-256.
+const canonicalPrompt=requestPrompt
+  .replace(/\r\n/g,'\n')
+  .replace(/\r/g,'\n');
+
+const enc=new TextEncoder().encode(canonicalPrompt);
 const digest=await crypto.subtle.digest('SHA-256',enc);
 const promptHash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
 const requestId=(crypto.randomUUID?crypto.randomUUID():('req-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
@@ -984,16 +990,14 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), pro
             shutil.copyfileobj(file.file, out, length=1024*1024)
         request_prompt = str(prompt or "").strip()
 
-        # R10.13C.2 DEBUG TRACE: confirma el prompt exacto recibido por /api/analyze.
-        print("\n=== PROMPT TRACE API ===")
-        print("REQUEST_ID:", request_id)
-        print("PROMPT_SHA256:", hashlib.sha256(request_prompt.encode("utf-8")).hexdigest())
-        print("PROMPT_PREVIEW:", " ".join(request_prompt.split())[:500])
-        print("========================\n")
+        # Canonicaliza saltos de línea para verificar la integridad del prompt
+        # independientemente de CRLF/LF del navegador o del sistema operativo.
+        canonical_prompt = request_prompt.replace("\r\n", "\n").replace("\r", "\n")
 
         if not request_prompt:
             raise HTTPException(status_code=400, detail="El prompt no puede estar vacío.")
-        actual_hash = hashlib.sha256(request_prompt.encode("utf-8")).hexdigest()
+
+        actual_hash = hashlib.sha256(canonical_prompt.encode("utf-8")).hexdigest()
         supplied_hash = str(prompt_sha256 or "").strip().lower()
         if supplied_hash and supplied_hash != actual_hash:
             raise HTTPException(status_code=409, detail="PROMPT_INTEGRITY_MISMATCH: el prompt recibido no coincide con su SHA-256.")
