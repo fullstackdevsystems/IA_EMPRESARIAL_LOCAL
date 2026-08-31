@@ -1797,6 +1797,117 @@ def build_dashboard_spec(
                 c["id"]
             )
 
+    # ======================================================================
+    # R10.13D.4
+    # SPEC-DRIVEN BUSINESS TABLE EXECUTION
+    # ======================================================================
+
+    def _table_execution_spec(
+        key: str,
+        roles: Dict[str, Any],
+    ) -> Dict[str, Any]:
+
+        grouped_metrics = [
+            "kpi:revenue",
+            "kpi:cost",
+            "kpi:profit",
+            "kpi:margin_pct",
+            "kpi:quantity",
+            "kpi:operations",
+            "kpi:ticket_avg",
+            "kpi:price_per_unit",
+            "kpi:cost_per_unit",
+            "kpi:profit_per_unit",
+        ]
+
+        if key == "customers":
+
+            return {
+                "operator": "grouped_business_table",
+                "grain_roles": (
+                    ["customer_id"]
+                    if roles.get("customer_id")
+                    else ["customer"]
+                ),
+                "fallback_grain_roles": [
+                    "customer",
+                ],
+                "label_roles": [
+                    "customer",
+                ],
+                "measure_kpis": grouped_metrics,
+                "sort_metric": "kpi:revenue",
+                "limit": 100,
+            }
+
+        if key == "products":
+
+            return {
+                "operator": "grouped_business_table",
+                "grain_roles": (
+                    ["product_id"]
+                    if roles.get("product_id")
+                    else ["product"]
+                ),
+                "fallback_grain_roles": [
+                    "product",
+                ],
+                "label_roles": [
+                    "product",
+                ],
+                "measure_kpis": grouped_metrics,
+                "sort_metric": "kpi:revenue",
+                "limit": 100,
+            }
+
+        if key == "sellers":
+
+            return {
+                "operator": "grouped_business_table",
+                "grain_roles": (
+                    ["seller_id"]
+                    if roles.get("seller_id")
+                    else ["seller"]
+                ),
+                "fallback_grain_roles": [
+                    "seller",
+                ],
+                "label_roles": [
+                    "seller",
+                ],
+                "measure_kpis": grouped_metrics,
+                "sort_metric": "kpi:revenue",
+                "limit": 100,
+            }
+
+        if key == "operations":
+
+            return {
+                "operator": "transaction_table",
+                "grain_roles": [
+                    "transaction_id",
+                ],
+                "columns": [
+                    "transaction_id",
+                    "date",
+                    "customer",
+                    "product",
+                    "seller",
+                    "warehouse",
+                    "revenue",
+                    "cost",
+                    "quantity",
+                    "origin_city",
+                    "destination_city",
+                    "customer_pickup",
+                ],
+                "limit": 250,
+            }
+
+        return {
+            "operator": "raw_table",
+            "limit": 100,
+        }
 
     # ------------------------------------------------------------------
     # TABLES
@@ -1807,16 +1918,28 @@ def build_dashboard_spec(
         or []
     ):
 
-        caps.append(
-            _cap(
+        c = _cap(
+            k,
+            "table",
+            SUPPORTED,
+            source=(
+                "prompt_specification"
+            ),
+        )
+
+        c["execution"] = (
+            _table_execution_spec(
                 k,
-                "table",
-                SUPPORTED,
-                source=(
-                    "prompt_specification"
-                ),
+                roles,
             )
         )
+
+        c["provenance"] = {
+            "source": "table_execution_planner",
+            "confidence": 1.0,
+        }
+
+        caps.append(c)
 
 
     # ------------------------------------------------------------------

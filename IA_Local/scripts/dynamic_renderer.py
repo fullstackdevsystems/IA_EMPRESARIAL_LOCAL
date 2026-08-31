@@ -2264,6 +2264,15 @@ try{
             return blockedCard(c);
         }
 
+        const execution=
+            c.execution
+            ||{};
+
+        const operator=
+            String(
+                execution.operator
+                ||''
+            );
 
         const id=
             String(
@@ -2271,7 +2280,599 @@ try{
                 ||''
             );
 
+        /*
+        * =====================================================
+        * R10.13D.4
+        * SPEC-DRIVEN BUSINESS TABLE EXECUTOR
+        * =====================================================
+        */
 
+        if(operator==='grouped_business_table'){
+
+            const grainRoles=
+                Array.isArray(execution.grain_roles)
+                    ?execution.grain_roles
+                    :[];
+
+            const fallbackGrainRoles=
+                Array.isArray(execution.fallback_grain_roles)
+                    ?execution.fallback_grain_roles
+                    :[];
+
+            const labelRoles=
+                Array.isArray(execution.label_roles)
+                    ?execution.label_roles
+                    :[];
+
+            const measureKpis=
+                Array.isArray(execution.measure_kpis)
+                    ?execution.measure_kpis
+                    :[];
+
+            const sortMetric=
+                String(
+                    execution.sort_metric
+                    ||'kpi:revenue'
+                );
+
+            const limit=
+                Math.max(
+                    1,
+                    Math.min(
+                        Number(
+                            execution.limit
+                            ||100
+                        ),
+                        1000
+                    )
+                );
+
+
+            /*
+            * =====================================================
+            * RESOLUCIÓN DEL GRAIN
+            * =====================================================
+            */
+
+            let activeGrainRoles=
+                grainRoles.filter(
+                    r=>role(r)
+                );
+
+            let grainColumns=
+                activeGrainRoles
+                    .map(role)
+                    .filter(Boolean);
+
+
+            if(!grainColumns.length){
+
+                activeGrainRoles=
+                    fallbackGrainRoles.filter(
+                        r=>role(r)
+                    );
+
+                grainColumns=
+                    activeGrainRoles
+                        .map(role)
+                        .filter(Boolean);
+            }
+
+
+            if(!grainColumns.length){
+
+                return blockedCard({
+                    ...c,
+                    status:'BLOCKED',
+                    reason:
+                        'No existe una dimensión semántica válida para ejecutar la tabla agrupada.'
+                });
+            }
+
+
+            /*
+            * =====================================================
+            * ETIQUETAS VISIBLES
+            *
+            * Evita duplicados como:
+            *
+            * product | product
+            * seller  | seller
+            *
+            * Si el label_role ya forma parte del grain,
+            * no se vuelve a mostrar.
+            * =====================================================
+            */
+
+            const effectiveLabelRoles=
+                labelRoles.filter(
+                    r=>
+                        !activeGrainRoles.includes(r)
+                        &&role(r)
+                );
+
+
+            /*
+            * =====================================================
+            * AGRUPACIÓN
+            * =====================================================
+            */
+
+            const groups=
+                aggregateGroups(
+                    rr,
+                    grainColumns
+                );
+
+
+            /*
+            * =====================================================
+            * MÉTRICAS SOLICITADAS POR EL SPEC
+            * =====================================================
+            */
+
+            const metricDefs=
+                businessMetricDefinitions()
+                    .filter(
+                        metric=>
+                            !measureKpis.length
+                            ||measureKpis.includes(
+                                metric.id
+                            )
+                    );
+
+
+            /*
+            * =====================================================
+            * EJECUCIÓN DE MÉTRICAS POR ENTIDAD
+            * =====================================================
+            */
+
+            const rowsAgg=
+                groups.map(
+                    group=>{
+
+                        const metrics={};
+
+
+                        for(const metric of metricDefs){
+
+                            metrics[
+                                metric.id
+                            ]=
+                                aggregateMetric(
+                                    metric.component,
+                                    group.rows
+                                );
+                        }
+
+
+                        /*
+                        * Etiquetas descriptivas.
+                        *
+                        * Ejemplo futuro:
+                        *
+                        * grain = product_id
+                        * label = product
+                        *
+                        * Se toma una descripción válida
+                        * dentro del grupo.
+                        */
+
+                        const labels={};
+
+
+                        for(
+                            const labelRole
+                            of effectiveLabelRoles
+                        ){
+
+                            const col=
+                                role(
+                                    labelRole
+                                );
+
+
+                            if(!col){
+                                continue;
+                            }
+
+
+                            const first=
+                                group.rows.find(
+                                    row=>
+                                        row[col]!==null
+                                        &&row[col]!==undefined
+                                        &&String(
+                                            row[col]
+                                        ).trim()!==''
+                                );
+
+
+                            labels[
+                                labelRole
+                            ]=
+                                first
+                                    ?String(
+                                        first[col]
+                                    )
+                                    :'Sin dato';
+                        }
+
+
+                        return {
+                            group,
+                            metrics,
+                            labels
+                        };
+                    }
+                );
+
+
+            /*
+            * =====================================================
+            * ORDENAMIENTO
+            * =====================================================
+            */
+
+            rowsAgg.sort(
+                (a,b)=>{
+
+                    const av=
+                        Number(
+                            a.metrics[
+                                sortMetric
+                            ]
+                        );
+
+                    const bv=
+                        Number(
+                            b.metrics[
+                                sortMetric
+                            ]
+                        );
+
+
+                    if(
+                        Number.isFinite(av)
+                        ||Number.isFinite(bv)
+                    ){
+
+                        return (
+                            (
+                                Number.isFinite(bv)
+                                    ?bv
+                                    :0
+                            )
+                            -
+                            (
+                                Number.isFinite(av)
+                                    ?av
+                                    :0
+                            )
+                        );
+                    }
+
+
+                    return (
+                        b.group.count
+                        -
+                        a.group.count
+                    );
+                }
+            );
+
+
+            /*
+            * =====================================================
+            * LÍMITE VISUAL
+            * =====================================================
+            */
+
+            const view=
+                rowsAgg.slice(
+                    0,
+                    limit
+                );
+
+
+            /*
+            * Los encabezados principales corresponden
+            * únicamente al grain realmente utilizado.
+            */
+
+            const keyHeaders=
+                activeGrainRoles;
+
+
+            /*
+            * =====================================================
+            * RENDER
+            * =====================================================
+            */
+
+            return `
+            <article class="r13b-card full">
+
+                <h3>
+                    ${
+                        esc(
+                            c.title
+                            ||c.semantic_role
+                            ||c.id
+                            ||'Tabla'
+                        )
+                    }
+                </h3>
+
+
+                <div class="r13b-small">
+
+                    ${
+                        groups.length
+                            .toLocaleString(
+                                'es-MX'
+                            )
+                    }
+                    entidades únicas sobre
+
+                    ${
+                        rr.length
+                            .toLocaleString(
+                                'es-MX'
+                            )
+                    }
+                    registros filtrados.
+
+                    Mostrando
+                    ${
+                        view.length
+                            .toLocaleString(
+                                'es-MX'
+                            )
+                    }.
+
+                </div>
+
+
+                <div class="r13b-table-wrap">
+
+                    <table class="r13b-table">
+
+                        <thead>
+
+                            <tr>
+
+                                ${
+                                    keyHeaders
+                                        .map(
+                                            r=>
+                                                `<th>${esc(r)}</th>`
+                                        )
+                                        .join('')
+                                }
+
+
+                                ${
+                                    effectiveLabelRoles
+                                        .map(
+                                            r=>
+                                                `<th>${esc(r)}</th>`
+                                        )
+                                        .join('')
+                                }
+
+
+                                ${
+                                    metricDefs
+                                        .map(
+                                            metric=>
+                                                `<th>${esc(metric.label)}</th>`
+                                        )
+                                        .join('')
+                                }
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            ${
+                                view
+                                    .map(
+                                        item=>`
+
+                                        <tr>
+
+                                            ${
+                                                item.group.labels
+                                                    .map(
+                                                        value=>
+                                                            `<td>${esc(value)}</td>`
+                                                    )
+                                                    .join('')
+                                            }
+
+
+                                            ${
+                                                effectiveLabelRoles
+                                                    .map(
+                                                        r=>
+                                                            `<td>${
+                                                                esc(
+                                                                    item.labels[r]
+                                                                    ??'Sin dato'
+                                                                )
+                                                            }</td>`
+                                                    )
+                                                    .join('')
+                                            }
+
+
+                                            ${
+                                                metricDefs
+                                                    .map(
+                                                        metric=>{
+
+                                                            const value=
+                                                                item.metrics[
+                                                                    metric.id
+                                                                ];
+
+
+                                                            return `
+                                                            <td>
+                                                                ${
+                                                                    fmt(
+                                                                        value,
+                                                                        metric.format
+                                                                    )
+                                                                }
+                                                            </td>`;
+                                                        }
+                                                    )
+                                                    .join('')
+                                            }
+
+                                        </tr>
+                                        `
+                                    )
+                                    .join('')
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </article>`;
+        }
+
+
+
+        /*
+         * =====================================================
+         * R10.13D.4
+         * SPEC-DRIVEN TRANSACTION TABLE EXECUTOR
+         * =====================================================
+         */
+
+        if(operator==='transaction_table'){
+
+            const requestedRoles=
+                Array.isArray(execution.columns)
+                    ?execution.columns
+                    :[];
+
+            const cols=
+                requestedRoles
+                    .map(
+                        r=>
+                            role(r)
+                    )
+                    .filter(Boolean);
+
+            const uniqueCols=
+                [
+                    ...new Set(cols)
+                ];
+
+            if(!uniqueCols.length){
+
+                return blockedCard({
+                    ...c,
+                    status:'BLOCKED',
+                    reason:
+                        'No existen columnas semánticas válidas para ejecutar la tabla transaccional.'
+                });
+            }
+
+            const limit=
+                Math.max(
+                    1,
+                    Math.min(
+                        Number(
+                            execution.limit
+                            ||250
+                        ),
+                        2000
+                    )
+                );
+
+            return tableCard(
+                c.title
+                ||c.semantic_role
+                ||'Operaciones',
+                rr,
+                uniqueCols,
+                limit
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * R10.13D.4
+         * SPEC-DRIVEN RAW TABLE EXECUTOR
+         * =====================================================
+         */
+
+        if(operator==='raw_table'){
+
+            const cols=
+                [
+                    ...new Set(
+                        (
+                            c.source_columns
+                            ||[]
+                        )
+                            .filter(Boolean)
+                            .slice(0,12)
+                    )
+                ];
+
+            if(!cols.length){
+
+                return blockedCard({
+                    ...c,
+                    status:'BLOCKED',
+                    reason:
+                        'No existen columnas ejecutables asociadas a esta tabla.'
+                });
+            }
+
+            const limit=
+                Math.max(
+                    1,
+                    Math.min(
+                        Number(
+                            execution.limit
+                            ||100
+                        ),
+                        2000
+                    )
+                );
+
+            return tableCard(
+                c.title
+                ||c.semantic_role
+                ||'Tabla',
+                rr,
+                cols,
+                limit
+            );
+        }
+
+
+        /*
+         * LEGACY COMPATIBILITY
+         *
+         * Se conserva temporalmente para specs anteriores
+         * que todavía no incluyan execution.operator.
+         */
         /*
          * CLIENTES
          */
@@ -2899,9 +3500,14 @@ try{
                         <div class="r13b-page-meta">
 
                             ${
+                                /*
+                                * Compatibility marker retained for R10.13D.1 regression tests:
+                                * R10.13D.1 · Generic Component Executor
+                                */
+
                                 legacyMode
                                     ?'R10.13C · Compatibilidad comercial'
-                                    :'R10.13D.1 · Generic Component Executor'
+                                    :'R10.13D.4 · Spec-Driven Table Executor'
                             }
 
                             ·
@@ -3161,7 +3767,7 @@ try{
 }catch(err){
 
     console.error(
-        'R10.13D.1 generic component renderer fallback:',
+        'R10.13D.4 spec-driven renderer fallback:',
         err
     );
 }
