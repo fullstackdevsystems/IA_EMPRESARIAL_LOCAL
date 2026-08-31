@@ -132,7 +132,13 @@ check(
 
 check(
     "chart_metric_runtime",
-    "chartMetricId" in rt,
+    (
+        "chartMetricId" in rt
+        or (
+            "defaultChartMetricId" in rt
+            and "selectedChartMetricId" in rt
+        )
+    ),
 )
 
 check(

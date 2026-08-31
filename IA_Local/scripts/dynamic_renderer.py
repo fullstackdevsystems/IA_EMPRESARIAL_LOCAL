@@ -347,6 +347,36 @@ def runtime_markup() -> str:
     white-space:nowrap
 }
 
+.r13b-metric-control{
+    grid-column:span 12;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    padding:10px 12px;
+    border:1px solid #d8edf0;
+    background:linear-gradient(135deg,#fff,#f3fbfc);
+    border-radius:12px
+}
+
+.r13b-metric-control label{
+    font-size:10px;
+    font-weight:800;
+    color:#61768b;
+    text-transform:uppercase
+}
+
+.r13b-metric-select{
+    min-width:210px;
+    border:1px solid #cfe1e8;
+    border-radius:9px;
+    padding:7px 9px;
+    background:#fff;
+    color:#102540;
+    font-weight:700;
+    cursor:pointer
+}
+
 .r13b-share{
     color:#61768b;
     font-weight:600;
@@ -2034,6 +2064,18 @@ try{
     }
 
 
+    /*
+     * =====================================================
+     * R10.13D.8
+     * INTERACTIVE DIMENSION METRIC SELECTOR
+     * =====================================================
+     *
+     * Mantiene la métrica elegida por componente aunque
+     * el dashboard se vuelva a renderizar por filtros.
+     */
+    const dimensionMetricSelection={};
+
+
     function dimensionProfitabilityCard(c,rr){
 
         const execution=c.execution||{};
@@ -2201,20 +2243,72 @@ try{
                 ||'dimension_bar_chart'
             );
 
-        const chartMetricId=
+        const defaultChartMetricId=
             String(
                 chartSpec.metric
                 ||sortMetric
                 ||'kpi:revenue'
             );
 
+        const selectedChartMetricId=
+            String(
+                dimensionMetricSelection[c.id]
+                ||defaultChartMetricId
+            );
+
         const chartMetricDef=
             metricDefs.find(
                 item=>
-                    item.id===chartMetricId
+                    item.id===selectedChartMetricId
+            )
+            ||metricDefs.find(
+                item=>
+                    item.id===defaultChartMetricId
             )
             ||metricDefs[0]
             ||null;
+
+        if(
+            chartMetricDef
+            &&dimensionMetricSelection[c.id]
+            !==chartMetricDef.id
+        ){
+            dimensionMetricSelection[c.id]=
+                chartMetricDef.id;
+        }
+
+        const metricSelectorHtml=
+            metricDefs.length>1
+                ?`
+                <div class="r13b-metric-control">
+                    <label>
+                        Métrica de la gráfica
+                    </label>
+                    <select
+                        class="r13b-metric-select"
+                        data-r13b-dimension-metric="${esc(c.id)}"
+                    >
+                        ${
+                            metricDefs
+                                .map(
+                                    metric=>`
+                                    <option
+                                        value="${esc(metric.id)}"
+                                        ${
+                                            chartMetricDef
+                                            &&metric.id===chartMetricDef.id
+                                                ?'selected'
+                                                :''
+                                        }
+                                    >
+                                        ${esc(metric.label)}
+                                    </option>`
+                                )
+                                .join('')
+                        }
+                    </select>
+                </div>`
+                :'';
 
         const chartTopN=
             Math.max(
@@ -2289,6 +2383,7 @@ try{
         }
 
         return `
+        ${metricSelectorHtml}
         ${chartHtml}
         <article class="r13b-card full">
             <h3>${esc(
@@ -3603,6 +3698,40 @@ try{
                     model.pages.length
                 } páginas`;
         }
+
+        /*
+         * R10.13D.8
+         * Re-vincula selectores porque pageHtml reemplaza innerHTML
+         * en cada render reactivo.
+         */
+        document
+            .querySelectorAll(
+                'select[data-r13b-dimension-metric]'
+            )
+            .forEach(
+                select=>{
+                    select.onchange=()=>{
+                        const componentId=
+                            String(
+                                select.dataset.r13bDimensionMetric
+                                ||''
+                            );
+
+                        if(!componentId){
+                            return;
+                        }
+
+                        dimensionMetricSelection[
+                            componentId
+                        ]=String(
+                            select.value
+                            ||''
+                        );
+
+                        renderPages();
+                    };
+                }
+            );
     }
 
 
