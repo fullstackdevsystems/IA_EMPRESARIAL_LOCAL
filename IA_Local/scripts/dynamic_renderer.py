@@ -610,6 +610,46 @@ def runtime_markup() -> str:
     font-size:12px
 }
 
+.r13b-drill-through-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin:0 0 12px
+}
+
+.r13b-drill-through-kpis{
+    display:grid;
+    grid-template-columns:repeat(
+        auto-fit,
+        minmax(150px,1fr)
+    );
+    gap:8px;
+    margin:0 0 12px
+}
+
+.r13b-drill-through-kpi{
+    border:1px solid #dce7ef;
+    background:#fbfdfe;
+    border-radius:11px;
+    padding:10px
+}
+
+.r13b-drill-through-kpi .label{
+    display:block;
+    color:#61768b;
+    font-size:9px;
+    font-weight:800;
+    text-transform:uppercase;
+    margin-bottom:4px
+}
+
+.r13b-drill-through-kpi .value{
+    display:block;
+    color:#18344d;
+    font-size:15px;
+    font-weight:900
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -1032,13 +1072,22 @@ try{
                         id="r13bDrillThroughSubtitle"
                     ></div>
                 </div>
-                <button
-                    type="button"
-                    class="r13b-drill-through-close"
-                    data-r13b-drill-through-close
-                >
-                    Cerrar
-                </button>
+                <div class="r13b-drill-through-actions">
+                    <button
+                        type="button"
+                        class="r13b-drill-through-btn"
+                        data-r13b-drill-through-export
+                    >
+                        Exportar CSV
+                    </button>
+                    <button
+                        type="button"
+                        class="r13b-drill-through-close"
+                        data-r13b-drill-through-close
+                    >
+                        Cerrar
+                    </button>
+                </div>
             </div>
             <div id="r13bDrillThroughBody"></div>
         </div>`;
@@ -4383,6 +4432,127 @@ try{
     }
 
 
+    let drillThroughCurrentRows=[];
+    let drillThroughCurrentCols=[];
+    let drillThroughCurrentLabel='detalle';
+
+
+    function drillThroughMetricSummary(
+        contextualRows
+    ){
+
+        return businessMetricDefinitions()
+            .map(
+                metric=>{
+
+                    const value=
+                        aggregateMetric(
+                            metric.component,
+                            contextualRows
+                        );
+
+                    return {
+                        id:metric.id,
+                        label:metric.label,
+                        format:metric.format,
+                        value
+                    };
+                }
+            );
+    }
+
+
+    function csvCell(value){
+
+        const s=String(
+            value
+            ??''
+        );
+
+        return '"'
+            +s.replace(
+                /"/g,
+                '""'
+            )
+            +'"';
+    }
+
+
+    function exportDrillThroughCsv(){
+
+        if(
+            !drillThroughCurrentRows.length
+            ||!drillThroughCurrentCols.length
+        ){
+            return;
+        }
+
+        const lines=[
+            drillThroughCurrentCols
+                .map(csvCell)
+                .join(',')
+        ];
+
+        for(
+            const row
+            of drillThroughCurrentRows
+        ){
+            lines.push(
+                drillThroughCurrentCols
+                    .map(
+                        col=>
+                            csvCell(
+                                row[col]
+                            )
+                    )
+                    .join(',')
+            );
+        }
+
+        const blob=
+            new Blob(
+                [
+                    '\ufeff'
+                    +lines.join('\r\n')
+                ],
+                {
+                    type:
+                        'text/csv;charset=utf-8;'
+                }
+            );
+
+        const url=
+            URL.createObjectURL(
+                blob
+            );
+
+        const a=
+            document.createElement(
+                'a'
+            );
+
+        a.href=url;
+        a.download=
+            'detalle_contextual_'
+            +String(
+                drillThroughCurrentLabel
+                ||'entidad'
+            )
+                .replace(
+                    /[^a-zA-Z0-9_-]+/g,
+                    '_'
+                )
+                .slice(0,80)
+            +'.csv';
+
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        URL.revokeObjectURL(url);
+    }
+
+
     function openDrillThrough(
         column,
         value,
@@ -4414,6 +4584,24 @@ try{
             contextualRows.slice(
                 0,
                 limit
+            );
+
+        drillThroughCurrentRows=
+            contextualRows.slice();
+
+        drillThroughCurrentCols=
+            cols.slice();
+
+        drillThroughCurrentLabel=
+            String(
+                label
+                ||value
+                ||'entidad'
+            );
+
+        const metricSummary=
+            drillThroughMetricSummary(
+                contextualRows
             );
 
         const title=
@@ -4489,6 +4677,9 @@ try{
             !contextualRows.length
             ||!cols.length
         ){
+            drillThroughCurrentRows=[];
+            drillThroughCurrentCols=[];
+
             body.innerHTML=
                 contextHtml
                 +`
@@ -4500,6 +4691,28 @@ try{
             body.innerHTML=
                 contextHtml
                 +`
+                <div class="r13b-drill-through-kpis">
+                    ${
+                        metricSummary
+                            .map(
+                                metric=>`
+                                <div class="r13b-drill-through-kpi">
+                                    <span class="label">
+                                        ${esc(metric.label)}
+                                    </span>
+                                    <span class="value">
+                                        ${
+                                            fmt(
+                                                metric.value,
+                                                metric.format
+                                            )
+                                        }
+                                    </span>
+                                </div>`
+                            )
+                            .join('')
+                    }
+                </div>
                 <div class="r13b-table-wrap">
                     <table class="r13b-table">
                         <thead>
@@ -4564,6 +4777,15 @@ try{
         );
     }
 
+
+    drillThroughModal
+        .querySelector(
+            '[data-r13b-drill-through-export]'
+        )
+        ?.addEventListener(
+            'click',
+            exportDrillThroughCsv
+        );
 
     drillThroughModal
         .querySelector(
