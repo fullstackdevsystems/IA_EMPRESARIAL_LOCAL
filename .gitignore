@@ -51,3 +51,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.13D.11 applicator
 /Aplicar_R10_13D11_Multidimensional_Drill_Filters.py
+
+# Local R10.13D.12 applicator
+/Aplicar_R10_13D12_Contextual_Drill_Through.py
