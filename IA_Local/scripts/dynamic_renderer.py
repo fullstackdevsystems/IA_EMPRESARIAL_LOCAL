@@ -650,6 +650,32 @@ def runtime_markup() -> str:
     font-weight:900
 }
 
+.r13b-drill-through-kpi details{
+    margin-top:7px;
+    border-top:1px solid #e7eef3;
+    padding-top:6px
+}
+
+.r13b-drill-through-kpi summary{
+    cursor:pointer;
+    color:#087f8e;
+    font-size:9px;
+    font-weight:800
+}
+
+.r13b-drill-through-kpi .meta{
+    display:grid;
+    gap:3px;
+    margin-top:6px;
+    color:#61768b;
+    font-size:9px;
+    line-height:1.35
+}
+
+.r13b-drill-through-kpi .meta b{
+    color:#31516a
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -4451,11 +4477,68 @@ try{
                             contextualRows
                         );
 
+                    const component=
+                        metric.component
+                        ||{};
+
+                    const provenance=
+                        component.provenance
+                        ||{};
+
+                    const rule=
+                        component.rule
+                        ||{};
+
+                    const execution=
+                        component.execution
+                        ||{};
+
                     return {
                         id:metric.id,
                         label:metric.label,
                         format:metric.format,
-                        value
+                        value,
+                        status:
+                            component.status
+                            ||'SUPPORTED',
+                        formula:
+                            component.formula
+                            ||null,
+                        dependencies:
+                            Array.isArray(
+                                component.dependencies
+                            )
+                                ?component.dependencies
+                                :(
+                                    Array.isArray(
+                                        execution.dependency_roles
+                                    )
+                                        ?execution.dependency_roles
+                                        :[]
+                                ),
+                        source_columns:
+                            Array.isArray(
+                                component.source_columns
+                            )
+                                ?component.source_columns
+                                :[],
+                        provenance_source:
+                            provenance.source
+                            ||'unknown',
+                        provenance_confidence:
+                            provenance.confidence
+                            ??null,
+                        rule_id:
+                            rule.rule_id
+                            ||null,
+                        ruleset_version:
+                            rule.ruleset_version
+                            ||model.ruleset_version
+                            ||null,
+                        operator:
+                            execution.operator
+                            ||rule.operator
+                            ||null
                     };
                 }
             );
@@ -4708,6 +4791,61 @@ try{
                                             )
                                         }
                                     </span>
+                                    <details>
+                                        <summary>
+                                            Fórmula y provenance
+                                        </summary>
+                                        <div class="meta">
+                                            <span>
+                                                <b>Estado:</b>
+                                                ${esc(metric.status)}
+                                            </span>
+                                            <span>
+                                                <b>Fórmula:</b>
+                                                ${esc(
+                                                    metric.formula
+                                                    ||'Directa / sin fórmula derivada'
+                                                )}
+                                            </span>
+                                            <span>
+                                                <b>Dependencias:</b>
+                                                ${esc(
+                                                    metric.dependencies.length
+                                                        ?metric.dependencies.join(', ')
+                                                        :'Ninguna'
+                                                )}
+                                            </span>
+                                            <span>
+                                                <b>Columnas fuente:</b>
+                                                ${esc(
+                                                    metric.source_columns.length
+                                                        ?metric.source_columns.join(', ')
+                                                        :'N/D'
+                                                )}
+                                            </span>
+                                            <span>
+                                                <b>Provenance:</b>
+                                                ${esc(metric.provenance_source)}
+                                                ${
+                                                    metric.provenance_confidence!==null
+                                                        ?`· confianza ${esc(metric.provenance_confidence)}`
+                                                        :''
+                                                }
+                                            </span>
+                                            <span>
+                                                <b>Regla:</b>
+                                                ${esc(metric.rule_id||'N/A')}
+                                            </span>
+                                            <span>
+                                                <b>Ruleset:</b>
+                                                ${esc(metric.ruleset_version||'N/A')}
+                                            </span>
+                                            <span>
+                                                <b>Operador:</b>
+                                                ${esc(metric.operator||'direct')}
+                                            </span>
+                                        </div>
+                                    </details>
                                 </div>`
                             )
                             .join('')
