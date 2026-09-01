@@ -75,3 +75,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.14A applicator
 /Aplicar_R10_14A_Governed_Analytical_Plan.py
+
+# Local R10.14B applicator
+/Aplicar_R10_14B_Governed_Analytical_Task_Execution.py
