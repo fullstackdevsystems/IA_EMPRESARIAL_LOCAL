@@ -713,6 +713,45 @@ def runtime_markup() -> str:
 .r13b-drill-sort:hover{color:#0a93a4}
 .r13b-drill-sort[aria-pressed="true"]{color:#087f8e}
 
+.r13b-drill-through-columns{
+    position:relative
+}
+
+.r13b-drill-through-columns summary{
+    cursor:pointer;
+    border:1px solid #dce7ef;
+    border-radius:9px;
+    padding:8px 10px;
+    background:#fff;
+    color:#31516a;
+    font-weight:700;
+    list-style:none
+}
+
+.r13b-drill-through-columns-menu{
+    position:absolute;
+    right:0;
+    top:calc(100% + 6px);
+    z-index:5;
+    min-width:260px;
+    max-height:280px;
+    overflow:auto;
+    background:#fff;
+    border:1px solid #dce7ef;
+    border-radius:10px;
+    padding:8px;
+    box-shadow:0 10px 24px rgba(18,52,77,.12)
+}
+
+.r13b-drill-through-columns-menu label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 4px;
+    color:#415b72;
+    font-size:11px
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -4510,6 +4549,7 @@ try{
     let drillThroughPage=1;
     let drillThroughSortColumn=null;
     let drillThroughSortDirection='asc';
+    let drillThroughVisibleCols=[];
     const drillThroughPageSize=100;
 
 
@@ -4903,7 +4943,7 @@ try{
                     row=>`
                     <tr>
                         ${
-                            drillThroughCurrentCols
+                            drillThroughVisibleCols
                                 .map(
                                     col=>`
                                     <td>
@@ -4992,6 +5032,44 @@ try{
             })
         );
 
+        drillThroughModal.querySelectorAll('[data-r13b-drill-column]').forEach(
+            checkbox=>checkbox.addEventListener('change',()=>{
+                const column=checkbox.getAttribute('data-r13b-drill-column');
+
+                if(checkbox.checked){
+                    if(!drillThroughVisibleCols.includes(column)){
+                        drillThroughVisibleCols.push(column);
+                    }
+                }else{
+                    drillThroughVisibleCols=
+                        drillThroughVisibleCols.filter(
+                            item=>item!==column
+                        );
+                }
+
+                drillThroughVisibleCols=
+                    drillThroughCurrentCols.filter(
+                        col=>drillThroughVisibleCols.includes(col)
+                    );
+
+                if(!drillThroughVisibleCols.length){
+                    checkbox.checked=true;
+                    drillThroughVisibleCols=[column];
+                }
+
+                if(
+                    drillThroughSortColumn
+                    &&!drillThroughVisibleCols.includes(drillThroughSortColumn)
+                ){
+                    drillThroughSortColumn=null;
+                    drillThroughSortDirection='asc';
+                }
+
+                drillThroughPage=1;
+                renderDrillThroughTable();
+            })
+        );
+
         renderDrillThroughTable();
     }
 
@@ -5049,6 +5127,7 @@ try{
         drillThroughPage=1;
         drillThroughSortColumn=null;
         drillThroughSortDirection='asc';
+        drillThroughVisibleCols=cols.slice();
 
         const metricSummary=
             drillThroughMetricSummary(
@@ -5227,6 +5306,26 @@ try{
                         placeholder="Buscar en el detalle contextual..."
                         aria-label="Buscar en el detalle contextual"
                     >
+                    <details class="r13b-drill-through-columns">
+                        <summary>Columnas</summary>
+                        <div class="r13b-drill-through-columns-menu">
+                            ${
+                                cols
+                                    .map(
+                                        col=>`
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                data-r13b-drill-column="${esc(col)}"
+                                                checked
+                                            >
+                                            <span>${esc(col)}</span>
+                                        </label>`
+                                    )
+                                    .join('')
+                            }
+                        </div>
+                    </details>
                     <div class="r13b-drill-through-pager">
                         <button type="button" class="r13b-drill-through-btn" data-r13b-drill-through-prev>
                             Anterior
@@ -5242,7 +5341,7 @@ try{
                         <thead>
                             <tr>
                                 ${
-                                    cols
+                                    drillThroughVisibleCols
                                         .map(
                                             col=>`<th><button type="button" class="r13b-drill-sort" data-r13b-drill-sort="${esc(col)}" aria-pressed="false">${esc(col)} ↕</button></th>`
                                         )
