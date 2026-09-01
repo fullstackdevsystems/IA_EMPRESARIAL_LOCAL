@@ -709,6 +709,10 @@ def runtime_markup() -> str:
     cursor:not-allowed
 }
 
+.r13b-drill-sort{border:0;background:transparent;color:#314c67;font:inherit;font-weight:800;cursor:pointer;padding:0;white-space:nowrap}
+.r13b-drill-sort:hover{color:#0a93a4}
+.r13b-drill-sort[aria-pressed="true"]{color:#087f8e}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -4504,6 +4508,8 @@ try{
     let drillThroughCurrentContext=null;
     let drillThroughSearch='';
     let drillThroughPage=1;
+    let drillThroughSortColumn=null;
+    let drillThroughSortDirection='asc';
     const drillThroughPageSize=100;
 
 
@@ -4828,34 +4834,47 @@ try{
     }
 
 
+    function drillThroughCompareValues(left,right){
+        const a=left??'';
+        const b=right??'';
+        const an=Number(a);
+        const bn=Number(b);
+        if(String(a).trim()!==''&&String(b).trim()!==''&&Number.isFinite(an)&&Number.isFinite(bn)){
+            return an-bn;
+        }
+        const datePattern=/^\d{4}-\d{2}-\d{2}/;
+        if(datePattern.test(String(a))&&datePattern.test(String(b))){
+            return Date.parse(a)-Date.parse(b);
+        }
+        return String(a).localeCompare(String(b),'es-MX',{numeric:true,sensitivity:'base'});
+    }
+
+
     function drillThroughFilteredRows(){
-
-        const term=
-            String(
-                drillThroughSearch
-                ||''
+        const term=String(drillThroughSearch||'').trim().toLowerCase();
+        const filtered=term
+            ?drillThroughCurrentRows.filter(
+                row=>drillThroughCurrentCols.some(
+                    col=>String(row[col]??'').toLowerCase().includes(term)
+                )
             )
-                .trim()
-                .toLowerCase();
+            :drillThroughCurrentRows.slice();
 
-        if(!term){
-            return drillThroughCurrentRows;
+        if(!drillThroughSortColumn||!drillThroughCurrentCols.includes(drillThroughSortColumn)){
+            return filtered;
         }
 
-        return drillThroughCurrentRows
-            .filter(
-                row=>
-                    drillThroughCurrentCols
-                        .some(
-                            col=>
-                                String(
-                                    row[col]
-                                    ??''
-                                )
-                                    .toLowerCase()
-                                    .includes(term)
-                        )
-            );
+        const direction=drillThroughSortDirection==='desc'?-1:1;
+        return filtered
+            .map((row,index)=>({row,index}))
+            .sort((left,right)=>{
+                const compared=drillThroughCompareValues(
+                    left.row[drillThroughSortColumn],
+                    right.row[drillThroughSortColumn]
+                );
+                return compared===0?left.index-right.index:compared*direction;
+            })
+            .map(item=>item.row);
     }
 
 
@@ -4916,6 +4935,13 @@ try{
         if(next){
             next.disabled=drillThroughPage>=totalPages;
         }
+
+        drillThroughModal.querySelectorAll('[data-r13b-drill-sort]').forEach(button=>{
+            const column=button.getAttribute('data-r13b-drill-sort');
+            const active=column===drillThroughSortColumn;
+            button.textContent=column+' '+(active?(drillThroughSortDirection==='desc'?'↓':'↑'):'↕');
+            button.setAttribute('aria-pressed',active?'true':'false');
+        });
     }
 
 
@@ -4950,6 +4976,20 @@ try{
                 drillThroughPage+=1;
                 renderDrillThroughTable();
             }
+        );
+
+        drillThroughModal.querySelectorAll('[data-r13b-drill-sort]').forEach(
+            button=>button.addEventListener('click',()=>{
+                const column=button.getAttribute('data-r13b-drill-sort');
+                if(column===drillThroughSortColumn){
+                    drillThroughSortDirection=drillThroughSortDirection==='asc'?'desc':'asc';
+                }else{
+                    drillThroughSortColumn=column;
+                    drillThroughSortDirection='asc';
+                }
+                drillThroughPage=1;
+                renderDrillThroughTable();
+            })
         );
 
         renderDrillThroughTable();
@@ -5007,6 +5047,8 @@ try{
 
         drillThroughSearch='';
         drillThroughPage=1;
+        drillThroughSortColumn=null;
+        drillThroughSortDirection='asc';
 
         const metricSummary=
             drillThroughMetricSummary(
@@ -5202,8 +5244,7 @@ try{
                                 ${
                                     cols
                                         .map(
-                                            col=>
-                                                `<th>${esc(col)}</th>`
+                                            col=>`<th><button type="button" class="r13b-drill-sort" data-r13b-drill-sort="${esc(col)}" aria-pressed="false">${esc(col)} ↕</button></th>`
                                         )
                                         .join('')
                                 }
