@@ -14,6 +14,7 @@ from capability_rules import (
     rule_public_metadata,
 )
 from analysis_planner import build_governed_analytical_plan
+from analysis_executor import execute_governed_analytical_plan
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -2096,6 +2097,12 @@ def build_dashboard_spec(
         components=caps,
     )
 
+    analytical_results = execute_governed_analytical_plan(
+        df,
+        analytical_plan=analytical_plan,
+        roles=roles,
+    )
+
 
     # ------------------------------------------------------------------
     # FINAL SPEC
@@ -2123,6 +2130,9 @@ def build_dashboard_spec(
 
         "analytical_plan":
             analytical_plan,
+
+        "analytical_results":
+            analytical_results,
 
 
         "source": {
