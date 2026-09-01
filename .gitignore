@@ -66,3 +66,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.13D.16 applicator
 /Aplicar_R10_13D16_Drill_Through_Search_Pagination.py
+
+# Local R10.13D.17 applicator
+/Aplicar_R10_13D17_Type_Aware_Drill_Sorting.py
