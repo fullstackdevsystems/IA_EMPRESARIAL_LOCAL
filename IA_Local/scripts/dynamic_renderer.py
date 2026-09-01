@@ -1108,6 +1108,13 @@ try{
                     </button>
                     <button
                         type="button"
+                        class="r13b-drill-through-btn"
+                        data-r13b-drill-through-audit
+                    >
+                        Exportar auditoría JSON
+                    </button>
+                    <button
+                        type="button"
                         class="r13b-drill-through-close"
                         data-r13b-drill-through-close
                     >
@@ -4461,6 +4468,7 @@ try{
     let drillThroughCurrentRows=[];
     let drillThroughCurrentCols=[];
     let drillThroughCurrentLabel='detalle';
+    let drillThroughCurrentContext=null;
 
 
     function drillThroughMetricSummary(
@@ -4542,6 +4550,154 @@ try{
                     };
                 }
             );
+    }
+
+
+    function drillThroughAuditSnapshot(){
+
+        if(
+            !drillThroughCurrentContext
+            ||!drillThroughCurrentRows.length
+        ){
+            return null;
+        }
+
+        const metricSummary=
+            drillThroughMetricSummary(
+                drillThroughCurrentRows
+            );
+
+        const blocked=
+            Array.isArray(model.blocked)
+                ?model.blocked
+                    .map(
+                        item=>({
+                            id:item.id,
+                            status:item.status,
+                            reason:item.reason
+                                ||null
+                        })
+                    )
+                :[];
+
+        return {
+            schema_version:'r10.13d.15',
+            type:'contextual_kpi_audit_snapshot',
+            context:{
+                entity_column:
+                    drillThroughCurrentContext.column,
+                entity_value:
+                    drillThroughCurrentContext.value,
+                entity_label:
+                    drillThroughCurrentContext.label,
+                active_filters:
+                    activeDrillSummary()
+                        .map(
+                            item=>({
+                                column:item.column,
+                                value:item.value,
+                                label:
+                                    item.label
+                                    ||item.value
+                            })
+                        ),
+                record_count:
+                    drillThroughCurrentRows.length,
+                transaction_columns:
+                    drillThroughCurrentCols.slice()
+            },
+            metrics:
+                metricSummary.map(
+                    metric=>({
+                        id:metric.id,
+                        label:metric.label,
+                        value:metric.value,
+                        format:metric.format,
+                        status:metric.status,
+                        formula:metric.formula,
+                        dependencies:
+                            metric.dependencies.slice(),
+                        source_columns:
+                            metric.source_columns.slice(),
+                        provenance:{
+                            source:
+                                metric.provenance_source,
+                            confidence:
+                                metric.provenance_confidence
+                        },
+                        rule:{
+                            rule_id:
+                                metric.rule_id,
+                            ruleset_version:
+                                metric.ruleset_version,
+                            operator:
+                                metric.operator
+                        }
+                    })
+                ),
+            governance:{
+                ruleset_version:
+                    model.ruleset_version
+                    ||null,
+                blocked
+            }
+        };
+    }
+
+
+    function exportDrillThroughAuditJson(){
+
+        const snapshot=
+            drillThroughAuditSnapshot();
+
+        if(!snapshot){
+            return;
+        }
+
+        const blob=
+            new Blob(
+                [
+                    JSON.stringify(
+                        snapshot,
+                        null,
+                        2
+                    )
+                ],
+                {
+                    type:
+                        'application/json;charset=utf-8;'
+                }
+            );
+
+        const url=
+            URL.createObjectURL(
+                blob
+            );
+
+        const a=
+            document.createElement(
+                'a'
+            );
+
+        a.href=url;
+        a.download=
+            'auditoria_contextual_'
+            +String(
+                drillThroughCurrentLabel
+                ||'entidad'
+            )
+                .replace(
+                    /[^a-zA-Z0-9_-]+/g,
+                    '_'
+                )
+                .slice(0,80)
+            +'.json';
+
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        URL.revokeObjectURL(url);
     }
 
 
@@ -4682,6 +4838,17 @@ try{
                 ||'entidad'
             );
 
+        drillThroughCurrentContext={
+            column,
+            value,
+            label:
+                String(
+                    label
+                    ||value
+                    ||'entidad'
+                )
+        };
+
         const metricSummary=
             drillThroughMetricSummary(
                 contextualRows
@@ -4762,6 +4929,7 @@ try{
         ){
             drillThroughCurrentRows=[];
             drillThroughCurrentCols=[];
+            drillThroughCurrentContext=null;
 
             body.innerHTML=
                 contextHtml
@@ -4914,6 +5082,16 @@ try{
             'false'
         );
     }
+
+
+    drillThroughModal
+        .querySelector(
+            '[data-r13b-drill-through-audit]'
+        )
+        ?.addEventListener(
+            'click',
+            exportDrillThroughAuditJson
+        );
 
 
     drillThroughModal
