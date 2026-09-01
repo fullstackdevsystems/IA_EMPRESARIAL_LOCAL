@@ -60,3 +60,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.13D.14 applicator
 /Aplicar_R10_13D14_Contextual_KPI_Provenance.py
+
+# Local R10.13D.15 applicator
+/Aplicar_R10_13D15_Contextual_KPI_Audit_JSON.py
