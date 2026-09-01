@@ -676,6 +676,39 @@ def runtime_markup() -> str:
     color:#31516a
 }
 
+.r13b-drill-through-table-tools{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:10px 0
+}
+
+.r13b-drill-through-table-tools input{
+    flex:1;
+    min-width:240px;
+    border:1px solid #dce7ef;
+    border-radius:9px;
+    padding:8px 10px;
+    color:#102540;
+    background:#fff
+}
+
+.r13b-drill-through-pager{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    color:#61768b;
+    font-size:10px
+}
+
+.r13b-drill-through-btn:disabled{
+    opacity:.45;
+    cursor:not-allowed
+}
+
 .r13b-drillable{
     cursor:pointer;
     transition:background .15s ease,transform .15s ease
@@ -4469,6 +4502,9 @@ try{
     let drillThroughCurrentCols=[];
     let drillThroughCurrentLabel='detalle';
     let drillThroughCurrentContext=null;
+    let drillThroughSearch='';
+    let drillThroughPage=1;
+    const drillThroughPageSize=100;
 
 
     function drillThroughMetricSummary(
@@ -4792,6 +4828,134 @@ try{
     }
 
 
+    function drillThroughFilteredRows(){
+
+        const term=
+            String(
+                drillThroughSearch
+                ||''
+            )
+                .trim()
+                .toLowerCase();
+
+        if(!term){
+            return drillThroughCurrentRows;
+        }
+
+        return drillThroughCurrentRows
+            .filter(
+                row=>
+                    drillThroughCurrentCols
+                        .some(
+                            col=>
+                                String(
+                                    row[col]
+                                    ??''
+                                )
+                                    .toLowerCase()
+                                    .includes(term)
+                        )
+            );
+    }
+
+
+    function renderDrillThroughTable(){
+
+        const tbody=drillThroughModal.querySelector('#r13bDrillThroughTableBody');
+        const info=drillThroughModal.querySelector('#r13bDrillThroughPageInfo');
+        const prev=drillThroughModal.querySelector('[data-r13b-drill-through-prev]');
+        const next=drillThroughModal.querySelector('[data-r13b-drill-through-next]');
+
+        if(!tbody){
+            return;
+        }
+
+        const filtered=drillThroughFilteredRows();
+        const totalPages=Math.max(1,Math.ceil(filtered.length/drillThroughPageSize));
+
+        drillThroughPage=Math.min(Math.max(1,drillThroughPage),totalPages);
+
+        const start=(drillThroughPage-1)*drillThroughPageSize;
+        const pageRows=filtered.slice(start,start+drillThroughPageSize);
+
+        tbody.innerHTML=
+            pageRows
+                .map(
+                    row=>`
+                    <tr>
+                        ${
+                            drillThroughCurrentCols
+                                .map(
+                                    col=>`
+                                    <td>
+                                        ${esc(row[col]??'Sin dato')}
+                                    </td>`
+                                )
+                                .join('')
+                        }
+                    </tr>`
+                )
+                .join('');
+
+        if(info){
+            info.textContent=
+                'Página '
+                +drillThroughPage.toLocaleString('es-MX')
+                +' de '
+                +totalPages.toLocaleString('es-MX')
+                +' · '
+                +filtered.length.toLocaleString('es-MX')
+                +' registros visibles de '
+                +drillThroughCurrentRows.length.toLocaleString('es-MX');
+        }
+
+        if(prev){
+            prev.disabled=drillThroughPage<=1;
+        }
+
+        if(next){
+            next.disabled=drillThroughPage>=totalPages;
+        }
+    }
+
+
+    function bindDrillThroughTableControls(){
+
+        const search=drillThroughModal.querySelector('#r13bDrillThroughSearch');
+        const prev=drillThroughModal.querySelector('[data-r13b-drill-through-prev]');
+        const next=drillThroughModal.querySelector('[data-r13b-drill-through-next]');
+
+        search?.addEventListener(
+            'input',
+            event=>{
+                drillThroughSearch=event.target.value||'';
+                drillThroughPage=1;
+                renderDrillThroughTable();
+            }
+        );
+
+        prev?.addEventListener(
+            'click',
+            ()=>{
+                if(drillThroughPage>1){
+                    drillThroughPage-=1;
+                    renderDrillThroughTable();
+                }
+            }
+        );
+
+        next?.addEventListener(
+            'click',
+            ()=>{
+                drillThroughPage+=1;
+                renderDrillThroughTable();
+            }
+        );
+
+        renderDrillThroughTable();
+    }
+
+
     function openDrillThrough(
         column,
         value,
@@ -4817,14 +4981,6 @@ try{
         const cols=
             drillThroughColumns();
 
-        const limit=500;
-
-        const visibleRows=
-            contextualRows.slice(
-                0,
-                limit
-            );
-
         drillThroughCurrentRows=
             contextualRows.slice();
 
@@ -4848,6 +5004,9 @@ try{
                     ||'entidad'
                 )
         };
+
+        drillThroughSearch='';
+        drillThroughPage=1;
 
         const metricSummary=
             drillThroughMetricSummary(
@@ -5019,6 +5178,23 @@ try{
                             .join('')
                     }
                 </div>
+                <div class="r13b-drill-through-table-tools">
+                    <input
+                        type="search"
+                        id="r13bDrillThroughSearch"
+                        placeholder="Buscar en el detalle contextual..."
+                        aria-label="Buscar en el detalle contextual"
+                    >
+                    <div class="r13b-drill-through-pager">
+                        <button type="button" class="r13b-drill-through-btn" data-r13b-drill-through-prev>
+                            Anterior
+                        </button>
+                        <span id="r13bDrillThroughPageInfo"></span>
+                        <button type="button" class="r13b-drill-through-btn" data-r13b-drill-through-next>
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
                 <div class="r13b-table-wrap">
                     <table class="r13b-table">
                         <thead>
@@ -5033,44 +5209,11 @@ try{
                                 }
                             </tr>
                         </thead>
-                        <tbody>
-                            ${
-                                visibleRows
-                                    .map(
-                                        row=>`
-                                        <tr>
-                                            ${
-                                                cols
-                                                    .map(
-                                                        col=>`
-                                                        <td>
-                                                            ${esc(
-                                                                row[col]
-                                                                ??'Sin dato'
-                                                            )}
-                                                        </td>`
-                                                    )
-                                                    .join('')
-                                            }
-                                        </tr>`
-                                    )
-                                    .join('')
-                            }
-                        </tbody>
+                        <tbody id="r13bDrillThroughTableBody"></tbody>
                     </table>
-                </div>
-                ${
-                    contextualRows.length>limit
-                        ?`
-                        <div class="r13b-small">
-                            Mostrando los primeros
-                            ${limit.toLocaleString('es-MX')}
-                            de
-                            ${contextualRows.length.toLocaleString('es-MX')}
-                            registros.
-                        </div>`
-                        :''
-                }`;
+                </div>`;
+
+            bindDrillThroughTableControls();
         }
 
         drillThroughModal.classList.add(
