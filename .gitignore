@@ -87,3 +87,8 @@ IA_Local/workspace/Entrada/
 /Aplicar_R10_14C3_Safe_Concentration_Truncation_Guard.py
 /Aplicar_R10_14C4_Policy_Boundary_Guard.py
 /Reparar_R10_14C2_Import_Order.py
+
+# Local R10.15A/R10.15B applicators
+/Aplicar_R10_15A_Governed_Business_Rule_Engine.py
+/Aplicar_R10_15A_Governed_Business_Rule_Engine_FIXED.py
+/Aplicar_R10_15B_Persistent_Governed_Business_Rule_Registry.py
