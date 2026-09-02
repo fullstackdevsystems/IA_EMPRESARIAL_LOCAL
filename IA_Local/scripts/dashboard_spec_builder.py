@@ -29,6 +29,10 @@ from enterprise_knowledge_retrieval import (
     public_knowledge_context,
     retrieve_contextual_enterprise_knowledge,
 )
+from enterprise_knowledge_context_injection import (
+    build_governed_knowledge_interpretation,
+    inject_governed_knowledge_into_intent,
+)
 
 SCHEMA_VERSION = "r10.13a"
 
@@ -2181,6 +2185,15 @@ def build_dashboard_spec(
     )
     enterprise_knowledge_context = public_knowledge_context(enterprise_knowledge_retrieval)
     intent["knowledge_context"] = enterprise_knowledge_context
+
+    enterprise_knowledge_interpretation = build_governed_knowledge_interpretation(
+        intent=intent,
+        knowledge_retrieval=enterprise_knowledge_retrieval,
+    )
+    intent = inject_governed_knowledge_into_intent(
+        intent=intent,
+        knowledge_interpretation=enterprise_knowledge_interpretation,
+    )
     resolved_business_rule_registry = (
         []
         if business_rule_context.get("status") == "INVALID"
@@ -2262,6 +2275,9 @@ def build_dashboard_spec(
 
         "enterprise_knowledge_context":
             enterprise_knowledge_context,
+
+        "enterprise_knowledge_interpretation":
+            enterprise_knowledge_interpretation,
 
         "enterprise_knowledge_registry": {
             "schema_version": enterprise_knowledge_registry.get("schema_version"),
