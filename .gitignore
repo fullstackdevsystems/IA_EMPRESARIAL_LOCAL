@@ -95,3 +95,7 @@ IA_Local/workspace/Entrada/
 
 # Local R10.15C applicator
 /Aplicar_R10_15C_Enterprise_Rule_Context_Scope_Governance.py
+
+# Local R10.15D applicators
+/Aplicar_R10_15D_Governed_Rule_Lifecycle_Validation.py
+/Aplicar_R10_15D_FIX_Embed_Registry_Governance.py
