@@ -1,0 +1,20 @@
+from pathlib import Path
+import sys
+def check(n,c):
+    if not c: print("FAIL",n); raise AssertionError(n)
+    print("PASS",n)
+if len(sys.argv)<2: raise SystemExit("Uso: python test_r10_16b_e2e_contextual_knowledge_retrieval.py <dashboard.html>")
+p=Path(sys.argv[1]); t=p.read_text(encoding="utf-8",errors="replace")
+print("\n=== R10.16B E2E CONTEXTUAL KNOWLEDGE RETRIEVAL ==="); print("Archivo:",p)
+check("knowledge_context_present",'"enterprise_knowledge_context":{' in t)
+check("knowledge_context_schema",'"schema_version":"r10.16b"' in t)
+check("knowledge_context_empty_default",'"matched_entry_count":0' in t)
+check("deterministic_relevance",'"deterministic_relevance_only":true' in t)
+check("no_llm_relevance",'"llm_relevance_inference":false' in t)
+check("source_precedence",'"source_data_precedence":true' in t)
+check("knowledge_cannot_create_metrics",'"knowledge_cannot_create_metrics":true' in t)
+check("r10_16a_preserved",'"schema_version":"r10.16a"' in t)
+check("r10_15f_preserved",'"schema_version":"r10.15f"' in t)
+check("freight_still_blocked",'"id":"kpi:freight"' in t and '"status":"BLOCKED"' in t)
+check("coverage_still_93_94",'"percent":93.94' in t or '"coverage_pct":93.94' in t)
+print("\nPASS R10.16B E2E CONTEXTUAL KNOWLEDGE RETRIEVAL")

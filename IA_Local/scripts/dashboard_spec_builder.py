@@ -25,7 +25,10 @@ from enterprise_metric_rules import (
 )
 from enterprise_rule_governance import build_enterprise_rule_governance_audit
 from enterprise_knowledge_registry import load_governed_enterprise_knowledge_registry
-
+from enterprise_knowledge_retrieval import (
+    public_knowledge_context,
+    retrieve_contextual_enterprise_knowledge,
+)
 
 SCHEMA_VERSION = "r10.13a"
 
@@ -2169,6 +2172,15 @@ def build_dashboard_spec(
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
     resolved_rule_as_of = resolved_rule_context.pop("as_of", None)
+
+    enterprise_knowledge_retrieval = retrieve_contextual_enterprise_knowledge(
+        prompt=prompt,
+        registry=enterprise_knowledge_registry,
+        context=({} if business_rule_context.get("status") == "INVALID" else resolved_rule_context),
+        as_of=(None if business_rule_context.get("status") == "INVALID" else resolved_rule_as_of),
+    )
+    enterprise_knowledge_context = public_knowledge_context(enterprise_knowledge_retrieval)
+    intent["knowledge_context"] = enterprise_knowledge_context
     resolved_business_rule_registry = (
         []
         if business_rule_context.get("status") == "INVALID"
@@ -2247,6 +2259,9 @@ def build_dashboard_spec(
 
         "enterprise_rule_governance":
             enterprise_rule_governance,
+
+        "enterprise_knowledge_context":
+            enterprise_knowledge_context,
 
         "enterprise_knowledge_registry": {
             "schema_version": enterprise_knowledge_registry.get("schema_version"),
