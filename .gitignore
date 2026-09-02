@@ -118,3 +118,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.16C applicator
 /Aplicar_R10_16C_Governed_Knowledge_Context_Injection.py
+
+# Local R10.16D applicator
+/Aplicar_R10_16D_Governed_Knowledge_Ingestion_Validation.py
