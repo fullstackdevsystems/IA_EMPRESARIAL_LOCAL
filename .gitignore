@@ -133,3 +133,9 @@ IA_Local/workspace/Entrada/
 
 # Local R10.17A applicator
 /Aplicar_R10_17A_Governed_Enterprise_Source_Registry.py
+
+# Local R10.17B applicators
+/Aplicar_R10_17B_Governed_Source_Resolution_File_Connector.py
+/Aplicar_R10_17B_Governed_Source_Resolution_File_Connector_CORREGIDO.py
+/Aplicar_R10_17B_Governed_Source_Resolution_File_Connector_V2.py
+/Aplicar_R10_17B_Fix_CSV_Reader.py
