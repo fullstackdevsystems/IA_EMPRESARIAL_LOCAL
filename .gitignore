@@ -124,3 +124,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.16E applicator
 /Aplicar_R10_16E_Governed_Knowledge_Approval_Promotion.py
+
+# Local R10.16F applicator
+/Aplicar_R10_16F_Enterprise_Memory_Closure_Hardening.py
