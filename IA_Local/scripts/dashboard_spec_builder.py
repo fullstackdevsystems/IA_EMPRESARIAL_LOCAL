@@ -24,6 +24,7 @@ from enterprise_metric_rules import (
     resolve_governed_enterprise_metric_rule,
 )
 from enterprise_rule_governance import build_enterprise_rule_governance_audit
+from enterprise_knowledge_registry import load_governed_enterprise_knowledge_registry
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -2163,6 +2164,7 @@ def build_dashboard_spec(
 
     business_rule_registry = load_governed_business_rule_registry()
     enterprise_metric_rule_registry = load_governed_enterprise_metric_rule_registry()
+    enterprise_knowledge_registry = load_governed_enterprise_knowledge_registry()
     business_rule_context = load_governed_business_context()
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
@@ -2245,6 +2247,18 @@ def build_dashboard_spec(
 
         "enterprise_rule_governance":
             enterprise_rule_governance,
+
+        "enterprise_knowledge_registry": {
+            "schema_version": enterprise_knowledge_registry.get("schema_version"),
+            "status": enterprise_knowledge_registry.get("status"),
+            "registry_id": enterprise_knowledge_registry.get("registry_id"),
+            "knowledge_version": enterprise_knowledge_registry.get("knowledge_version"),
+            "entry_count": enterprise_knowledge_registry.get("entry_count"),
+            "approved_entry_count": enterprise_knowledge_registry.get("approved_entry_count"),
+            "fingerprint_sha256": enterprise_knowledge_registry.get("fingerprint_sha256"),
+            "errors": enterprise_knowledge_registry.get("errors"),
+            "governance": enterprise_knowledge_registry.get("governance"),
+        },
 
         "enterprise_metric_rule_registry": {
             "schema_version": enterprise_metric_rule_registry.get("schema_version"),
