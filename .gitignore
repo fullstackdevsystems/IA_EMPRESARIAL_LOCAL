@@ -103,3 +103,7 @@ IA_Local/workspace/Entrada/
 # Local R10.15E applicators
 /Aplicar_R10_15E_Governed_Enterprise_Derived_Metric_Rules.py
 /Aplicar_R10_15E_FIX_Pandas_Index_Ambiguous.py
+
+# Local R10.15F applicators
+/Aplicar_R10_15F_Enterprise_Business_Rule_Engine_Closure.py
+/Aplicar_R10_15F_FIX_Context_AsOf_FailClosed.py
