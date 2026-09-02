@@ -69,8 +69,15 @@ def load_governed_business_context(path: Optional[str] = None) -> Dict[str, Any]
 
     as_of = raw_context.get("as_of")
     if as_of not in (None, ""):
+        from datetime import date
+        try:
+            date.fromisoformat(str(as_of))
+        except Exception:
+            out = deepcopy(base)
+            out["status"] = "INVALID"
+            out["errors"] = ["invalid_as_of"]
+            return out
         clean["as_of"] = str(as_of)
-
     return {
         "schema_version": CONTEXT_VERSION,
         "status": "LOADED" if clean else "UNCONFIGURED",

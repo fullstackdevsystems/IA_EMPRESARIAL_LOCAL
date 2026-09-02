@@ -23,6 +23,7 @@ from enterprise_metric_rules import (
     load_governed_enterprise_metric_rule_registry,
     resolve_governed_enterprise_metric_rule,
 )
+from enterprise_rule_governance import build_enterprise_rule_governance_audit
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -470,6 +471,8 @@ def _derived_metric(
 def _enterprise_derived_metric(key, available_columns):
     registry = load_governed_enterprise_metric_rule_registry()
     context_doc = load_governed_business_context()
+    if context_doc.get("status") == "INVALID":
+        return None
     context = dict(context_doc.get("context") or {})
     as_of = context.pop("as_of", None)
     resolution = resolve_governed_enterprise_metric_rule(
@@ -2164,10 +2167,15 @@ def build_dashboard_spec(
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
     resolved_rule_as_of = resolved_rule_context.pop("as_of", None)
+    resolved_business_rule_registry = (
+        []
+        if business_rule_context.get("status") == "INVALID"
+        else business_rule_registry.get("rules")
+    )
 
     business_rule_interpretation = apply_governed_business_rules(
         business_insights=business_insights,
-        rule_registry=business_rule_registry.get("rules"),
+        rule_registry=resolved_business_rule_registry,
         context=resolved_rule_context,
         as_of=resolved_rule_as_of,
     )
@@ -2190,6 +2198,13 @@ def build_dashboard_spec(
         "errors": business_rule_registry.get("errors"),
         "governance": business_rule_registry.get("governance"),
     }
+
+    enterprise_rule_governance = build_enterprise_rule_governance_audit(
+        business_rule_interpretation=business_rule_interpretation,
+        business_rule_registry=business_rule_registry,
+        business_rule_context=business_rule_context,
+        enterprise_metric_rule_registry=enterprise_metric_rule_registry,
+    )
 
 
     # ------------------------------------------------------------------
@@ -2227,6 +2242,9 @@ def build_dashboard_spec(
 
         "business_rule_interpretation":
             business_rule_interpretation,
+
+        "enterprise_rule_governance":
+            enterprise_rule_governance,
 
         "enterprise_metric_rule_registry": {
             "schema_version": enterprise_metric_rule_registry.get("schema_version"),

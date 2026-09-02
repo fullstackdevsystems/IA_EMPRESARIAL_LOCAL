@@ -103,14 +103,13 @@ def apply_governed_business_rules(
     # R10.15A intentionally ships with no company thresholds. Rules must be supplied
     # explicitly by a governed registry. Arbitrary expressions are never evaluated.
     ctx = dict(context or {})
+    invalid_explicit_as_of = bool(as_of) and _parse_date(as_of) is None
     resolved_as_of = _parse_date(as_of) if as_of else date.today()
-    if resolved_as_of is None:
-        resolved_as_of = date.today()
 
     accepted: List[Dict[str, Any]] = []
     rejected: List[Dict[str, Any]] = []
 
-    for raw in list(rule_registry or []):
+    for raw in ([] if invalid_explicit_as_of else list(rule_registry or [])):
         rule = dict(raw or {})
         ok, reason = _validate_rule(rule)
         if not ok:
@@ -177,7 +176,7 @@ def apply_governed_business_rules(
     return {
         "schema_version": BUSINESS_RULE_ENGINE_VERSION,
         "mode": "governed-whitelist-business-rules",
-        "as_of": resolved_as_of.isoformat(),
+        "as_of": resolved_as_of.isoformat() if resolved_as_of else None,
         "context": ctx,
         "active_rule_count": len(accepted),
         "rejected_rule_count": len(rejected),
@@ -186,6 +185,10 @@ def apply_governed_business_rules(
         "rule_applications": applications,
         "rejected_rules": rejected,
         "observations": deepcopy(list((business_insights or {}).get("observations") or [])),
+        "governance_observations": (
+            [{"code": "INVALID_AS_OF_FAIL_CLOSED", "provided_as_of": as_of}]
+            if invalid_explicit_as_of else []
+        ),
         "governance": {
             "default_enterprise_thresholds": False,
             "arbitrary_expression_evaluation": False,
