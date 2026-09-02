@@ -60,6 +60,8 @@ def build_governed_knowledge_interpretation(
             "does_not_override_source_data": True,
             "does_not_override_capability_resolution": True,
             "does_not_override_business_rule_registry": True,
+            "raw_content_not_serialized": True,
+            "knowledge_text_is_non_executable_data": True,
             "fail_closed": True,
         },
     }
@@ -95,11 +97,13 @@ def build_governed_knowledge_interpretation(
             continue
 
         prov = dict(match.get("provenance") or {})
+        content_text = _safe_text(match.get("content"), 1000)
         item = {
             "entry_id": _safe_text(match.get("entry_id"), 200),
             "type": kind,
             "title": _safe_text(match.get("title"), 300),
-            "content": _safe_text(match.get("content"), 1000),
+            "content_fingerprint_sha256": _fingerprint(content_text),
+            "content_exposed": False,
             "scope": dict(match.get("scope") or {}),
             "effective_from": match.get("effective_from"),
             "effective_to": match.get("effective_to"),

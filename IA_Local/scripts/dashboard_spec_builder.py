@@ -33,6 +33,7 @@ from enterprise_knowledge_context_injection import (
     build_governed_knowledge_interpretation,
     inject_governed_knowledge_into_intent,
 )
+from enterprise_memory_closure import build_enterprise_memory_closure
 
 SCHEMA_VERSION = "r10.13a"
 
@@ -2194,6 +2195,11 @@ def build_dashboard_spec(
         intent=intent,
         knowledge_interpretation=enterprise_knowledge_interpretation,
     )
+    enterprise_memory_closure = build_enterprise_memory_closure(
+        registry=enterprise_knowledge_registry,
+        retrieval=enterprise_knowledge_retrieval,
+        interpretation=enterprise_knowledge_interpretation,
+    )
     resolved_business_rule_registry = (
         []
         if business_rule_context.get("status") == "INVALID"
@@ -2278,6 +2284,9 @@ def build_dashboard_spec(
 
         "enterprise_knowledge_interpretation":
             enterprise_knowledge_interpretation,
+
+        "enterprise_memory_closure":
+            enterprise_memory_closure,
 
         "enterprise_knowledge_registry": {
             "schema_version": enterprise_knowledge_registry.get("schema_version"),
