@@ -15,6 +15,7 @@ from capability_rules import (
 )
 from analysis_planner import build_governed_analytical_plan
 from analysis_executor import execute_governed_analytical_plan
+from insight_engine import build_governed_business_insights
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -2103,6 +2104,10 @@ def build_dashboard_spec(
         roles=roles,
     )
 
+    business_insights = build_governed_business_insights(
+        analytical_results=analytical_results,
+    )
+
 
     # ------------------------------------------------------------------
     # FINAL SPEC
@@ -2133,6 +2138,9 @@ def build_dashboard_spec(
 
         "analytical_results":
             analytical_results,
+
+        "business_insights":
+            business_insights,
 
 
         "source": {

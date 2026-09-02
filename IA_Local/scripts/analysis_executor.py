@@ -68,7 +68,21 @@ def _trend(df, task, roles):
     w["__period"] = p.loc[p.notna()].dt.to_period("M").astype(str)
     rows = []
     for period, g in w.groupby("__period", sort=True):
-        row = {"period": str(period), "record_count": int(len(g))}
+        period_dates = pd.to_datetime(g[col], errors="coerce").dropna()
+        row = {
+            "period": str(period),
+            "record_count": int(len(g)),
+            "observed_min_date": (
+                period_dates.min().date().isoformat()
+                if not period_dates.empty
+                else None
+            ),
+            "observed_max_date": (
+                period_dates.max().date().isoformat()
+                if not period_dates.empty
+                else None
+            ),
+        }
         for e in _metrics(task):
             row[str(e.get("key"))] = _metric_value(g, e)
         rows.append(row)
@@ -80,8 +94,13 @@ def _grouped(df, task, roles):
     cols = [roles[d] for d in dims]
     if not cols:
         return _snapshot(df, task)
+
+    row_limit = 500
+    grouped = df.groupby(cols, dropna=False, sort=False)
+    total_group_count = int(grouped.ngroups)
     rows = []
-    for keys, g in df.groupby(cols, dropna=False, sort=False):
+
+    for keys, g in grouped:
         if not isinstance(keys, tuple):
             keys = (keys,)
         row = {dims[i]: ("Sin dato" if pd.isna(v) else str(v)) for i, v in enumerate(keys)}
@@ -89,9 +108,18 @@ def _grouped(df, task, roles):
         for e in _metrics(task):
             row[str(e.get("key"))] = _metric_value(g, e)
         rows.append(row)
-        if len(rows) >= 500:
+        if len(rows) >= row_limit:
             break
-    return {"kind": "grouped_analysis", "dimensions": dims, "row_limit": 500, "rows": rows}
+
+    return {
+        "kind": "grouped_analysis",
+        "dimensions": dims,
+        "row_limit": row_limit,
+        "returned_group_count": len(rows),
+        "total_group_count": total_group_count,
+        "is_truncated": total_group_count > len(rows),
+        "rows": rows,
+    }
 
 
 def execute_governed_analytical_plan(df, *, analytical_plan: Dict[str, Any], roles: Dict[str, Any]) -> Dict[str, Any]:
