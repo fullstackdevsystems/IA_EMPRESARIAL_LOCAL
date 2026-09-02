@@ -18,6 +18,7 @@ from analysis_executor import execute_governed_analytical_plan
 from insight_engine import build_governed_business_insights
 from business_rule_engine import apply_governed_business_rules
 from business_rule_registry import load_governed_business_rule_registry
+from business_rule_context import load_governed_business_context
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -2111,11 +2112,25 @@ def build_dashboard_spec(
     )
 
     business_rule_registry = load_governed_business_rule_registry()
+    business_rule_context = load_governed_business_context()
+
+    resolved_rule_context = dict(business_rule_context.get("context") or {})
+    resolved_rule_as_of = resolved_rule_context.pop("as_of", None)
 
     business_rule_interpretation = apply_governed_business_rules(
         business_insights=business_insights,
         rule_registry=business_rule_registry.get("rules"),
+        context=resolved_rule_context,
+        as_of=resolved_rule_as_of,
     )
+
+    business_rule_interpretation["context_governance"] = {
+        "schema_version": business_rule_context.get("schema_version"),
+        "status": business_rule_context.get("status"),
+        "context": business_rule_context.get("context"),
+        "errors": business_rule_context.get("errors"),
+        "governance": business_rule_context.get("governance"),
+    }
 
     business_rule_interpretation["registry"] = {
         "schema_version": business_rule_registry.get("schema_version"),
