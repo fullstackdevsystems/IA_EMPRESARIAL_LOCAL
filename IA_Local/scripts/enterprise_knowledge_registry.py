@@ -3,6 +3,7 @@ import hashlib, json
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from enterprise_knowledge_approval import validate_approved_knowledge_entry
 
 KNOWLEDGE_REGISTRY_VERSION = "r10.16a"
 _ALLOWED_TYPES = {"fact","definition","decision","policy","document_reference"}
@@ -42,7 +43,8 @@ def _base(p):
             "effective_date_guard": True,
             "revoked_entries_are_not_retrievable": True,
             "knowledge_does_not_override_source_data": True,
-            "knowledge_does_not_create_metrics_by_itself": True
+            "knowledge_does_not_create_metrics_by_itself": True,
+            "approved_entries_require_r10_16e_approval_evidence": True
         }
     }
 
@@ -55,6 +57,10 @@ def _validate_entry(entry, index):
     if kind not in _ALLOWED_TYPES: errors.append(f"entry_{index}:unsupported_type:{eid}:{kind}")
     status=str(entry.get("status") or "")
     if status not in _ALLOWED_STATUSES: errors.append(f"entry_{index}:unsupported_status:{eid}:{status}")
+    if status=="APPROVED":
+        approval_errors=validate_approved_knowledge_entry(entry)
+        if approval_errors:
+            errors.append(f"entry_{index}:invalid_approval:{eid}:{','.join(approval_errors)}")
     if not str(entry.get("title") or "").strip(): errors.append(f"entry_{index}:missing_title:{eid}")
     content=entry.get("content")
     if content in (None,""): errors.append(f"entry_{index}:missing_content:{eid}")
