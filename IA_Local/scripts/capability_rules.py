@@ -185,6 +185,8 @@ def evaluate_rule(df, capability: Dict[str, Any]) -> Optional[float]:
         s = df[col]
         return int(s.dropna().astype(str).str.strip().replace("", None).dropna().nunique())
 
+    if op == "sum_columns" and cols:
+        return sum(_sum(col) for col in cols)
     if op == "difference_of_sums" and len(cols) >= 2:
         return _sum(cols[0]) - _sum(cols[1])
     if op == "ratio_of_sums" and len(cols) >= 2:

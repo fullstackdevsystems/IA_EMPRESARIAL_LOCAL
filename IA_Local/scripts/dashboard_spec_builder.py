@@ -19,6 +19,10 @@ from insight_engine import build_governed_business_insights
 from business_rule_engine import apply_governed_business_rules
 from business_rule_registry import load_governed_business_rule_registry
 from business_rule_context import load_governed_business_context
+from enterprise_metric_rules import (
+    load_governed_enterprise_metric_rule_registry,
+    resolve_governed_enterprise_metric_rule,
+)
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -461,6 +465,48 @@ def _derived_metric(
 
 
 # ======================================================================
+# GOVERNED ENTERPRISE DERIVED METRIC
+# ======================================================================
+def _enterprise_derived_metric(key, available_columns):
+    registry = load_governed_enterprise_metric_rule_registry()
+    context_doc = load_governed_business_context()
+    context = dict(context_doc.get("context") or {})
+    as_of = context.pop("as_of", None)
+    resolution = resolve_governed_enterprise_metric_rule(
+        metric=key,
+        available_columns=available_columns,
+        rule_registry=registry,
+        context=context,
+        as_of=as_of,
+    )
+    if resolution.get("status") != DERIVABLE:
+        return None
+    rule = dict(resolution.get("rule") or {})
+    cols = [str(c) for c in (rule.get("source_columns") or [])]
+    cap = _cap(
+        key, "kpi", DERIVABLE, columns=cols, formula=None,
+        source="governed_enterprise_metric_rule", dependencies=cols,
+    )
+    cap["rule"] = {
+        "rule_id": rule.get("rule_id"),
+        "ruleset_version": registry.get("ruleset_version"),
+        "scope": rule.get("scope") or {},
+        "operator": rule.get("operator"),
+        "approval_status": rule.get("approval_status"),
+        "source_columns": cols,
+        "provenance": rule.get("provenance"),
+    }
+    cap["output_format"] = rule.get("format") or "number"
+    cap["execution"] = {
+        "operator": rule.get("operator"),
+        "dependency_roles": [],
+        "source_columns": cols,
+        "zero_division": "N/D",
+    }
+    return cap
+
+
+# ======================================================================
 # AUTHORIZED FREIGHT
 # ======================================================================
 
@@ -533,6 +579,7 @@ def resolve_metric(
     roles,
     sources,
     analytic_context=None,
+    available_columns=None,
 ):
 
     direct = _direct_metric(
@@ -544,14 +591,13 @@ def resolve_metric(
     if direct:
         return direct
 
-    if key == "freight":
+    enterprise = _enterprise_derived_metric(
+        key,
+        list(available_columns) if available_columns is not None else [],
+    )
 
-        auth = _authorized_freight(
-            analytic_context
-        )
-
-        if auth:
-            return auth
+    if enterprise:
+        return enterprise
 
     derived = _derived_metric(
         key,
@@ -1681,6 +1727,7 @@ def build_dashboard_spec(
                 roles,
                 sources,
                 analytic_context,
+                df.columns,
             )
         )
 
@@ -2112,6 +2159,7 @@ def build_dashboard_spec(
     )
 
     business_rule_registry = load_governed_business_rule_registry()
+    enterprise_metric_rule_registry = load_governed_enterprise_metric_rule_registry()
     business_rule_context = load_governed_business_context()
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
@@ -2179,6 +2227,17 @@ def build_dashboard_spec(
 
         "business_rule_interpretation":
             business_rule_interpretation,
+
+        "enterprise_metric_rule_registry": {
+            "schema_version": enterprise_metric_rule_registry.get("schema_version"),
+            "status": enterprise_metric_rule_registry.get("status"),
+            "registry_id": enterprise_metric_rule_registry.get("registry_id"),
+            "ruleset_version": enterprise_metric_rule_registry.get("ruleset_version"),
+            "rule_count": enterprise_metric_rule_registry.get("rule_count"),
+            "fingerprint_sha256": enterprise_metric_rule_registry.get("fingerprint_sha256"),
+            "errors": enterprise_metric_rule_registry.get("errors"),
+            "governance": enterprise_metric_rule_registry.get("governance"),
+        },
 
 
         "source": {

@@ -1,0 +1,22 @@
+from pathlib import Path
+import sys
+def check(n,c):
+    if not c: print("FAIL",n); raise AssertionError(n)
+    print("PASS",n)
+if len(sys.argv)<2: raise SystemExit("Uso: python test_r10_15e_e2e_governed_enterprise_derived_metrics.py <dashboard.html>")
+p=Path(sys.argv[1]); t=p.read_text(encoding="utf-8",errors="replace")
+print("\n=== R10.15E E2E GOVERNED ENTERPRISE DERIVED METRICS ==="); print("Archivo:",p)
+check("enterprise_registry_present",'"enterprise_metric_rule_registry":{' in t)
+check("enterprise_registry_schema",'"schema_version":"r10.15e"' in t)
+check("enterprise_registry_empty",'"registry_id":"enterprise-derived-metric-rules"' in t and '"rule_count":0' in t)
+check("explicit_rules_only",'"explicit_rules_only":true' in t)
+check("no_arbitrary_eval",'"arbitrary_formula_evaluation":false' in t)
+check("whitelist_only",'"whitelist_operators_only":true' in t)
+check("freight_still_blocked",'"id":"kpi:freight"' in t and '"status":"BLOCKED"' in t)
+check("freight_analysis_still_blocked",'"id":"analysis:freight_analysis"' in t and '"status":"BLOCKED"' in t)
+check("r10_15d_preserved",'"schema_version":"r10.15d"' in t)
+check("r10_15c_preserved",'"schema_version":"r10.15c"' in t)
+check("r10_15a_preserved",'"schema_version":"r10.15a"' in t)
+check("r10_14c_preserved",'"business_insights"' in t and '"schema_version":"r10.14c"' in t)
+check("coverage_still_93_94",'"percent":93.94' in t or '"coverage_pct":93.94' in t)
+print("\nPASS R10.15E E2E GOVERNED ENTERPRISE DERIVED METRICS")
