@@ -2140,6 +2140,7 @@ def build_dashboard_spec(
         "rule_count": business_rule_registry.get("rule_count"),
         "fingerprint_sha256": business_rule_registry.get("fingerprint_sha256"),
         "errors": business_rule_registry.get("errors"),
+        "governance": business_rule_registry.get("governance"),
     }
 
 
