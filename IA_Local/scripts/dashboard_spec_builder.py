@@ -34,6 +34,7 @@ from enterprise_knowledge_context_injection import (
     inject_governed_knowledge_into_intent,
 )
 from enterprise_memory_closure import build_enterprise_memory_closure
+from enterprise_source_registry import load_governed_enterprise_source_registry
 
 SCHEMA_VERSION = "r10.13a"
 
@@ -2173,6 +2174,7 @@ def build_dashboard_spec(
     business_rule_registry = load_governed_business_rule_registry()
     enterprise_metric_rule_registry = load_governed_enterprise_metric_rule_registry()
     enterprise_knowledge_registry = load_governed_enterprise_knowledge_registry()
+    enterprise_source_registry = load_governed_enterprise_source_registry()
     business_rule_context = load_governed_business_context()
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
@@ -2287,6 +2289,18 @@ def build_dashboard_spec(
 
         "enterprise_memory_closure":
             enterprise_memory_closure,
+
+        "enterprise_source_registry": {
+            "schema_version": enterprise_source_registry.get("schema_version"),
+            "status": enterprise_source_registry.get("status"),
+            "registry_id": enterprise_source_registry.get("registry_id"),
+            "sources_version": enterprise_source_registry.get("sources_version"),
+            "source_count": enterprise_source_registry.get("source_count"),
+            "enabled_source_count": enterprise_source_registry.get("enabled_source_count"),
+            "fingerprint_sha256": enterprise_source_registry.get("fingerprint_sha256"),
+            "errors": enterprise_source_registry.get("errors"),
+            "governance": enterprise_source_registry.get("governance"),
+        },
 
         "enterprise_knowledge_registry": {
             "schema_version": enterprise_knowledge_registry.get("schema_version"),
