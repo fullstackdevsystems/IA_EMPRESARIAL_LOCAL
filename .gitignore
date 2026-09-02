@@ -115,3 +115,6 @@ IA_Local/workspace/Entrada/
 /Aplicar_R10_16B_Governed_Contextual_Knowledge_Retrieval.py
 /Aplicar_R10_16B_FIX_Builder_Retrieval_Import.py
 /Aplicar_R10_16B_FIX2_Builder_Retrieval_Import.py
+
+# Local R10.16C applicator
+/Aplicar_R10_16C_Governed_Knowledge_Context_Injection.py
