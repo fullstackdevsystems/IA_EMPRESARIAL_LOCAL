@@ -127,3 +127,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.16F applicator
 /Aplicar_R10_16F_Enterprise_Memory_Closure_Hardening.py
+
+# Local R10.17A applicator
+/Aplicar_R10_17A_Governed_Enterprise_Source_Registry.py
