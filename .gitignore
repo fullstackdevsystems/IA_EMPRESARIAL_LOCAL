@@ -121,3 +121,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.16D applicator
 /Aplicar_R10_16D_Governed_Knowledge_Ingestion_Validation.py
+
+# Local R10.16E applicator
+/Aplicar_R10_16E_Governed_Knowledge_Approval_Promotion.py
