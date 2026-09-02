@@ -110,3 +110,8 @@ IA_Local/workspace/Entrada/
 
 # Local R10.16A applicator
 /Aplicar_R10_16A_Governed_Enterprise_Knowledge_Registry.py
+
+# Local R10.16B applicators
+/Aplicar_R10_16B_Governed_Contextual_Knowledge_Retrieval.py
+/Aplicar_R10_16B_FIX_Builder_Retrieval_Import.py
+/Aplicar_R10_16B_FIX2_Builder_Retrieval_Import.py
