@@ -78,3 +78,12 @@ IA_Local/workspace/Entrada/
 
 # Local R10.14B applicator
 /Aplicar_R10_14B_Governed_Analytical_Task_Execution.py
+
+# Local R10.14C applicators
+/Aplicar_R10_14C_Governed_Business_Insights.py
+/Aplicar_R10_14C1_Period_Completeness_Guard.py
+/Aplicar_R10_14C2_Calendar_Completeness_Guard.py
+/Aplicar_R10_14C2_Calendar_Completeness_Guard_FIXED.py
+/Aplicar_R10_14C3_Safe_Concentration_Truncation_Guard.py
+/Aplicar_R10_14C4_Policy_Boundary_Guard.py
+/Reparar_R10_14C2_Import_Order.py
