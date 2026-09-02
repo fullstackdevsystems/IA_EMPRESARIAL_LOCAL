@@ -16,6 +16,8 @@ from capability_rules import (
 from analysis_planner import build_governed_analytical_plan
 from analysis_executor import execute_governed_analytical_plan
 from insight_engine import build_governed_business_insights
+from business_rule_engine import apply_governed_business_rules
+from business_rule_registry import load_governed_business_rule_registry
 
 
 SCHEMA_VERSION = "r10.13a"
@@ -2108,6 +2110,23 @@ def build_dashboard_spec(
         analytical_results=analytical_results,
     )
 
+    business_rule_registry = load_governed_business_rule_registry()
+
+    business_rule_interpretation = apply_governed_business_rules(
+        business_insights=business_insights,
+        rule_registry=business_rule_registry.get("rules"),
+    )
+
+    business_rule_interpretation["registry"] = {
+        "schema_version": business_rule_registry.get("schema_version"),
+        "status": business_rule_registry.get("status"),
+        "registry_id": business_rule_registry.get("registry_id"),
+        "ruleset_version": business_rule_registry.get("ruleset_version"),
+        "rule_count": business_rule_registry.get("rule_count"),
+        "fingerprint_sha256": business_rule_registry.get("fingerprint_sha256"),
+        "errors": business_rule_registry.get("errors"),
+    }
+
 
     # ------------------------------------------------------------------
     # FINAL SPEC
@@ -2141,6 +2160,9 @@ def build_dashboard_spec(
 
         "business_insights":
             business_insights,
+
+        "business_rule_interpretation":
+            business_rule_interpretation,
 
 
         "source": {
