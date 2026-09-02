@@ -67,9 +67,16 @@ def _validate_entry(entry, index):
     else:
         unknown=sorted(set(scope)-_ALLOWED_SCOPE_KEYS)
         if unknown: errors.append(f"entry_{index}:unsupported_scope_keys:{eid}:{','.join(unknown)}")
-        wildcard_keys=sorted(k for k,v in scope.items() if v in (None,"","*"))
-        if wildcard_keys:
-            errors.append(f"entry_{index}:wildcard_scope_values_forbidden:{eid}:{','.join(wildcard_keys)}")
+        invalid_scope_keys=[]
+        for k,v in scope.items():
+            if isinstance(v,bool) or isinstance(v,(list,dict,set,tuple)) or v is None:
+                invalid_scope_keys.append(k)
+                continue
+            sv=str(v).strip()
+            if not sv or sv=="*":
+                invalid_scope_keys.append(k)
+        if invalid_scope_keys:
+            errors.append(f"entry_{index}:invalid_scope_values_forbidden:{eid}:{','.join(sorted(invalid_scope_keys))}")
     ef,et=entry.get("effective_from"),entry.get("effective_to")
     pef,pet=_parse_date(ef),_parse_date(et)
     if ef not in (None,"") and pef is None: errors.append(f"entry_{index}:invalid_effective_from:{eid}")
@@ -120,10 +127,20 @@ def retrieve_governed_enterprise_knowledge(*,registry,context=None,as_of=None,kn
         if str(e.get("type") or "") not in allowed: continue
         ok=True
         for k,v in dict(e.get("scope") or {}).items():
-            if v in (None,"","*"):
+            if isinstance(v,bool) or isinstance(v,(list,dict,set,tuple)) or v is None:
                 ok=False
                 break
-            if str(ctx.get(k) or "")!=str(v): ok=False; break
+            sv=str(v).strip()
+            if not sv or sv=="*":
+                ok=False
+                break
+            cv=ctx.get(k)
+            if isinstance(cv,bool) or isinstance(cv,(list,dict,set,tuple)) or cv is None:
+                ok=False
+                break
+            if str(cv).strip()!=sv:
+                ok=False
+                break
         if not ok: continue
         ef,et=_parse_date(e.get("effective_from")),_parse_date(e.get("effective_to"))
         if ef and resolved<ef: continue
