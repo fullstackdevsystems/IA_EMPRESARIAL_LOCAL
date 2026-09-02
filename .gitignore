@@ -107,3 +107,6 @@ IA_Local/workspace/Entrada/
 # Local R10.15F applicators
 /Aplicar_R10_15F_Enterprise_Business_Rule_Engine_Closure.py
 /Aplicar_R10_15F_FIX_Context_AsOf_FailClosed.py
+
+# Local R10.16A applicator
+/Aplicar_R10_16A_Governed_Enterprise_Knowledge_Registry.py
