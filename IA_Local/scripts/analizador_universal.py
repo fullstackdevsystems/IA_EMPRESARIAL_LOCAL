@@ -16,6 +16,7 @@ import json
 import math
 import os
 import re
+import uuid
 
 import hashlib
 import unicodedata
@@ -31,6 +32,11 @@ import dashboard_planner as dp
 import dashboard_dynamic as dd
 from data_contract import validate_workbook_contract, DataContractError
 from enterprise_deliverable_manifest import build_governed_deliverable_manifest
+from enterprise_deliverable_registry import (
+    DeliverableRegistryError,
+    GovernedDeliverableRegistry,
+    deliverable_registry_public_audit,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -881,6 +887,31 @@ def _attach_governed_deliverable_manifest(
     profile["deliverable_manifest"] = manifest
 
 
+def _local_deliverable_scope() -> Dict[str, Optional[str]]:
+    return {
+        "company_id": str(os.environ.get("IA_COMPANY_ID") or "empresa-local"),
+        "user_id": str(os.environ.get("IA_USER_ID") or "admin-local"),
+        "business_unit": None,
+        "branch": None,
+    }
+
+
+def _register_governed_deliverables(
+    *,
+    profile: Dict[str, Any],
+    outputs: Dict[str, Optional[str]],
+    domain: str,
+) -> Dict[str, Any]:
+    registry = GovernedDeliverableRegistry(base.REPORTES)
+    return registry.register(
+        scope=_local_deliverable_scope(),
+        run_id=f"run-{uuid.uuid4().hex}",
+        manifest=profile["deliverable_manifest"],
+        outputs=outputs,
+        domain=domain,
+    )
+
+
 def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     # R10.13C.2: request prompt is immutable authority for this execution.
     request_prompt = str(prompt or "").strip()
@@ -1090,7 +1121,8 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     except Exception as _dataset_exc:
         notes.append(f"V8: no se pudo registrar el dataset para consultas futuras: {_dataset_exc}")
 
-    return {
+    deliverable_run = _register_governed_deliverables(profile=profile, outputs=outputs, domain=domain)
+    response = {
         "ok": True,
         "request_prompt_sha256": request_prompt_sha256,
         "request_prompt_preview": request_prompt_preview,
@@ -1116,8 +1148,10 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         "html": outputs.get("html"),
         "excel": outputs.get("excel"),
         "pdf": outputs.get("pdf"),
+        "deliverable_run": deliverable_run,
         "segundos": round(base.time.time() - started, 2),
     }
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -1200,6 +1234,34 @@ except Exception as _enterprise_exc:
     print(f"ADVERTENCIA V8: capa enterprise_ai no pudo inicializarse: {_enterprise_exc}")
 
 app = base.app
+
+
+@app.get("/api/deliverables")
+def list_governed_deliverables(limit: int = 100) -> Dict[str, Any]:
+    try:
+        records = GovernedDeliverableRegistry(base.REPORTES).list(_local_deliverable_scope(), limit=limit)
+        return {"registry": deliverable_registry_public_audit(records), "items": records}
+    except DeliverableRegistryError as exc:
+        raise base.HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+@app.get("/api/deliverables/{run_id}")
+def get_governed_deliverable(run_id: str) -> Dict[str, Any]:
+    try:
+        return GovernedDeliverableRegistry(base.REPORTES).get(_local_deliverable_scope(), run_id)
+    except DeliverableRegistryError as exc:
+        status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
+        raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+@app.get("/api/deliverables/{run_id}/download/{kind}")
+def download_governed_deliverable(run_id: str, kind: str):
+    try:
+        path = GovernedDeliverableRegistry(base.REPORTES).artifact_path(_local_deliverable_scope(), run_id, kind)
+        return base.FileResponse(path, filename=path.name)
+    except DeliverableRegistryError as exc:
+        status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
+        raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
 
 
 def main() -> None:
