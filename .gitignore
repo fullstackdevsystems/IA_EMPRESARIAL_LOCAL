@@ -1,4 +1,4 @@
-.venv/
+﻿.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -149,3 +149,5 @@ IA_Local/workspace/Entrada/
 # Local R10.17E applicators
 /Aplicar_R10_17E_Governed_Query_Registry_Authorization_Hardening.py
 /Aplicar_R10_17E_Governed_Query_Registry_Authorization_Hardening_V2.py
+/Aplicar_R10_18C_Governed_Output_Intent_Source_Traceability.py
+/Aplicar_R10_18C_V2_Governed_Universal_Source_Execution.py
