@@ -851,7 +851,32 @@ def pdf_report(path: Path, prompt: str, profile: Dict[str, Any], sections: Dict[
 
 def analyze_file(path: Path, prompt: str) -> Dict[str, Any]:
     started = time.time()
-    original, meta = load_tabular(path)
+    from enterprise_source_execution import (
+        execute_uploaded_file_source,
+        public_source_execution_metadata,
+    )
+
+    source_execution = execute_uploaded_file_source(
+        path=path,
+        workspace_root=WORKSPACE,
+    )
+    if source_execution.get("status") != "OPENED":
+        raise RuntimeError(
+            "GOVERNED_SOURCE_EXECUTION_BLOCKED:"
+            + str(source_execution.get("reason") or "unknown")
+        )
+
+    original = source_execution["dataframe"]
+    provenance = dict(source_execution.get("provenance") or {})
+    sheet_value = provenance.get("sheet")
+    meta = {
+        "archivo": path.name,
+        "extension": path.suffix.lower(),
+        "hojas": ["CSV"] if path.suffix.lower() in {".csv", ".txt"} else ([str(sheet_value)] if sheet_value is not None else []),
+        "hoja_analizada": "CSV" if path.suffix.lower() in {".csv", ".txt"} else str(sheet_value if sheet_value is not None else 0),
+        "motor_excel": provenance.get("reader_engine"),
+        "source_execution": public_source_execution_metadata(source_execution),
+    }
     original.columns = [str(c).strip() for c in original.columns]
     roles = infer_roles(original)
     work, derived = prepare_df(original, roles)
