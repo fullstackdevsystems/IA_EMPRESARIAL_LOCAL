@@ -1012,7 +1012,18 @@ try{const r=await fetch('/api/analyze',{method:'POST',body:fd});const d=await r.
 out.textContent=d.narrativa;
 const details=document.createElement('details');details.style.marginTop='12px';const sm=document.createElement('summary');sm.textContent='Ver detalles tecnicos';details.appendChild(sm);const pre=document.createElement('pre');pre.textContent='Plan legacy: '+JSON.stringify(d.plan,null,2)+'\n\nSecciones: '+JSON.stringify(Object.keys(d.secciones||{}),null,2)+'\n\nDashboard renderer: '+String(d.dashboard_renderer_version||'N/D')+'\nDashboard domain: '+String(d.dashboard_domain||'N/D')+'\nDashboard pages: '+JSON.stringify(d.dashboard_pages||[],null,2);details.appendChild(pre);out.appendChild(details);
 status.innerHTML='<div class="note ok">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.<br><b>Prompt SHA-256:</b> '+String(d.request_prompt_sha256||'N/D')+'</div>';
-links.innerHTML='<a class="dashboard" target="_blank" rel="noopener" href="/dashboard/'+encodeURIComponent(d.dashboard)+'">Abrir Dashboard</a><a href="/download/'+encodeURIComponent(d.dashboard)+'">Descargar Dashboard HTML</a><a href="/download/'+encodeURIComponent(d.excel)+'">Descargar Excel</a><a href="/download/'+encodeURIComponent(d.pdf)+'">Descargar PDF</a>';
+const dashboardFile=d.dashboard||d.html||null;
+links.innerHTML='';
+if(dashboardFile){
+  links.innerHTML+='<a class="dashboard" target="_blank" rel="noopener" href="/dashboard/'+encodeURIComponent(dashboardFile)+'">Abrir Dashboard</a>';
+  links.innerHTML+='<a href="/download/'+encodeURIComponent(dashboardFile)+'">Descargar Dashboard HTML</a>';
+}
+if(d.excel){
+  links.innerHTML+='<a href="/download/'+encodeURIComponent(d.excel)+'">Descargar Excel</a>';
+}
+if(d.pdf){
+  links.innerHTML+='<a href="/download/'+encodeURIComponent(d.pdf)+'">Descargar PDF</a>';
+}
 }catch(err){out.textContent='ERROR: '+err.message;status.innerHTML='<div class="note">Revisa C:\\IA_Local\\logs\\analizador.err.log si el problema continua.</div>';}finally{go.disabled=false;}});
 </script></body></html>
 """

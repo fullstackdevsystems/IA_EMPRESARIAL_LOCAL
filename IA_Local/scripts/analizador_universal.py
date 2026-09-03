@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 try:
     from enterprise_ai.traceability import build_file_trace
 except Exception:
@@ -37,6 +37,7 @@ from enterprise_deliverable_registry import (
     GovernedDeliverableRegistry,
     deliverable_registry_public_audit,
 )
+from enterprise_question_answering import answer_enterprise_question
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -962,8 +963,8 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     meta["source_execution"] = public_source_execution_metadata(source_execution)
     original.columns = _dedupe_columns(original.columns)
 
-    # V8.5.5: mapeo BI semántico independiente de la cardinalidad. El encabezado y
-    # las relaciones entre columnas tienen prioridad sobre el número de valores únicos.
+    # V8.5.5: mapeo BI semÃ¡ntico independiente de la cardinalidad. El encabezado y
+    # las relaciones entre columnas tienen prioridad sobre el nÃºmero de valores Ãºnicos.
     roles_bi = bi.semantic_map(original, semantic_context)
     dashboard_plan = dp.detect_dashboard_plan(original, prompt, semantic_context)
     is_customer_performance = dashboard_plan.get("type") == "customer_performance"
@@ -972,7 +973,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     if is_customer_performance:
         # R8: familia especializada para seguimiento de clientes Actual/Presupuesto/Anterior.
         # No exige importe de venta ni fecha transaccional y respeta Fecha_Inicial/Fecha_Final
-        # únicamente como cobertura del reporte.
+        # Ãºnicamente como cobertura del reporte.
         work, planner_notes = dp.prepare_customer_performance(original, dashboard_plan)
         model = dp.build_customer_performance_model(work, prompt, dashboard_plan)
         spec = bi.compile_report_spec(prompt)
@@ -1122,8 +1123,8 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         narrative = base.narrate(prompt, profile, plan, sections, notes)
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
-        # R8: el fallback universal también respeta las salidas pedidas y SI puede
-        # producir HTML, evitando el antiguo camino que siempre devolvía html=None.
+        # R8: el fallback universal tambiÃ©n respeta las salidas pedidas y SI puede
+        # producir HTML, evitando el antiguo camino que siempre devolvÃ­a html=None.
         spec = bi.compile_report_spec(prompt)
         outputs = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
@@ -1203,7 +1204,7 @@ base.app.version = "8.5.5-r10.2"
 # Actualiza textos de la interfaz sin duplicar todo el HTML de V3.
 base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analizador Empresarial de Excel / CSV",
-    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R10.2 · Dashboard Dinámico IA",
+    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R10.2 Â· Dashboard DinÃ¡mico IA",
 ).replace(
     "Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.",
     "Detecta automaticamente hojas, encabezados, columnas, tipos de datos y metricas. Procesa los datos con Python y usa Qwen local solo para interpretar resultados; nada se envia a Internet.",
@@ -1215,7 +1216,7 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analiza completamente el archivo y genera un dashboard HTML interactivo, un reporte ejecutivo PDF y un Excel analitico. Incluye resumen, evolucion, lineas, productos, clientes, vendedores, facturas, clientes perdidos, clientes en caida, oportunidades y calidad de datos. Usa solo columnas reales y calculos deterministas; no inventes costos, margenes ni formulas.",
 ).replace(
     "<title>IA Empresarial Local - Analizador</title>",
-    "<title>IA Empresarial Local - V8.5.5 R10.2 · Dashboard Dinámico IA</title>",
+    "<title>IA Empresarial Local - V8.5.5 R10.2 Â· Dashboard DinÃ¡mico IA</title>",
 ).replace(
     "<h1>Analizador Universal Empresarial de Excel / CSV</h1>",
     "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R10.2</span></h1>",
@@ -1241,6 +1242,309 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "status.innerHTML='<div class=\"note ok\">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.<br><small>Prompt recibido: '+(d.prompt_preview||'')+'<br>SHA-256: '+(d.prompt_sha256||'N/D')+'</small></div>';",
 )
 
+# ---------------------------------------------------------------------------
+# R10.19A - Consultable Enterprise Agent UI
+# ---------------------------------------------------------------------------
+
+_qa_panel_old = (
+    '<div id="status"></div>'
+    '<div id="out" class="result" style="display:none"></div>'
+    '<div id="links" class="links"></div>'
+)
+
+_qa_panel_new = (
+    '<div id="status"></div>'
+    '<div id="out" class="result" style="display:none"></div>'
+    '<div id="links" class="links"></div>'
+    '<div id="enterpriseAsk" '
+    'style="margin-top:24px;padding:20px;border:1px solid #dbe2ea;'
+    'border-radius:14px;background:#f8fafc">'
+    '<h2 style="margin:0 0 6px;font-size:20px">'
+    'Preg\u00fantale a tu an\u00e1lisis'
+    '</h2>'
+    '<div style="font-size:13px;color:#64748b;margin-bottom:12px">'
+    'Consulta m\u00e9tricas, cobertura, bloqueos y entregables del an\u00e1lisis '
+    'gobernado. Las respuestas no inventan c\u00e1lculos ni f\u00f3rmulas.'
+    '</div>'
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    '<input id="enterpriseQuestion" type="text" '
+    'placeholder="Ej. \u00bfCu\u00e1l fue la cobertura del an\u00e1lisis?" '
+    'style="flex:1;min-width:260px;box-sizing:border-box;'
+    'border:1px solid #cbd5e1;border-radius:10px;padding:12px">'
+    '<button type="button" class="btn" id="enterpriseAskButton">'
+    'Preguntar'
+    '</button>'
+    '</div>'
+    '<div id="enterpriseAskStatus"></div>'
+    '<div id="enterpriseAskAnswer" class="result" '
+    'style="display:none;margin-top:12px"></div>'
+    '</div>'
+)
+
+if _qa_panel_old not in base.INDEX_HTML:
+    raise RuntimeError(
+        "R10.19A_UI_ANCHOR_NOT_FOUND: "
+        "no se encontr\u00f3 el bloque status/out/links"
+    )
+
+base.INDEX_HTML = base.INDEX_HTML.replace(
+    _qa_panel_old,
+    _qa_panel_new,
+    1,
+)
+
+_qa_script_marker = '</script></body></html>'
+
+_qa_script = r'''
+// R10.19A Consultable Enterprise Agent
+window.__enterpriseRunId = window.__enterpriseRunId || null;
+
+const enterpriseAskButton =
+    document.getElementById('enterpriseAskButton');
+
+const enterpriseQuestion =
+    document.getElementById('enterpriseQuestion');
+
+const enterpriseAskAnswer =
+    document.getElementById('enterpriseAskAnswer');
+
+const enterpriseAskStatus =
+    document.getElementById('enterpriseAskStatus');
+
+function enterpriseFormatAnswer(result){
+    const status=String(result?.status||'UNRESOLVED');
+    const answer=result?.answer;
+    const reason=result?.reason||'';
+
+    if(status==='BLOCKED'){
+        return [
+            'ESTADO: BLOQUEADO',
+            '',
+            'La m\u00e9trica o an\u00e1lisis solicitado no puede calcularse',
+            'con las reglas y datos gobernados actuales.',
+            '',
+            reason ? ('Motivo: '+reason) : ''
+        ].join('\n');
+    }
+
+    if(status==='UNRESOLVED'){
+        return [
+            'ESTADO: NO RESUELTO',
+            '',
+            'La pregunta todav\u00eda no est\u00e1 soportada por el',
+            'agente empresarial gobernado.',
+            '',
+            reason ? ('Motivo: '+reason) : ''
+        ].join('\n');
+    }
+
+    if(status!=='ANSWERED'){
+        return (
+            'ESTADO: '+status+
+            '\n\n'+JSON.stringify(result,null,2)
+        );
+    }
+
+    if(answer && typeof answer==='object'){
+
+        if(
+            Object.prototype.hasOwnProperty.call(answer,'percent') &&
+            Object.prototype.hasOwnProperty.call(answer,'fulfilled')
+        ){
+            return [
+                'Cobertura del an\u00e1lisis: '+answer.percent+'%',
+                '',
+                'Solicitado: '+answer.requested,
+                'Soportado: '+answer.supported,
+                'Derivable: '+answer.derivable,
+                'Cumplido: '+answer.fulfilled,
+                'Bloqueado: '+answer.blocked
+            ].join('\n');
+        }
+
+        if(Array.isArray(answer)){
+            if(!answer.length){
+                return 'No existen elementos para mostrar.';
+            }
+
+            return answer.map((item,index)=>{
+                if(item && typeof item==='object'){
+                    const id=
+                        item.id ||
+                        item.component_id ||
+                        ('Elemento '+(index+1));
+
+                    const why=
+                        item.reason
+                        ? (' \u2022 '+item.reason)
+                        : '';
+
+                    return '\u2022 '+id+why;
+                }
+
+                return '\u2022 '+String(item);
+            }).join('\n');
+        }
+
+        if(Array.isArray(answer.formats)){
+            return (
+                'Formatos generados: '+
+                answer.formats.join(', ')
+            );
+        }
+
+        if(
+            Object.prototype.hasOwnProperty.call(
+                answer,
+                'value'
+            )
+        ){
+            return 'Resultado: '+String(answer.value);
+        }
+
+        return JSON.stringify(answer,null,2);
+    }
+
+    return String(
+        answer ?? 'Sin valor disponible.'
+    );
+}
+
+async function enterpriseAsk(){
+    const question=
+        (enterpriseQuestion.value||'').trim();
+
+    if(!question){
+        enterpriseAskStatus.innerHTML=
+            '<div class="note">Escribe una pregunta.</div>';
+        return;
+    }
+
+    enterpriseAskButton.disabled=true;
+
+    enterpriseAskAnswer.style.display='block';
+    enterpriseAskAnswer.textContent=
+        'Consultando an\u00e1lisis gobernado...';
+
+    enterpriseAskStatus.innerHTML='';
+
+    try{
+        const body={question};
+
+        if(window.__enterpriseRunId){
+            body.run_id=
+                window.__enterpriseRunId;
+        }
+
+        const response=
+            await fetch('/api/ask',{
+                method:'POST',
+                headers:{
+                    'Content-Type':
+                        'application/json; charset=utf-8'
+                },
+                body:JSON.stringify(body)
+            });
+
+        const data=await response.json();
+
+        if(!response.ok){
+            const detail=data?.detail;
+
+            const message=
+                detail?.message ||
+                detail?.code ||
+                (
+                    typeof detail==='string'
+                    ? detail
+                    : null
+                ) ||
+                'Error al consultar el an\u00e1lisis.';
+
+            throw new Error(message);
+        }
+
+        const result=data.result||{};
+
+        window.__enterpriseRunId=
+            data.run_id ||
+            window.__enterpriseRunId;
+
+        enterpriseAskAnswer.textContent=
+            enterpriseFormatAnswer(result);
+
+        const status=
+            String(result.status||'');
+
+        if(status==='ANSWERED'){
+            enterpriseAskStatus.innerHTML=
+                '<div class="note ok">'+
+                'Respuesta gobernada \u2022 '+
+                String(data.run_id||'')+
+                '</div>';
+
+        }else if(status==='BLOCKED'){
+
+            enterpriseAskStatus.innerHTML=
+                '<div class="note">'+
+                'Solicitud bloqueada por gobernanza.'+
+                '</div>';
+
+        }else{
+
+            enterpriseAskStatus.innerHTML=
+                '<div class="note">'+
+                'Pregunta no resuelta sin inventar respuesta.'+
+                '</div>';
+        }
+
+    }catch(err){
+
+        enterpriseAskAnswer.textContent=
+            'ERROR: '+err.message;
+
+        enterpriseAskStatus.innerHTML=
+            '<div class="note">'+
+            'No fue posible consultar el an\u00e1lisis.'+
+            '</div>';
+
+    }finally{
+        enterpriseAskButton.disabled=false;
+    }
+}
+
+if(enterpriseAskButton){
+    enterpriseAskButton.addEventListener(
+        'click',
+        enterpriseAsk
+    );
+}
+
+if(enterpriseQuestion){
+    enterpriseQuestion.addEventListener(
+        'keydown',
+        event=>{
+            if(event.key==='Enter'){
+                event.preventDefault();
+                enterpriseAsk();
+            }
+        }
+    );
+}
+'''
+
+if _qa_script_marker not in base.INDEX_HTML:
+    raise RuntimeError(
+        "R10.19A_SCRIPT_ANCHOR_NOT_FOUND"
+    )
+
+base.INDEX_HTML = base.INDEX_HTML.replace(
+    _qa_script_marker,
+    _qa_script + _qa_script_marker,
+    1,
+)
+
+
 @base.app.get("/view/{filename}")
 def view_html_report(filename: str):
     """Abre dashboards HTML en el navegador; otros formatos siguen usando /download."""
@@ -1253,7 +1557,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"prompt_integrity": "r10.13c.2-request-authority", "version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"prompt_integrity": "r10.13c.2-request-authority", "version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinÃ¡mico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:
@@ -1294,6 +1598,122 @@ def download_governed_deliverable(run_id: str, kind: str):
         status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
         raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
 
+
+
+@app.post("/api/ask")
+def ask_enterprise_question(
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    R10.19A - Governed Enterprise Question Answering.
+
+    El endpoint:
+    - usa el registro gobernado;
+    - puede resolver el \u00faltimo run autom\u00e1ticamente;
+    - no concede autoridad computacional al LLM;
+    - respeta BLOCKED / UNRESOLVED;
+    - verifica artefactos antes de responder.
+    """
+    question = str(
+        payload.get("question") or ""
+    ).strip()
+
+    if not question:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": "QUESTION_REQUIRED",
+                "message": "La pregunta es obligatoria.",
+            },
+        )
+
+    requested_run_id = str(
+        payload.get("run_id") or ""
+    ).strip()
+
+    registry = GovernedDeliverableRegistry(
+        base.REPORTES
+    )
+
+    scope = _local_deliverable_scope()
+
+    try:
+        run_id = requested_run_id
+
+        if not run_id:
+            runs = registry.list(
+                scope,
+                limit=1,
+            )
+
+            if not runs:
+                raise base.HTTPException(
+                    status_code=404,
+                    detail={
+                        "code": "NO_GOVERNED_RUNS",
+                        "message": (
+                            "No existen an\u00e1lisis gobernados "
+                            "disponibles para consultar."
+                        ),
+                    },
+                )
+
+            run_id = str(
+                runs[0].get("run_id") or ""
+            ).strip()
+
+        if not run_id:
+            raise base.HTTPException(
+                status_code=404,
+                detail={
+                    "code": "RUN_ID_NOT_AVAILABLE",
+                    "message": (
+                        "No fue posible resolver una ejecuci\u00f3n "
+                        "gobernada."
+                    ),
+                },
+            )
+
+        result = answer_enterprise_question(
+            registry=registry,
+            scope=scope,
+            run_id=run_id,
+            question=question,
+        )
+
+        return {
+            "api_version": "r10.19a",
+            "run_id": run_id,
+            "result": result,
+        }
+
+    except DeliverableRegistryError as exc:
+        status = (
+            404
+            if exc.code
+            in {
+                "RUN_NOT_FOUND",
+                "ARTIFACT_NOT_FOUND",
+            }
+            else 400
+        )
+
+        raise base.HTTPException(
+            status_code=status,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+            },
+        ) from exc
+
+    except ValueError as exc:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": "ENTERPRISE_QA_ERROR",
+                "message": str(exc),
+            },
+        ) from exc
 
 def main() -> None:
     parser = base.argparse.ArgumentParser()
