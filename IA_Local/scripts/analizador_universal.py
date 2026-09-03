@@ -37,7 +37,11 @@ from enterprise_deliverable_registry import (
     GovernedDeliverableRegistry,
     deliverable_registry_public_audit,
 )
-from enterprise_question_answering import answer_enterprise_question
+from enterprise_knowledge_qa import answer_unified_enterprise_question
+from enterprise_knowledge_store import (
+    EnterpriseKnowledgeError,
+    EnterpriseKnowledgeStore,
+)
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -1646,43 +1650,24 @@ def ask_enterprise_question(
                 limit=1,
             )
 
-            if not runs:
-                raise base.HTTPException(
-                    status_code=404,
-                    detail={
-                        "code": "NO_GOVERNED_RUNS",
-                        "message": (
-                            "No existen an\u00e1lisis gobernados "
-                            "disponibles para consultar."
-                        ),
-                    },
-                )
+            if runs:
+                run_id = str(
+                    runs[0].get("run_id") or ""
+                ).strip()
 
-            run_id = str(
-                runs[0].get("run_id") or ""
-            ).strip()
-
-        if not run_id:
-            raise base.HTTPException(
-                status_code=404,
-                detail={
-                    "code": "RUN_ID_NOT_AVAILABLE",
-                    "message": (
-                        "No fue posible resolver una ejecuci\u00f3n "
-                        "gobernada."
-                    ),
-                },
-            )
-
-        result = answer_enterprise_question(
+        knowledge_store = EnterpriseKnowledgeStore(
+            base.REPORTES / ".knowledge"
+        )
+        result = answer_unified_enterprise_question(
             registry=registry,
+            knowledge_store=knowledge_store,
             scope=scope,
             run_id=run_id,
             question=question,
         )
 
         return {
-            "api_version": "r10.19a",
+            "api_version": "r10.19b",
             "run_id": run_id,
             "result": result,
         }
@@ -1704,6 +1689,12 @@ def ask_enterprise_question(
                 "code": exc.code,
                 "message": str(exc),
             },
+        ) from exc
+
+    except EnterpriseKnowledgeError as exc:
+        raise base.HTTPException(
+            status_code=400,
+            detail={"code": exc.code, "message": str(exc)},
         ) from exc
 
     except ValueError as exc:
