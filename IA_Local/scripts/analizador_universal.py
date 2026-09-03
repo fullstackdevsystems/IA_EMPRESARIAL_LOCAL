@@ -42,6 +42,10 @@ from enterprise_knowledge_store import (
     EnterpriseKnowledgeError,
     EnterpriseKnowledgeStore,
 )
+from enterprise_sql_gateway import (
+    EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor,
+    SqlServerPyodbcProvider,
+)
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -1602,6 +1606,38 @@ def download_governed_deliverable(run_id: str, kind: str):
         status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
         raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
 
+
+def _sql_http_error(exc: EnterpriseSqlError):
+    status = 404 if exc.code in {"SQL_CONNECTION_NOT_FOUND", "SQL_SCOPE_DENIED"} else (503 if exc.code == "SQL_DRIVER_NOT_AVAILABLE" else (504 if exc.code == "SQL_TIMEOUT" else 400))
+    raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+def _sql_executor():
+    return EnterpriseSqlExecutor(EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections"), SqlServerPyodbcProvider())
+
+
+@app.get("/api/sql/connections")
+def list_sql_connections() -> Dict[str, Any]:
+    try:
+        records = EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections").list(_local_deliverable_scope())
+        fields = ("connection_id", "provider", "server", "database", "auth_mode", "enabled", "allowed_schemas", "allowed_tables", "read_only")
+        return {"items": [{key: item.get(key) for key in fields} for item in records]}
+    except EnterpriseSqlError as exc: _sql_http_error(exc)
+
+
+@app.get("/api/sql/schema")
+def sql_schema(connection_id: str) -> Dict[str, Any]:
+    try: return _sql_executor().discover(_local_deliverable_scope(), connection_id)
+    except EnterpriseSqlError as exc: _sql_http_error(exc)
+
+
+@app.post("/api/sql/query")
+def sql_query(payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        connection_id = str(payload.get("connection_id") or "").strip()
+        if not connection_id: raise EnterpriseSqlError("SQL_CONNECTION_NOT_FOUND", "connection_id es obligatorio")
+        return _sql_executor().execute(_local_deliverable_scope(), connection_id, payload.get("query_plan") or {})
+    except EnterpriseSqlError as exc: _sql_http_error(exc)
 
 
 @app.post("/api/ask")

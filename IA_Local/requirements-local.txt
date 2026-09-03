@@ -15,4 +15,5 @@ tabulate
 fastapi
 uvicorn
 python-multipart
+pyodbc==5.3.0
 requests
