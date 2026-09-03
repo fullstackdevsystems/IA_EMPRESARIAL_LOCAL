@@ -52,6 +52,7 @@ def build_governed_deliverable_manifest(
     sheet: str = "",
     row_count: Optional[int] = None,
     prompt_sha256: Optional[str] = None,
+    source_fingerprint_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
     execution = dashboard_plan.get("execution_plan") if isinstance(dashboard_plan, dict) else None
     execution = execution if isinstance(execution, dict) else {}
@@ -82,7 +83,7 @@ def build_governed_deliverable_manifest(
             "filename": str(filename or ""),
             "sheet": str(sheet or ""),
             "row_count": int(row_count) if row_count is not None else None,
-            "source_fingerprint_sha256": _text(source.get("fingerprint_sha256")),
+            "source_fingerprint_sha256": _text(source_fingerprint_sha256 or source.get("fingerprint_sha256")),
         },
         "request": {
             "prompt_sha256": _text(prompt_sha256 or dashboard_plan.get("request_prompt_sha256")),

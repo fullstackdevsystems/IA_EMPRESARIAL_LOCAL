@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from output_intent_resolver import output_list
+
 import re
 import unicodedata
 from dataclasses import dataclass, asdict
@@ -249,20 +251,7 @@ ANALYSIS_TERMS: Dict[str, Sequence[str]] = {
 
 def parse_prompt_intent(prompt: str) -> PromptIntent:
     n = norm(prompt)
-    outputs: List[str] = []
-    for key, terms in {
-        "html": ("html", "dashboard", "tablero"),
-        "pdf": ("pdf", "reporte ejecutivo"),
-        "excel": ("generar excel", "genera excel", "reporte excel", "excel analitico", "excel analítico", "libro analitico", "libro analítico", "salida xlsx"),
-    }.items():
-        if any(norm(t) in n for t in terms):
-            outputs.append(key)
-    if not outputs:
-        outputs = ["html"]
-    # Explicit "solo" controls output surface.
-    if re.search(r"\bsolo\s+(?:un\s+|el\s+)?pdf\b", n): outputs = ["pdf"]
-    elif re.search(r"\bsolo\s+(?:un\s+|el\s+)?(?:excel|xlsx)\b", n): outputs = ["excel"]
-    elif re.search(r"\bsolo\s+(?:un\s+|el\s+)?(?:html|dashboard|tablero)\b", n): outputs = ["html"]
+    outputs: List[str] = output_list(prompt, default_all=True)
 
     metrics = [k for k, terms in METRIC_TERMS.items() if any(norm(t) in n for t in terms)]
     dims = [k for k, terms in DIMENSION_TERMS.items() if any(norm(t) in n for t in terms)]

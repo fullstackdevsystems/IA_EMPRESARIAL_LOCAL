@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Callable, Any, Dict, Optional
 
 from enterprise_file_connector import ENTERPRISE_FILE_CONNECTOR_VERSION, open_governed_file_source
 from enterprise_source_registry import resolve_governed_enterprise_sources
@@ -70,6 +70,97 @@ def public_source_execution_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
         "provenance": _public_provenance(result.get("provenance")),
         "governance": dict(result.get("governance") or {}),
     }
+
+def _sha256_file_for_universal_reader(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def execute_uploaded_file_source_with_reader(
+    *,
+    path: str | Path,
+    workspace_root: str | Path,
+    reader: Callable[[Path], Any],
+) -> Dict[str, Any]:
+    """R10.18C: gobernanza de una lectura universal sin degradar su semantica."""
+    root = Path(workspace_root).resolve()
+    candidate = Path(path).resolve()
+
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError:
+        return _blocked("uploaded_file_outside_workspace")
+
+    if not candidate.exists() or not candidate.is_file():
+        return _blocked("uploaded_file_missing")
+
+    ext = candidate.suffix.lower()
+    kind = _SUPPORTED_UPLOAD_EXTENSIONS.get(ext)
+    if not kind:
+        return _blocked("unsupported_uploaded_file_extension")
+
+    digest = hashlib.sha256(relative.as_posix().encode("utf-8")).hexdigest()[:16]
+    source_id = f"request.upload.{digest}"
+
+    try:
+        fingerprint_before = _sha256_file_for_universal_reader(candidate)
+        stat_before = candidate.stat()
+        opened = reader(candidate)
+        if not isinstance(opened, tuple) or len(opened) != 2:
+            return _blocked("universal_reader_contract_invalid", source_id, kind)
+        dataframe, reader_metadata = opened
+        fingerprint_after = _sha256_file_for_universal_reader(candidate)
+        stat_after = candidate.stat()
+    except Exception as exc:
+        return _blocked(f"universal_reader_failed:{type(exc).__name__}", source_id, kind)
+
+    if fingerprint_before != fingerprint_after:
+        return _blocked("source_changed_during_read", source_id, kind)
+    if stat_before.st_size != stat_after.st_size:
+        return _blocked("source_size_changed_during_read", source_id, kind)
+
+    if not isinstance(reader_metadata, dict):
+        return _blocked("universal_reader_metadata_invalid", source_id, kind)
+
+    provenance = {
+        "schema_version": ENTERPRISE_SOURCE_EXECUTION_VERSION,
+        "source_id": source_id,
+        "kind": kind,
+        "relative_path": relative.as_posix(),
+        "file_name": candidate.name,
+        "extension": ext,
+        "size_bytes": int(stat_after.st_size),
+        "fingerprint_sha256": fingerprint_after,
+        "rows": int(len(dataframe)),
+        "columns": int(len(dataframe.columns)),
+        "reader_engine": reader_metadata.get("motor_excel"),
+        "sheet": reader_metadata.get("hoja_analizada"),
+        "reader_mode": "universal_governed_reader",
+    }
+
+    return {
+        "schema_version": ENTERPRISE_SOURCE_EXECUTION_VERSION,
+        "status": "OPENED",
+        "reason": None,
+        "source_id": source_id,
+        "kind": kind,
+        "source_origin": "request_upload",
+        "connector_schema_version": "r10.18c-universal-governed-reader",
+        "dataframe": dataframe,
+        "reader_metadata": dict(reader_metadata),
+        "provenance": _public_provenance(provenance),
+        "governance": {
+            **_governance(),
+            "universal_reader_governed": True,
+            "workspace_boundary_enforced": True,
+            "toctou_fingerprint_check": True,
+            "source_fingerprint_required": True,
+        },
+    }
+
 
 def execute_uploaded_file_source(*, path: str | Path, workspace_root: str | Path) -> Dict[str, Any]:
     root = Path(workspace_root).resolve()

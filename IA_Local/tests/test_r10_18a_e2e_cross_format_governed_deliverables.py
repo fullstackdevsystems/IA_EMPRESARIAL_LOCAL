@@ -40,13 +40,16 @@ with tempfile.TemporaryDirectory() as td:
     reports = root / "Reportes"
     reports.mkdir()
     old_reports = analyzer.base.REPORTES
+    old_workspace = analyzer.base.WORKSPACE
     old_llm = os.environ.get("IA_DYNAMIC_DASHBOARD_LLM")
     analyzer.base.REPORTES = reports
+    analyzer.base.WORKSPACE = root
     os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = "0"
     try:
         result = analyzer.analyze_file(source, prompt)
     finally:
         analyzer.base.REPORTES = old_reports
+        analyzer.base.WORKSPACE = old_workspace
         if old_llm is None:
             os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
         else:

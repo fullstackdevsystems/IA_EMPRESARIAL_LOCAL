@@ -37,6 +37,10 @@ from enterprise_deliverable_registry import (
     GovernedDeliverableRegistry,
     deliverable_registry_public_audit,
 )
+from enterprise_source_execution import (
+    execute_uploaded_file_source_with_reader,
+    public_source_execution_metadata,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -875,6 +879,7 @@ def _attach_governed_deliverable_manifest(
     sheet: str,
     row_count: int,
     prompt_sha256: str,
+    source_fingerprint_sha256: Optional[str] = None,
 ) -> None:
     manifest = build_governed_deliverable_manifest(
         dashboard_plan=dashboard_plan,
@@ -882,9 +887,20 @@ def _attach_governed_deliverable_manifest(
         sheet=sheet,
         row_count=row_count,
         prompt_sha256=prompt_sha256,
+        source_fingerprint_sha256=source_fingerprint_sha256,
     )
     dashboard_plan["enterprise_deliverable_manifest"] = manifest
     profile["deliverable_manifest"] = manifest
+
+
+def _source_fingerprint_from_meta(meta: Dict[str, Any]) -> Optional[str]:
+    execution = meta.get("source_execution") if isinstance(meta, dict) else None
+    execution = execution if isinstance(execution, dict) else {}
+    provenance = execution.get("provenance") if isinstance(execution.get("provenance"), dict) else {}
+    value = str(provenance.get("fingerprint_sha256") or "").strip().lower()
+    if re.fullmatch(r"[a-f0-9]{64}", value):
+        return value
+    return None
 
 
 def _local_deliverable_scope() -> Dict[str, Optional[str]]:
@@ -928,7 +944,19 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     prompt_preview = " ".join(prompt.split())[:220]
 
     started = base.time.time()
-    original, meta = load_tabular(path, prompt)
+    source_execution = execute_uploaded_file_source_with_reader(
+        path=path,
+        workspace_root=base.WORKSPACE,
+        reader=lambda governed_path: load_tabular(governed_path, prompt),
+    )
+    if source_execution.get("status") != "OPENED":
+        raise RuntimeError(
+            "GOVERNED_UNIVERSAL_SOURCE_EXECUTION_BLOCKED:"
+            + str(source_execution.get("reason") or "unknown")
+        )
+    original = source_execution["dataframe"]
+    meta = dict(source_execution.get("reader_metadata") or {})
+    meta["source_execution"] = public_source_execution_metadata(source_execution)
     original.columns = _dedupe_columns(original.columns)
 
     # V8.5.5: mapeo BI semántico independiente de la cardinalidad. El encabezado y
@@ -970,7 +998,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
@@ -1024,7 +1052,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
@@ -1097,7 +1125,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
