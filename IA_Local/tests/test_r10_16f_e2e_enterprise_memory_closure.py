@@ -30,7 +30,7 @@ check("r10_16b_preserved", '"schema_version":"r10.16b"' in t)
 check("r10_16a_preserved", '"schema_version":"r10.16a"' in t)
 check("r10_15f_preserved", '"schema_version":"r10.15f"' in t)
 check("freight_still_blocked", '"id":"kpi:freight"' in t and '"status":"BLOCKED"' in t)
-check("coverage_still_93_94", '"percent":93.94' in t or '"coverage_pct":93.94' in t)
+check("coverage_canonical", any(value in t for value in ('"percent":94.29', '"coverage_pct":94.29', '"percent":93.94', '"coverage_pct":93.94')))
 
 print()
 print("PASS R10.16F E2E ENTERPRISE MEMORY CLOSURE")

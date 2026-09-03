@@ -18,6 +18,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from enterprise_deliverable_manifest import deliverable_manifest_component_rows, deliverable_manifest_summary_rows
+
 NAVY="#0B1F33"; BLUE="#0F62FE"; TEAL="#007D79"; GREEN="#198038"; ORANGE="#FF832B"; RED="#DA1E28"; PURPLE="#6929C4"
 LIGHT="#F4F7FB"; PALE_BLUE="#EDF5FF"; PALE_GREEN="#DEFBE6"; PALE_ORANGE="#FFF2E8"; PALE_RED="#FFF1F1"; MID="#697077"; BORDER="#DDE1E6"; WHITE="#FFFFFF"
 
@@ -355,6 +357,7 @@ def _write_table_sheet(writer, sheet_name: str, df: pd.DataFrame, title: str, ta
 
 def excel_report_professional(path,prompt: str,profile: Dict[str,Any],plan: Dict[str,Any],sections: Dict[str,pd.DataFrame],notes: List[str],narrative: str,source_preview: pd.DataFrame,work: pd.DataFrame,roles: Dict[str,Optional[str]],domain: str)->None:
     insights=executive_insights(profile,sections,notes,domain)
+    manifest=profile.get("deliverable_manifest") if isinstance(profile.get("deliverable_manifest"),dict) else {}
     with pd.ExcelWriter(path,engine="xlsxwriter") as writer:
         wb=writer.book; wb.set_properties({"title":domain_title(domain),"subject":"Reporte ejecutivo generado por IA Empresarial Local","author":"IA Empresarial Local"})
         ws=wb.add_worksheet("Dashboard"); writer.sheets["Dashboard"]=ws; ws.hide_gridlines(2); ws.set_zoom(90); ws.set_tab_color(BLUE); ws.set_column("A:L",13); ws.set_row(0,30); ws.set_row(1,30)
@@ -370,6 +373,11 @@ def excel_report_professional(path,prompt: str,profile: Dict[str,Any],plan: Dict
         for i,(key,sn) in enumerate(_sheet_mapping(sections,domain)): meta[key]=_write_table_sheet(writer,sn,sections[key],key.replace("_"," "),tabs[i%len(tabs)])
         roles_df=pd.DataFrame([{"Rol semántico":k,"Columna detectada":v or ""} for k,v in profile.get("roles_detectados",{}).items()]); _write_table_sheet(writer,"Diccionario_Datos",roles_df,"Diccionario y mapeo semántico",MID)
         trace=pd.DataFrame([{"Campo":"Solicitud","Valor":prompt},{"Campo":"Plan","Valor":str(plan)},{"Campo":"Cálculos derivados","Valor":str(profile.get("calculos_derivados",{}))},{"Campo":"Motor Excel","Valor":str(profile.get("motor_excel",""))}]); _write_table_sheet(writer,"Trazabilidad",trace,"Trazabilidad técnica",MID); _write_table_sheet(writer,"Muestra_Datos",source_preview.head(1000),"Muestra del archivo fuente (máx. 1,000 filas)",MID); writer.sheets["Trazabilidad"].hide(); writer.sheets["Muestra_Datos"].hide(); writer.sheets["Diccionario_Datos"].hide()
+        if manifest:
+            _write_table_sheet(writer,"Gobernanza",pd.DataFrame(deliverable_manifest_summary_rows(manifest)),"Manifiesto gobernado del entregable",TEAL)
+            writer.sheets["Gobernanza"].set_column("A:A",28)
+            writer.sheets["Gobernanza"].set_column("B:B",72)
+            _write_table_sheet(writer,"Capacidades",pd.DataFrame(deliverable_manifest_component_rows(manifest)),"Capacidades autorizadas y bloqueadas",ORANGE)
         if domain=="comercial" and "Tendencia_Mensual" in meta:
             m=meta["Tendencia_Mensual"]; d=m["df"]
             if not d.empty and "Mes" in d.columns and "Ventas" in d.columns:
@@ -419,6 +427,7 @@ def _pdf_table(df: pd.DataFrame, styles, max_rows: int=10)->Table:
 
 def pdf_report_professional(path,prompt: str,profile: Dict[str,Any],sections: Dict[str,pd.DataFrame],notes: List[str],narrative: str,domain: str)->None:
     insights=executive_insights(profile,sections,notes,domain); cards=_kpi_cards(profile,sections,domain); doc=SimpleDocTemplate(str(path),pagesize=landscape(A4),rightMargin=1.1*cm,leftMargin=1.1*cm,topMargin=1.5*cm,bottomMargin=1.25*cm,title=domain_title(domain),author="IA Empresarial Local")
+    manifest=profile.get("deliverable_manifest") if isinstance(profile.get("deliverable_manifest"),dict) else {}
     st=getSampleStyleSheet(); st.add(ParagraphStyle(name="ExecTitle",parent=st["Title"],fontName="Helvetica-Bold",fontSize=21,leading=24,textColor=colors.HexColor(NAVY),alignment=TA_LEFT,spaceAfter=4)); st.add(ParagraphStyle(name="ExecSub",parent=st["BodyText"],fontSize=8.5,leading=11,textColor=colors.HexColor(MID),spaceAfter=5)); st.add(ParagraphStyle(name="Sec",parent=st["Heading2"],fontName="Helvetica-Bold",fontSize=13,leading=16,textColor=colors.HexColor(NAVY),spaceBefore=6,spaceAfter=7)); st.add(ParagraphStyle(name="Insight",parent=st["BodyText"],fontSize=9.2,leading=13,textColor=colors.HexColor("#343A3F"),leftIndent=8,firstLineIndent=-6,spaceAfter=4)); st.add(ParagraphStyle(name="Small",parent=st["BodyText"],fontSize=7.5,leading=10,textColor=colors.HexColor(MID))); st.add(ParagraphStyle(name="TableHead",parent=st["BodyText"],fontSize=7,leading=8,textColor=colors.white)); st.add(ParagraphStyle(name="TableCell",parent=st["BodyText"],fontSize=7,leading=8.5,textColor=colors.HexColor("#343A3F"))); st.add(ParagraphStyle(name="Card",parent=st["BodyText"],fontSize=9,leading=12,alignment=TA_CENTER,textColor=colors.HexColor(NAVY)))
     def page(can,doc_):
         can.saveState(); w,h=landscape(A4); can.setFillColor(colors.HexColor(NAVY)); can.rect(0,h-.55*cm,w,.55*cm,stroke=0,fill=1); can.setFillColor(colors.HexColor(MID)); can.setFont("Helvetica",7); can.drawString(1.1*cm,.55*cm,"IA Empresarial Local | Reporte generado localmente"); can.drawRightString(w-1.1*cm,.55*cm,f"Página {doc_.page}"); can.restoreState()
@@ -471,4 +480,13 @@ def pdf_report_professional(path,prompt: str,profile: Dict[str,Any],sections: Di
             n=str(n).strip()
             if n and n not in un: un.append(n)
         for n in un[:8]: story.append(Paragraph("• "+n,st["Small"]))
+    if manifest:
+        story += [PageBreak(),Paragraph("Gobernanza y trazabilidad",st["ExecTitle"]),Paragraph("Este entregable usa la misma autoridad analítica que el dashboard HTML. Las capacidades BLOCKED no se presentan como valores calculados.",st["Small"]),Spacer(1,.2*cm)]
+        summary_df=pd.DataFrame(deliverable_manifest_summary_rows(manifest))
+        story += [_pdf_table(summary_df,st,20),Spacer(1,.25*cm)]
+        components_df=pd.DataFrame(deliverable_manifest_component_rows(manifest))
+        blocked=components_df.loc[components_df["Estado"].eq("BLOCKED")] if not components_df.empty else components_df
+        story += [Paragraph("Capacidades bloqueadas",st["Sec"])]
+        if blocked.empty: story.append(Paragraph("No existen capacidades bloqueadas en esta solicitud.",st["Small"]))
+        else: story.append(_pdf_table(blocked[["Componente","Título","Estado","Motivo","Dependencias","Provenance"]],st,20))
     doc.build(story,onFirstPage=page,onLaterPages=page)

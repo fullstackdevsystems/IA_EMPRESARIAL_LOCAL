@@ -403,8 +403,8 @@ def _safe_inline_json(obj: Any) -> str:
     return s.replace('</', '<\\/')
 
 
-def generate_dynamic_dashboard(output_path: Path, df: pd.DataFrame, prompt: str, filename: str, sheet: str = '', semantic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    plan = build_dashboard_plan(df, prompt, filename, sheet, semantic_context)
+def generate_dynamic_dashboard(output_path: Path, df: pd.DataFrame, prompt: str, filename: str, sheet: str = '', semantic_context: Optional[Dict[str, Any]] = None, prepared_plan: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    plan = dict(prepared_plan) if isinstance(prepared_plan, dict) else build_dashboard_plan(df, prompt, filename, sheet, semantic_context)
     from dynamic_renderer import attach_dynamic_renderer
     plan = attach_dynamic_renderer(plan)
     kinds = {str(c): _series_kind(df[c]) for c in df.columns}

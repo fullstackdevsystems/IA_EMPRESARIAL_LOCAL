@@ -179,7 +179,7 @@ def _is_invalid_freight_mapping(
 
     # Evidencia semántica negativa:
     # "sin flete" significa explícitamente que excluye flete.
-    return (
+    if (
         "sin_flete" in n
         or "without_freight" in n
         or "excluding_freight" in n
@@ -187,7 +187,17 @@ def _is_invalid_freight_mapping(
             "costo_sin_flete",
             "cost_without_freight",
         }
-    )
+    ):
+        return True
+
+    # Un componente no representa por sí solo el flete total. La combinación de
+    # flete corto/largo/traspaso requiere una regla empresarial aprobada.
+    tokens = set(n.split("_"))
+    component_tokens = {
+        "corto", "largo", "traspaso", "short", "long", "transfer",
+        "local", "linehaul", "line", "haul",
+    }
+    return bool(tokens & component_tokens) and bool(tokens & {"flete", "freight"})
 
 
 # ======================================================================

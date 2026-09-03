@@ -30,6 +30,7 @@ import bi_productivo as bi
 import dashboard_planner as dp
 import dashboard_dynamic as dd
 from data_contract import validate_workbook_contract, DataContractError
+from enterprise_deliverable_manifest import build_governed_deliverable_manifest
 
 
 # ---------------------------------------------------------------------------
@@ -845,6 +846,41 @@ def _ensure_commercial_report_sections(work: pd.DataFrame, roles: Dict[str, Opti
     return sections
 
 
+def _prepare_governed_deliverable_plan(
+    original: pd.DataFrame,
+    prompt: str,
+    path: Path,
+    sheet: str,
+    semantic_context: Optional[Dict[str, Any]],
+    prompt_sha256: str,
+    prompt_preview: str,
+) -> Dict[str, Any]:
+    plan = dd.build_dashboard_plan(original, prompt, path.name, sheet, semantic_context)
+    plan["request_prompt_sha256"] = prompt_sha256
+    plan["request_prompt_preview"] = prompt_preview
+    plan["prompt_integrity"] = "r10.18a-cross-format-authority"
+    return plan
+
+
+def _attach_governed_deliverable_manifest(
+    profile: Dict[str, Any],
+    dashboard_plan: Dict[str, Any],
+    path: Path,
+    sheet: str,
+    row_count: int,
+    prompt_sha256: str,
+) -> None:
+    manifest = build_governed_deliverable_manifest(
+        dashboard_plan=dashboard_plan,
+        filename=path.name,
+        sheet=sheet,
+        row_count=row_count,
+        prompt_sha256=prompt_sha256,
+    )
+    dashboard_plan["enterprise_deliverable_manifest"] = manifest
+    profile["deliverable_manifest"] = manifest
+
+
 def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     # R10.13C.2: request prompt is immutable authority for this execution.
     request_prompt = str(prompt or "").strip()
@@ -901,13 +937,12 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
+        dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
+        profile["dynamic_dashboard_plan"] = dynamic_plan
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
-            if isinstance(dynamic_plan, dict):
-                dynamic_plan["request_prompt_sha256"] = prompt_sha256
-                dynamic_plan["request_prompt_preview"] = prompt_preview
-                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
@@ -956,22 +991,21 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
+        dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
+        profile["dynamic_dashboard_plan"] = dynamic_plan
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
-            if isinstance(dynamic_plan, dict):
-                dynamic_plan["request_prompt_sha256"] = prompt_sha256
-                dynamic_plan["request_prompt_preview"] = prompt_preview
-                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):
             pdf_path = base.REPORTES / f"Reporte_Ejecutivo_BI_{stem}_{stamp}.pdf"
-            bi.generate_pdf(pdf_path, path.name, model, notes)
+            bi.generate_pdf(pdf_path, path.name, model, notes, profile["deliverable_manifest"])
             outputs["pdf"] = pdf_path.name
         if spec["outputs"].get("excel"):
             xlsx_path = base.REPORTES / f"Analisis_BI_{stem}_{stamp}.xlsx"
-            bi.generate_excel(xlsx_path, path.name, model)
+            bi.generate_excel(xlsx_path, path.name, model, profile["deliverable_manifest"])
             outputs["excel"] = xlsx_path.name
 
         narrative = bi.executive_narrative(model, outputs)
@@ -1030,13 +1064,12 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         # producir HTML, evitando el antiguo camino que siempre devolvía html=None.
         spec = bi.compile_report_spec(prompt)
         outputs = {"html": None, "pdf": None, "excel": None}
+        dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
+        profile["dynamic_dashboard_plan"] = dynamic_plan
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256)
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context)
-            if isinstance(dynamic_plan, dict):
-                dynamic_plan["request_prompt_sha256"] = prompt_sha256
-                dynamic_plan["request_prompt_preview"] = prompt_preview
-                dynamic_plan["prompt_integrity"] = "r10.13c.1-request-authority"
+            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("excel"):

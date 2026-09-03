@@ -21,6 +21,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from enterprise_deliverable_manifest import deliverable_manifest_component_rows, deliverable_manifest_summary_rows
+
 VERSION = '8.5.5'
 NAVY='#0B1F33'; BLUE='#2563EB'; ORANGE='#C97B0A'; GREEN='#169447'; RED='#D82C3F'; PURPLE='#7C3AED'; TEAL='#007D79'
 MID='#697077'; BORDER='#DDE1E6'; LIGHT='#F4F7FB'; WHITE='#FFFFFF'; PALE_GREEN='#ECFDF5'; PALE_RED='#FFF1F1'; PALE_BLUE='#EFF6FF'; PALE_ORANGE='#FFF7ED'
@@ -674,7 +676,7 @@ def _has_section(model: Dict[str,Any], *names: str) -> bool:
     return any(n in requested for n in names)
 
 
-def generate_pdf(path: Path, filename: str, model: Dict[str,Any], notes: List[str]) -> None:
+def generate_pdf(path: Path, filename: str, model: Dict[str,Any], notes: List[str], manifest: Optional[Dict[str,Any]]=None) -> None:
     k=model['kpis']; spec=model['spec']; top_n=int(spec.get('top_n') or 15); pdf_rows=min(top_n,10); doc=SimpleDocTemplate(str(path),pagesize=landscape(A4),rightMargin=1.0*cm,leftMargin=1.0*cm,topMargin=1.35*cm,bottomMargin=1.15*cm,title='Reporte Ejecutivo BI',author='IA Empresarial Local')
     st=getSampleStyleSheet(); st.add(ParagraphStyle(name='TitleBI',parent=st['Title'],fontName='Helvetica-Bold',fontSize=20,leading=23,textColor=colors.HexColor(NAVY),alignment=TA_LEFT,spaceAfter=4)); st.add(ParagraphStyle(name='SecBI',parent=st['Heading2'],fontName='Helvetica-Bold',fontSize=12.5,leading=15,textColor=colors.HexColor(NAVY),spaceBefore=4,spaceAfter=6)); st.add(ParagraphStyle(name='SmallBI',parent=st['BodyText'],fontSize=7.5,leading=10,textColor=colors.HexColor(MID))); st.add(ParagraphStyle(name='TH',parent=st['BodyText'],fontSize=6.6,leading=7.5,textColor=colors.white)); st.add(ParagraphStyle(name='TC',parent=st['BodyText'],fontSize=6.5,leading=7.8,textColor=colors.HexColor('#343A3F'))); st.add(ParagraphStyle(name='CardBI',parent=st['BodyText'],fontSize=8,leading=10,alignment=TA_CENTER,textColor=colors.HexColor(NAVY)))
     def footer(can,doc_):
@@ -744,6 +746,14 @@ def generate_pdf(path: Path, filename: str, model: Dict[str,Any], notes: List[st
         if notes:
             story += [Spacer(1,.12*cm),Paragraph('Notas de validación',st['SecBI'])]
             for n in list(dict.fromkeys(str(x) for x in notes if str(x).strip()))[:10]: story.append(Paragraph('• '+n,st['SmallBI']))
+    if isinstance(manifest,dict) and manifest:
+        story += [PageBreak(),Paragraph('Gobernanza y trazabilidad',st['TitleBI']),Paragraph('Este PDF comparte la autoridad analítica del dashboard y del Excel. Las capacidades BLOCKED no se presentan como valores calculados.',st['SmallBI']),Spacer(1,.15*cm)]
+        summary=pd.DataFrame(deliverable_manifest_summary_rows(manifest))
+        story += [_pdf_table(summary,st,['Campo','Valor'],20),Spacer(1,.2*cm),Paragraph('Capacidades bloqueadas',st['SecBI'])]
+        components=pd.DataFrame(deliverable_manifest_component_rows(manifest))
+        blocked=components.loc[components['Estado'].eq('BLOCKED')] if not components.empty else components
+        if blocked.empty: story.append(Paragraph('No existen capacidades bloqueadas en esta solicitud.',st['SmallBI']))
+        else: story.append(_pdf_table(blocked,st,['Componente','Título','Estado','Motivo','Dependencias','Provenance'],20))
     doc.build(story,onFirstPage=footer,onLaterPages=footer)
 
 
@@ -766,7 +776,7 @@ def _excel_write_table(writer, name: str, df: pd.DataFrame, title: str, color: s
     er=sr+len(show); tbl=re.sub(r'[^A-Za-z0-9]','',name)[:20]+'Tbl'; ws.add_table(sr,0,er,len(show.columns)-1,{'name':tbl,'style':'Table Style Medium 2','columns':[{'header':str(c)} for c in show.columns]}); ws.freeze_panes(sr+1,0)
 
 
-def generate_excel(path: Path, filename: str, model: Dict[str,Any]) -> None:
+def generate_excel(path: Path, filename: str, model: Dict[str,Any], manifest: Optional[Dict[str,Any]]=None) -> None:
     k=model['kpis']; requested=set(model.get('spec',{}).get('sections') or [])
     with pd.ExcelWriter(path,engine='xlsxwriter') as writer:
         wb=writer.book; ws=wb.add_worksheet('Dashboard'); writer.sheets['Dashboard']=ws; ws.hide_gridlines(2); ws.set_zoom(90); ws.set_column('A:L',13)
@@ -785,6 +795,11 @@ def generate_excel(path: Path, filename: str, model: Dict[str,Any]) -> None:
             if key in requested: _excel_write_table(writer,name,df,title2)
         trace=pd.DataFrame([{'Campo':'Prompt','Valor':model['prompt']},{'Campo':'Especificación','Valor':json.dumps(model['spec'],ensure_ascii=False)},{'Campo':'Roles BI','Valor':json.dumps(model['roles'],ensure_ascii=False)},{'Campo':'Cálculos derivados','Valor':json.dumps(model['derived'],ensure_ascii=False,default=str)}])
         _excel_write_table(writer,'Trazabilidad',trace,'Trazabilidad de la generación'); writer.sheets['Trazabilidad'].hide()
+        if isinstance(manifest,dict) and manifest:
+            _excel_write_table(writer,'Gobernanza',pd.DataFrame(deliverable_manifest_summary_rows(manifest)),'Manifiesto gobernado del entregable',TEAL)
+            writer.sheets['Gobernanza'].set_column('A:A',28)
+            writer.sheets['Gobernanza'].set_column('B:B',72)
+            _excel_write_table(writer,'Capacidades',pd.DataFrame(deliverable_manifest_component_rows(manifest)),'Capacidades autorizadas y bloqueadas',ORANGE)
 
 
 def executive_narrative(model: Dict[str,Any], outputs: Dict[str,Optional[str]]) -> str:
