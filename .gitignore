@@ -139,3 +139,6 @@ IA_Local/workspace/Entrada/
 /Aplicar_R10_17B_Governed_Source_Resolution_File_Connector_CORREGIDO.py
 /Aplicar_R10_17B_Governed_Source_Resolution_File_Connector_V2.py
 /Aplicar_R10_17B_Fix_CSV_Reader.py
+
+# Local R10.17C applicators
+/Aplicar_R10_17C_Governed_SQL_Server_Connector.py
