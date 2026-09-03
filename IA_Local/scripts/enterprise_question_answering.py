@@ -155,6 +155,7 @@ def _metric_alias(question: str) -> Optional[str]:
             "kpi:freight",
             (
                 "flete total",
+                "flete",
                 "costo de flete",
                 "costo flete",
                 "freight",
@@ -328,6 +329,71 @@ def answer_enterprise_question(
         verify_artifacts=True,
     )
 
+    qnorm = _norm(question)
+
+    # Estas preguntas tienen como única autoridad el registro gobernado.
+    # La integridad de los artefactos ya fue verificada arriba, pero no se
+    # necesita ni se debe exigir un dashboard HTML para responderlas.
+    if "fuente" in qnorm or "origen" in qnorm:
+        return {
+            "schema_version": ENTERPRISE_QA_VERSION,
+            "status": "ANSWERED",
+            "question": question,
+            "question_hash_sha256": _question_hash(question),
+            "intent": {"type": "source_query"},
+            "answer": {
+                "source_fingerprint_sha256": run.get(
+                    "source_fingerprint_sha256"
+                ),
+            },
+            "evidence": [{"source": "deliverable_registry"}],
+            "provenance": {
+                "run_id": run.get("run_id"),
+                "manifest_fingerprint_sha256": run.get(
+                    "manifest_fingerprint_sha256"
+                ),
+                "record_fingerprint_sha256": run.get(
+                    "record_fingerprint_sha256"
+                ),
+            },
+            "governance": {
+                "fail_closed": True,
+                "llm_computational_authority": False,
+                "llm_formula_authority": False,
+            },
+        }
+
+    if "formatos" in qnorm or "entregables" in qnorm:
+        formats = [
+            item.get("format")
+            for item in list(run.get("deliverables") or [])
+            if item.get("format")
+        ]
+
+        return {
+            "schema_version": ENTERPRISE_QA_VERSION,
+            "status": "ANSWERED",
+            "question": question,
+            "question_hash_sha256": _question_hash(question),
+            "intent": {"type": "deliverables_query"},
+            "answer": {"formats": formats},
+            "evidence": [{"source": "deliverable_registry"}],
+            "provenance": {
+                "run_id": run.get("run_id"),
+                "manifest_fingerprint_sha256": run.get(
+                    "manifest_fingerprint_sha256"
+                ),
+                "record_fingerprint_sha256": run.get(
+                    "record_fingerprint_sha256"
+                ),
+            },
+            "governance": {
+                "fail_closed": True,
+                "llm_computational_authority": False,
+                "llm_formula_authority": False,
+            },
+        }
+
     html_item = None
 
     for item in list(run.get("deliverables") or []):
@@ -348,8 +414,6 @@ def answer_enterprise_question(
 
     payload = _extract_dashboard_payload(html_path)
     spec = _dashboard_spec(payload)
-
-    qnorm = _norm(question)
 
     if (
         "cobertura" in qnorm
@@ -468,98 +532,6 @@ def answer_enterprise_question(
                 "llm_computational_authority": False,
                 "llm_formula_authority": False,
                 "source_data_precedence": True,
-            },
-        }
-
-    if (
-        "archivo fuente" in qnorm
-        or "fuente" == qnorm
-        or "archivo origen" in qnorm
-    ):
-        return {
-            "schema_version": ENTERPRISE_QA_VERSION,
-            "status": "ANSWERED",
-            "question": question,
-            "question_hash_sha256":
-                _question_hash(question),
-            "intent": {
-                "type": "source_query",
-            },
-            "answer": {
-                "source_fingerprint_sha256":
-                    run.get(
-                        "source_fingerprint_sha256"
-                    ),
-            },
-            "evidence": [
-                {
-                    "source":
-                        "deliverable_registry",
-                }
-            ],
-            "provenance": {
-                "run_id": run.get("run_id"),
-                "manifest_fingerprint_sha256":
-                    run.get(
-                        "manifest_fingerprint_sha256"
-                    ),
-                "record_fingerprint_sha256":
-                    run.get(
-                        "record_fingerprint_sha256"
-                    ),
-            },
-            "governance": {
-                "fail_closed": True,
-                "llm_computational_authority": False,
-                "llm_formula_authority": False,
-            },
-        }
-
-    if (
-        "formatos" in qnorm
-        or "entregables" in qnorm
-    ):
-        formats = [
-            item.get("format")
-            for item in list(
-                run.get("deliverables") or []
-            )
-            if item.get("format")
-        ]
-
-        return {
-            "schema_version": ENTERPRISE_QA_VERSION,
-            "status": "ANSWERED",
-            "question": question,
-            "question_hash_sha256":
-                _question_hash(question),
-            "intent": {
-                "type": "deliverables_query",
-            },
-            "answer": {
-                "formats": formats,
-            },
-            "evidence": [
-                {
-                    "source":
-                        "deliverable_registry",
-                }
-            ],
-            "provenance": {
-                "run_id": run.get("run_id"),
-                "manifest_fingerprint_sha256":
-                    run.get(
-                        "manifest_fingerprint_sha256"
-                    ),
-                "record_fingerprint_sha256":
-                    run.get(
-                        "record_fingerprint_sha256"
-                    ),
-            },
-            "governance": {
-                "fail_closed": True,
-                "llm_computational_authority": False,
-                "llm_formula_authority": False,
             },
         }
 
