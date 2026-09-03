@@ -142,3 +142,6 @@ IA_Local/workspace/Entrada/
 
 # Local R10.17C applicators
 /Aplicar_R10_17C_Governed_SQL_Server_Connector.py
+
+# Local R10.17D applicators
+/Aplicar_R10_17D_Governed_Source_Execution_Pipeline.py
