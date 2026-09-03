@@ -59,7 +59,7 @@ def _base(path: Path) -> Dict[str, Any]:
 def _validate_scope(scope: Any, source_id: str, index: int) -> List[str]:
     errors: List[str] = []
     if scope is None:
-        return errors
+        return [f"source_{index}:scope_required_explicit_object:{source_id}"]
     if not isinstance(scope, dict):
         return [f"source_{index}:scope_must_be_object:{source_id}"]
     unknown = sorted(set(scope) - _ALLOWED_SCOPE_KEYS)

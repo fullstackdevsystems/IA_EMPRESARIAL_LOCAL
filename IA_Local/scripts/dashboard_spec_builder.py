@@ -38,6 +38,7 @@ from enterprise_source_registry import load_governed_enterprise_source_registry
 from enterprise_file_connector import build_file_connector_capability_audit
 from enterprise_sql_server_connector import build_sql_server_connector_capability_audit
 from enterprise_source_execution import build_source_execution_capability_audit
+from enterprise_query_registry import build_query_registry_capability_audit
 
 SCHEMA_VERSION = "r10.13a"
 
@@ -2181,6 +2182,7 @@ def build_dashboard_spec(
     enterprise_file_connector = build_file_connector_capability_audit()
     enterprise_sql_server_connector = build_sql_server_connector_capability_audit()
     enterprise_source_execution = build_source_execution_capability_audit()
+    enterprise_query_registry = build_query_registry_capability_audit()
     business_rule_context = load_governed_business_context()
 
     resolved_rule_context = dict(business_rule_context.get("context") or {})
@@ -2304,6 +2306,9 @@ def build_dashboard_spec(
 
         "enterprise_source_execution":
             enterprise_source_execution,
+
+        "enterprise_query_registry":
+            enterprise_query_registry,
 
         "enterprise_source_registry": {
             "schema_version": enterprise_source_registry.get("schema_version"),

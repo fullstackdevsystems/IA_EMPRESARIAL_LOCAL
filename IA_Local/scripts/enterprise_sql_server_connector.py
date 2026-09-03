@@ -58,6 +58,8 @@ def validate_read_only_sql(sql: str) -> Dict[str, Any]:
     normalized = _normalize_sql(sql)
     if not normalized:
         return {"valid": False, "reason": "empty_query", "normalized_sql": normalized}
+    if "--" in normalized or "/*" in normalized or "*/" in normalized:
+        return {"valid": False, "reason": "sql_comments_forbidden", "normalized_sql": normalized}
     trimmed = normalized.rstrip()
     if ";" in trimmed.rstrip(";"):
         return {"valid": False, "reason": "multiple_statements_forbidden", "normalized_sql": normalized}
@@ -176,7 +178,7 @@ def execute_governed_sql_query(*, source: Dict[str, Any], query_id: str) -> Dict
         conn = pyodbc.connect(connection_string, timeout=int(q["timeout_seconds"]), autocommit=False)
         cursor = conn.cursor()
         cursor.timeout = int(q["timeout_seconds"])
-        cursor.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+        cursor.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
         cursor.execute(q["sql"])
         columns = [d[0] for d in cursor.description] if cursor.description else []
         rows = cursor.fetchmany(int(q["row_limit"]) + 1)

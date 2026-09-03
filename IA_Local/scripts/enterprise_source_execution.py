@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from enterprise_file_connector import ENTERPRISE_FILE_CONNECTOR_VERSION, open_governed_file_source
 from enterprise_source_registry import resolve_governed_enterprise_sources
+from enterprise_query_registry import resolve_governed_enterprise_query
 from enterprise_sql_server_connector import ENTERPRISE_SQL_CONNECTOR_VERSION, execute_governed_sql_query
 
 ENTERPRISE_SOURCE_EXECUTION_VERSION = "r10.17d"
@@ -111,7 +112,7 @@ def execute_uploaded_file_source(*, path: str | Path, workspace_root: str | Path
         "governance": _governance(),
     }
 
-def execute_registered_source(*, registry: Dict[str, Any], source_id: str, context: Optional[Dict[str, Any]] = None, workspace_root: str | Path, query_id: Optional[str] = None) -> Dict[str, Any]:
+def execute_registered_source(*, registry: Dict[str, Any], source_id: str, context: Optional[Dict[str, Any]] = None, workspace_root: str | Path, query_id: Optional[str] = None, query_registry: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     sid = str(source_id or "").strip()
     if not sid:
         return _blocked("source_id_required")
@@ -131,7 +132,21 @@ def execute_registered_source(*, registry: Dict[str, Any], source_id: str, conte
     elif kind == "sql_server":
         if not str(query_id or "").strip():
             return _blocked("query_id_required", sid, kind)
-        opened = execute_governed_sql_query(source=source, query_id=str(query_id))
+        if not isinstance(query_registry, dict):
+            return _blocked("query_registry_required", sid, kind)
+        approved = resolve_governed_enterprise_query(
+            registry=query_registry,
+            source_id=sid,
+            query_id=str(query_id),
+        )
+        if approved.get("status") != "APPROVED":
+            return _blocked(str(approved.get("reason") or "query_not_approved"), sid, kind)
+        source_for_execution = dict(source)
+        source_for_execution["approved_queries"] = [dict(approved["query"])]
+        opened = execute_governed_sql_query(
+            source=source_for_execution,
+            query_id=str(query_id),
+        )
     else:
         return _blocked("unsupported_execution_kind", sid, kind)
     if opened.get("status") != "OPENED":
