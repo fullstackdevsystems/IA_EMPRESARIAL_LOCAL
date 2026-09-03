@@ -131,11 +131,47 @@ class GovernedDeliverableRegistry:
         normalized_scope = normalize_deliverable_scope(scope)
         safe_run = _safe_id(run_id, "run_id")
         manifest_fingerprint = verify_manifest_fingerprint(manifest)
+        if str(manifest.get("status") or "").strip().upper() != "READY":
+            raise DeliverableRegistryError(
+                "MANIFEST_NOT_READY",
+                "No se puede registrar una ejecución cuyo manifiesto no está READY",
+            )
+
+        request = manifest.get("request") if isinstance(manifest.get("request"), dict) else {}
+        source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
+        governance = manifest.get("governance") if isinstance(manifest.get("governance"), dict) else {}
+
+        source_fingerprint = str(source.get("source_fingerprint_sha256") or "").strip().lower()
+        if governance.get("source_fingerprint_required") is True:
+            if not re.fullmatch(r"[a-f0-9]{64}", source_fingerprint):
+                raise DeliverableRegistryError(
+                    "SOURCE_FINGERPRINT_REQUIRED",
+                    "La ejecución gobernada requiere fingerprint SHA-256 de la fuente",
+                )
+
         deliverables = [self._artifact(kind, outputs[kind]) for kind in _FORMATS if outputs.get(kind)]
         if not deliverables:
             raise DeliverableRegistryError("DELIVERABLE_REQUIRED", "La ejecución no produjo entregables")
-        request = manifest.get("request") if isinstance(manifest.get("request"), dict) else {}
-        source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
+
+        if governance.get("output_intent_enforced") is True:
+            requested = request.get("requested_formats")
+            if not isinstance(requested, list):
+                raise DeliverableRegistryError(
+                    "OUTPUT_INTENT_REQUIRED",
+                    "El manifiesto gobernado requiere formatos solicitados",
+                )
+            requested_set = {str(item).strip().lower() for item in requested if str(item or "").strip()}
+            if not requested_set or not requested_set.issubset(set(_FORMATS)):
+                raise DeliverableRegistryError(
+                    "INVALID_OUTPUT_INTENT",
+                    "Los formatos solicitados del manifiesto son inválidos",
+                )
+            produced_set = {str(item.get("format") or "") for item in deliverables}
+            if produced_set != requested_set:
+                raise DeliverableRegistryError(
+                    "OUTPUT_INTENT_MISMATCH",
+                    "Los entregables producidos no coinciden con la intención de salida gobernada",
+                )
         record: Dict[str, Any] = {
             "schema_version": ENTERPRISE_DELIVERABLE_REGISTRY_VERSION,
             "status": "READY",
@@ -154,6 +190,10 @@ class GovernedDeliverableRegistry:
                 "integrity_verified_on_read": True,
                 "paths_serialized": False,
                 "credentials_serialized": False,
+                "integrity_closure_version": "r10.18d",
+                "manifest_ready_required": True,
+                "output_intent_verified": bool(governance.get("output_intent_enforced")),
+                "source_fingerprint_verified": bool(governance.get("source_fingerprint_required")),
             },
         }
         record["record_fingerprint_sha256"] = hashlib.sha256(_canonical(record)).hexdigest()

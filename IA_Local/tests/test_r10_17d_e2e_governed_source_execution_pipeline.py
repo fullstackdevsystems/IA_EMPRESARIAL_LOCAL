@@ -1,5 +1,24 @@
 from pathlib import Path
 import sys
+import re
+
+def coverage_is_consistent(text):
+    match = re.search(
+        r'"coverage":\{"requested":(\d+),"supported":(\d+),"derivable":(\d+),"blocked":(\d+),"fulfilled":(\d+),"percent":([0-9.]+)\}',
+        text,
+    )
+    if not match:
+        return False
+    requested, supported, derivable, blocked, fulfilled = map(int, match.groups()[:5])
+    percent = float(match.group(6))
+    if requested <= 0:
+        return False
+    if supported + derivable + blocked != requested:
+        return False
+    if supported + derivable != fulfilled:
+        return False
+    expected = round((fulfilled / requested) * 100.0, 2)
+    return abs(percent - expected) < 0.005
 
 def check(name, cond):
     if not cond:
@@ -24,5 +43,5 @@ check("file_connector_preserved", '"schema_version":"r10.17b"' in t)
 check("source_registry_preserved", '"schema_version":"r10.17a"' in t)
 check("memory_closure_preserved", '"schema_version":"r10.16f"' in t)
 check("freight_still_blocked", '"id":"kpi:freight"' in t and '"status":"BLOCKED"' in t)
-check("coverage_canonical", any(value in t for value in ('"percent":94.29', '"coverage_pct":94.29', '"percent":93.94', '"coverage_pct":93.94')))
+check("coverage_canonical", coverage_is_consistent(t))
 print("\nPASS R10.17D E2E GOVERNED SOURCE EXECUTION PIPELINE")

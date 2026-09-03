@@ -53,6 +53,8 @@ def build_governed_deliverable_manifest(
     row_count: Optional[int] = None,
     prompt_sha256: Optional[str] = None,
     source_fingerprint_sha256: Optional[str] = None,
+    output_intent: Optional[Dict[str, Any]] = None,
+    source_fingerprint_required: bool = False,
 ) -> Dict[str, Any]:
     execution = dashboard_plan.get("execution_plan") if isinstance(dashboard_plan, dict) else None
     execution = execution if isinstance(execution, dict) else {}
@@ -63,6 +65,13 @@ def build_governed_deliverable_manifest(
         if isinstance(item, dict)
     ]
     counts = {status: sum(1 for item in components if item.get("status") == status) for status in ("SUPPORTED", "DERIVABLE", "BLOCKED")}
+    coverage = spec.get("coverage") if isinstance(spec.get("coverage"), dict) else {}
+    canonical_requested = coverage.get("requested")
+    canonical_supported = coverage.get("supported")
+    canonical_derivable = coverage.get("derivable")
+    canonical_blocked = coverage.get("blocked")
+    canonical_fulfilled = coverage.get("fulfilled")
+    canonical_percent = coverage.get("percent")
     audits = []
     for key in _ENTERPRISE_AUDITS:
         value = spec.get(key)
@@ -75,6 +84,12 @@ def build_governed_deliverable_manifest(
             "fingerprint_sha256": _text(value.get("fingerprint_sha256")),
         })
     source = spec.get("source") if isinstance(spec.get("source"), dict) else {}
+    intent = output_intent if isinstance(output_intent, dict) else {}
+    intent_outputs = intent.get("outputs") if isinstance(intent.get("outputs"), dict) else {}
+    requested_formats = [
+        kind for kind in ("html", "excel", "pdf")
+        if intent_outputs.get(kind) is True
+    ]
     manifest = {
         "schema_version": ENTERPRISE_DELIVERABLE_MANIFEST_VERSION,
         "status": "READY" if spec else "BLOCKED",
@@ -88,6 +103,9 @@ def build_governed_deliverable_manifest(
         "request": {
             "prompt_sha256": _text(prompt_sha256 or dashboard_plan.get("request_prompt_sha256")),
             "prompt_integrity": _text(dashboard_plan.get("prompt_integrity")),
+            "requested_formats": requested_formats,
+            "output_intent_schema_version": _text(intent.get("schema_version")),
+            "output_intent_reason": _text(intent.get("reason")),
         },
         "authority": {
             "source_of_truth": _text(execution.get("source_of_truth")),
@@ -97,10 +115,12 @@ def build_governed_deliverable_manifest(
         },
         "summary": {
             "component_count": len(components),
-            "supported_count": counts["SUPPORTED"],
-            "derivable_count": counts["DERIVABLE"],
-            "blocked_count": counts["BLOCKED"],
-            "coverage_pct": execution.get("coverage_pct"),
+            "requested_count": canonical_requested,
+            "supported_count": canonical_supported if canonical_supported is not None else counts["SUPPORTED"],
+            "derivable_count": canonical_derivable if canonical_derivable is not None else counts["DERIVABLE"],
+            "blocked_count": canonical_blocked if canonical_blocked is not None else counts["BLOCKED"],
+            "fulfilled_count": canonical_fulfilled,
+            "coverage_pct": canonical_percent if canonical_percent is not None else execution.get("coverage_pct"),
         },
         "components": components,
         "governance_audits": audits,
@@ -110,6 +130,9 @@ def build_governed_deliverable_manifest(
             "raw_rows_serialized": False,
             "sql_serialized": False,
             "credentials_serialized": False,
+            "integrity_closure_version": "r10.18d",
+            "output_intent_enforced": bool(intent),
+            "source_fingerprint_required": bool(source_fingerprint_required),
         },
     }
     canonical = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -128,6 +151,8 @@ def deliverable_manifest_summary_rows(manifest: Dict[str, Any]) -> List[Dict[str
         ("Archivo", source.get("filename")),
         ("Hoja", source.get("sheet")),
         ("Filas", source.get("row_count")),
+        ("Fingerprint de fuente", source.get("source_fingerprint_sha256")),
+        ("Formatos solicitados", ", ".join(_strings(request.get("requested_formats")))),
         ("Prompt SHA-256", request.get("prompt_sha256")),
         ("Integridad del prompt", request.get("prompt_integrity")),
         ("Fuente de autoridad", authority.get("source_of_truth")),
@@ -135,6 +160,8 @@ def deliverable_manifest_summary_rows(manifest: Dict[str, Any]) -> List[Dict[str
         ("Versión del dashboard spec", authority.get("dashboard_spec_version")),
         ("Versión de reglas", authority.get("ruleset_version")),
         ("Componentes", summary.get("component_count")),
+        ("Solicitados", summary.get("requested_count")),
+        ("Cumplidos", summary.get("fulfilled_count")),
         ("SUPPORTED", summary.get("supported_count")),
         ("DERIVABLE", summary.get("derivable_count")),
         ("BLOCKED", summary.get("blocked_count")),

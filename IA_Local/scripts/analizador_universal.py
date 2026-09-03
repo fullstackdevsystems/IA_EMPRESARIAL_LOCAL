@@ -880,6 +880,7 @@ def _attach_governed_deliverable_manifest(
     row_count: int,
     prompt_sha256: str,
     source_fingerprint_sha256: Optional[str] = None,
+    output_intent: Optional[Dict[str, Any]] = None,
 ) -> None:
     manifest = build_governed_deliverable_manifest(
         dashboard_plan=dashboard_plan,
@@ -888,6 +889,8 @@ def _attach_governed_deliverable_manifest(
         row_count=row_count,
         prompt_sha256=prompt_sha256,
         source_fingerprint_sha256=source_fingerprint_sha256,
+        output_intent=output_intent,
+        source_fingerprint_required=True,
     )
     dashboard_plan["enterprise_deliverable_manifest"] = manifest
     profile["deliverable_manifest"] = manifest
@@ -998,7 +1001,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta), spec.get("output_intent"))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
@@ -1052,7 +1055,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta), spec.get("output_intent"))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
@@ -1125,7 +1128,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         outputs = {"html": None, "pdf": None, "excel": None}
         dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
-        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta))
+        _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta), spec.get("output_intent"))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
             dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
