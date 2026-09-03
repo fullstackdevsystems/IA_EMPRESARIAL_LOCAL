@@ -22,6 +22,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from enterprise_deliverable_manifest import deliverable_manifest_component_rows, deliverable_manifest_summary_rows
+from enterprise_output_contract import compile_output_contract
 
 VERSION = '8.5.5'
 NAVY='#0B1F33'; BLUE='#2563EB'; ORANGE='#C97B0A'; GREEN='#169447'; RED='#D82C3F'; PURPLE='#7C3AED'; TEAL='#007D79'
@@ -275,24 +276,9 @@ def compile_report_spec(prompt: str) -> Dict[str, Any]:
                 return True
         return False
 
-    outputs = {'html': False, 'pdf': False, 'excel': False}
-    html_terms = ('html','dashboard','tablero','interactivo','business intelligence','power bi')
-    pdf_terms = ('pdf','reporte ejecutivo','direccion','dirección','directivo')
-    excel_terms = ('generar excel','genera excel','reporte excel','excel analitico','excel analítico','libro analitico','libro analítico','salida xlsx')
-    if has_any(*html_terms) and not negated('html','dashboard','tablero'): outputs['html'] = True
-    if has_any(*pdf_terms) and not negated('pdf','reporte ejecutivo'): outputs['pdf'] = True
-    if has_any(*excel_terms) and not negated('excel','xlsx','libro analitico'): outputs['excel'] = True
-
-    # "solo X" debe restringir la salida aunque el resto del prompt describa otras secciones.
-    if re.search(r'\bsolo\s+(?:un\s+|el\s+)?pdf\b', n): outputs = {'html':False,'pdf':True,'excel':False}
-    elif re.search(r'\bsolo\s+(?:un\s+|el\s+)?(?:html|dashboard|tablero)\b', n): outputs = {'html':True,'pdf':False,'excel':False}
-    elif re.search(r'\bsolo\s+(?:un\s+|el\s+)?(?:excel|xlsx)\b', n): outputs = {'html':False,'pdf':False,'excel':True}
-
+    output_contract = compile_output_contract(raw)
+    outputs = {kind: bool(item.get('requested')) for kind, item in output_contract['formats'].items()}
     broad = has_any('analiza completamente','analisis completo','análisis completo','reporte completo','dashboard comercial','dashboard profesional','genera 3 salidas','genera tres salidas','resultado final','reporte integral')
-    if broad and not any(outputs.values()): outputs = {'html': True, 'pdf': True, 'excel': True}
-    if not any(outputs.values()):
-        # Compatibilidad y mejor experiencia: un análisis empresarial sin formato explícito genera las tres vistas.
-        outputs = {'html': True, 'pdf': True, 'excel': True}
 
     section_terms = {
         'resumen': ('resumen','kpi','indicadores'),
@@ -340,6 +326,7 @@ def compile_report_spec(prompt: str) -> Dict[str, Any]:
     return {
         'version': VERSION,
         'outputs': outputs,
+        'output_contract': output_contract,
         'sections': sections,
         'interactive': bool(outputs['html']),
         'style': style,

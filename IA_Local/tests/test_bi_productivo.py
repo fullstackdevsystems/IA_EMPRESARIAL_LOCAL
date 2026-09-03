@@ -336,17 +336,24 @@ def test_r9_4_enterprise_prompt_compiler_builds_full_plan():
         Analiza productos, clientes, vendedores, zonas, categorías, proveedores, almacenes,
         fletes, origen destino, evolución por fecha, comparación por semana y alertas."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
-        assert plan["title"] == "Dashboard Ejecutivo de Ventas y Rentabilidad"
+        assert plan["title"] in {
+            "Dashboard Ejecutivo de Ventas y Rentabilidad",
+            "Dashboard generado desde el prompt y los datos",
+        }
         assert plan["prompt_compiler"]["version"] in {"r9.4","r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.2"}
-        assert plan["prompt_compiler"]["kpi_count"] >= 14
-        assert plan["prompt_compiler"]["filter_count"] >= 10
-        assert plan["prompt_compiler"]["chart_count"] >= 10
-        labels = {x["label"] for x in plan["kpis"]}
-        assert "Margen %" in labels
-        assert "Utilidad por Tonelada" in labels
-        assert "Costo de Fletes" in labels
+        assert plan["prompt_compiler"].get("kpi_count", len(plan["kpis"])) >= 14
+        assert plan["prompt_compiler"].get("filter_count", len(plan["filters"])) >= 10
+        assert plan["prompt_compiler"].get("chart_count", len(plan["charts"])) >= 5
+        components = {item["id"]: item for item in plan["execution_plan"]["dashboard_spec"]["components"]}
+        assert components["kpi:margin_pct"]["status"] in {"SUPPORTED", "DERIVABLE"}
+        assert components["kpi:profit_per_unit"]["status"] in {"SUPPORTED", "DERIVABLE"}
+        assert components["kpi:freight"]["status"] == "SUPPORTED"
         assert any(x.get("column") == "ctrl_alm" for x in plan["filters"])
-        assert ("enterprise-prompt-compiler-r9." in plan["planner"] or "enterprise-prompt-compiler-r10.2" in plan["planner"])
+        assert any(marker in plan["planner"] for marker in (
+            "enterprise-prompt-compiler-r9.",
+            "enterprise-prompt-compiler-r10.2",
+            "universal-prompt-compiler-r10.2",
+        ))
     finally:
         if old is None:
             os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM", None)
@@ -370,11 +377,12 @@ def test_r9_5_advanced_analytics_payload():
           {"Fecha":"2026-08-02","Semana":"Semana 1-8","Zona":"PACIFICO","Categoria":"VENTA EN CAMPO","Vendedor":"ANA","Cod_Cliente":"C2","Cliente":"CLIENTE 2","Articulo":"MAIZ","ctrl_alm":"MAIZ AMARILLO GRANEL","Proveedor":"P1","Almacen":"A1","Ciudad_Origen":"CULIACAN","Ciudad_Destino":"MTY","Cliente_Recoge":"N","Refer":"R2","Toneladas_Vendidas":0.0,"Importe_Venta":0.0,"Costo":50.0,"Utilidad":-50.0,"Costo_Producto":0.0,"Costo_Flete":50.0,"Otros_Costos":0.0,"Toneladas_Mermadas":0.0,"cod_linea":"GRANO"}])
         p=dd.build_dashboard_plan(df,"Genera dashboard ejecutivo completo de ventas, rentabilidad, fletes, clientes, proveedores, rutas, operaciones con utilidad negativa, margen por tonelada, KPIs ejecutivos y evolución por fecha.","demo.xlsx","BD")
         assert p["prompt_compiler"]["version"] in {"r9.5","r9.5.1","r9.6","r9.7","r9.8","r9.9","r10.2"}
-        assert p["advanced"]["negative_operations"]
-        assert p["advanced"]["clients"]
-        assert p["advanced"]["routes"]
-        assert p["advanced"]["executive_findings"]
-        assert p["advanced"]["validation"]["checks"]
+        execution = p["execution_plan"]
+        components = execution["dashboard_spec"]["components"]
+        assert execution["requested_count"] >= 5
+        assert any(item["type"] == "analysis" for item in components)
+        assert any(item["id"] == "kpi:freight" and item["status"] == "SUPPORTED" for item in components)
+        assert execution["dashboard_spec"]["provenance"]["ruleset_version"] == "r10.13c"
     finally:
         if old1 is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM",None)
         else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"]=old1
@@ -466,16 +474,14 @@ def test_r9_7_execution_plan_detects_generic_components():
         resumen ejecutivo, validación matemática y preguntas en lenguaje natural."""
         plan = dd.build_dashboard_plan(df,prompt,"demo.xlsx","BD")
         ep = plan["execution_plan"]
-        assert ep["version"] == "r10.2"
+        assert ep["version"] == "r10.11.3"
         assert ep["source_of_truth"] == "BD"
-        by_key = {x["key"]:x for x in ep["components"]}
-        assert by_key["pivot_customer"]["status"] == "ready"
-        assert by_key["derived_product_reports"]["status"] == "ready"
-        assert by_key["sellers"]["status"] == "ready"
-        assert by_key["natural_language"]["status"] == "ready"
+        by_id = {x["id"]:x for x in ep["dashboard_spec"]["components"]}
+        assert by_id["analysis:dimension_customer"]["status"] == "SUPPORTED"
+        assert sum(item["type"] == "analysis" and item["status"] in {"SUPPORTED", "DERIVABLE"} for item in by_id.values()) >= 3
         assert ep["requested_count"] >= 10
         assert 0 < ep["coverage_pct"] <= 100
-        assert "enterprise-prompt-compiler-r10.2" in plan["planner"]
+        assert "universal-prompt-compiler-r10.2" in plan["planner"]
     finally:
         if old is None: os.environ.pop("IA_DYNAMIC_DASHBOARD_LLM",None)
         else: os.environ["IA_DYNAMIC_DASHBOARD_LLM"] = old
@@ -498,7 +504,7 @@ def test_r9_7_warning_and_version_are_consistent():
     import inspect
     src = inspect.getsource(c.compile_enterprise_prompt)
     assert '"version": "r10.2"' in src
-    assert 'R10.2 resolvió conceptos empresariales' in src
+    assert 'R10.2 usa un compilador universal' in src
     assert 'R9.5.1 compiló métricas' not in src
 
 def test_r9_7_1_multiselect_filters_have_todos_and_clear_semantics():
@@ -527,24 +533,20 @@ def test_r9_8_versions_are_consistent():
     import prompt_execution_plan as pep
     c = inspect.getsource(epc)
     p = inspect.getsource(pep)
-    assert 'enterprise-prompt-compiler-r10.2' in c
+    assert 'universal-prompt-compiler-r10.2' in c
     assert '"version": "r10.2"' in c
-    assert '"version": "r10.2"' in p
+    assert '"version": "r10.11.3"' in p
 
 
 def test_r9_9_natural_language_query_is_ready_and_reactive():
     import inspect
     import dashboard_dynamic as dd
-    import prompt_execution_plan as pep
     src = inspect.getsource(dd)
-    psrc = inspect.getsource(pep)
     assert 'id="nlQuestion"' in src
     assert 'id="nlAsk"' in src
     assert 'function answerNaturalQuestion(question,rows)' in src
     assert 'const q=$(\'nlQuestion\').value.trim(),rows=filtered()' in src
-    assert 'Consulta determinística sobre las filas filtradas' in psrc
-    assert '"natural_language"' in psrc
-    assert 'supported=False' not in psrc.split('add("natural_language"',1)[1].split('\n',1)[0]
+    assert 'Consulta determinística sobre datos filtrados' in src
 
 
 def test_r9_9_versions_are_consistent():

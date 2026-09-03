@@ -37,6 +37,7 @@ from enterprise_deliverable_registry import (
     GovernedDeliverableRegistry,
     deliverable_registry_public_audit,
 )
+from enterprise_output_contract import finalize_output_contract
 
 
 # ---------------------------------------------------------------------------
@@ -901,6 +902,7 @@ def _register_governed_deliverables(
     profile: Dict[str, Any],
     outputs: Dict[str, Optional[str]],
     domain: str,
+    output_contract: Dict[str, Any],
 ) -> Dict[str, Any]:
     registry = GovernedDeliverableRegistry(base.REPORTES)
     return registry.register(
@@ -909,6 +911,7 @@ def _register_governed_deliverables(
         manifest=profile["deliverable_manifest"],
         outputs=outputs,
         domain=domain,
+        output_contract=output_contract,
     )
 
 
@@ -1121,7 +1124,8 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     except Exception as _dataset_exc:
         notes.append(f"V8: no se pudo registrar el dataset para consultas futuras: {_dataset_exc}")
 
-    deliverable_run = _register_governed_deliverables(profile=profile, outputs=outputs, domain=domain)
+    output_contract = finalize_output_contract(spec["output_contract"], outputs, base.REPORTES)
+    deliverable_run = _register_governed_deliverables(profile=profile, outputs=outputs, domain=domain, output_contract=output_contract)
     response = {
         "ok": True,
         "request_prompt_sha256": request_prompt_sha256,
@@ -1148,6 +1152,7 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         "html": outputs.get("html"),
         "excel": outputs.get("excel"),
         "pdf": outputs.get("pdf"),
+        "output_contract": output_contract,
         "deliverable_run": deliverable_run,
         "segundos": round(base.time.time() - started, 2),
     }

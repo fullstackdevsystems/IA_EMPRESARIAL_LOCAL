@@ -43,10 +43,16 @@ def compile_enterprise_prompt(
     out["title"] = universal.get("title") or out.get("title") or "Dashboard Ejecutivo"
     out["subtitle"] = universal.get("subtitle") or out.get("subtitle") or filename
     out["top_n"] = universal.get("top_n", out.get("top_n", 15))
-    out["status"] = universal.get("status", out.get("status", "ready"))
+    guarded_status = out.get("status", "ready")
+    universal_status = universal.get("status", "ready")
     out["semantic_columns_strict"] = universal.get("semantic_roles", {})
     out["data_profile"] = universal.get("data_profile", {})
-    out["missing_requirements"] = [m.get("key") for m in universal.get("blocked_metrics", [])]
+    guarded_missing = out.get("missing_requirements") or []
+    if isinstance(guarded_missing, dict):
+        guarded_missing = list(guarded_missing)
+    universal_missing = [m.get("key") for m in universal.get("blocked_metrics", []) if m.get("key")]
+    out["missing_requirements"] = list(dict.fromkeys([str(item) for item in list(guarded_missing) + universal_missing if item]))
+    out["status"] = "partial" if "partial" in {guarded_status, universal_status} or out["missing_requirements"] else universal_status
     out["warnings"] = list(dict.fromkeys(list(out.get("warnings") or []) + list(universal.get("warnings") or []) + [
         "R10.2 usa un compilador universal: el dashboard se vincula al prompt y al esquema real del archivo, no a un prompt o industria específicos.",
         "Las cifras base se calculan por código sobre columnas existentes; las métricas no soportadas quedan como N/D en vez de inventarse.",

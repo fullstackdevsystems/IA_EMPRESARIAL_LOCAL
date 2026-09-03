@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from enterprise_output_contract import verify_output_contract_fingerprint
+
 
 ENTERPRISE_DELIVERABLE_REGISTRY_VERSION = "r10.18b"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
@@ -127,10 +129,12 @@ class GovernedDeliverableRegistry:
         manifest: Dict[str, Any],
         outputs: Dict[str, Any],
         domain: Optional[str] = None,
+        output_contract: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         normalized_scope = normalize_deliverable_scope(scope)
         safe_run = _safe_id(run_id, "run_id")
         manifest_fingerprint = verify_manifest_fingerprint(manifest)
+        output_contract_fingerprint = verify_output_contract_fingerprint(output_contract) if output_contract is not None else None
         deliverables = [self._artifact(kind, outputs[kind]) for kind in _FORMATS if outputs.get(kind)]
         if not deliverables:
             raise DeliverableRegistryError("DELIVERABLE_REQUIRED", "La ejecución no produjo entregables")
@@ -146,6 +150,7 @@ class GovernedDeliverableRegistry:
             "prompt_sha256": request.get("prompt_sha256"),
             "source_fingerprint_sha256": source.get("source_fingerprint_sha256"),
             "manifest_fingerprint_sha256": manifest_fingerprint,
+            "output_contract_fingerprint_sha256": output_contract_fingerprint,
             "deliverables": deliverables,
             "governance": {
                 "read_only": True,
