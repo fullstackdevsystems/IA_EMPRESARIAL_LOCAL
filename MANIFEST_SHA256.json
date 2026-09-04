@@ -1,10 +1,10 @@
 {
-  "version": "8.5.5-r7-clean-corrected-v2",
+  "version": "r10.20c.1",
   "files": [
     {
       "path": "IA_Local/ABRIR_ADMIN_MEMORIA_RAG.bat",
-      "sha256": "bd3e471bae6cd0a3bc587401aa52605bb604acfe9f2764fd44194650f1ce9816",
-      "size": 316
+      "sha256": "ccd293763b4afe7a94726606c9f2a875198bf684fddc712209bc38233dacddb4",
+      "size": 318
     },
     {
       "path": "IA_Local/ABRIR_ANALIZADOR_EXCEL.bat",
@@ -13,8 +13,8 @@
     },
     {
       "path": "IA_Local/ABRIR_ASISTENTE.bat",
-      "sha256": "00b5f4653844dae136ab71a392c1866d984ffa6418b8a3e22e2a03ac99b36eda",
-      "size": 320
+      "sha256": "36e0e967d68d9acf68d882ba427f3e259e07b5a6332b331c9142aa09c488160e",
+      "size": 322
     },
     {
       "path": "IA_Local/ABRIR_CARPETA_ENTRADA.bat",
@@ -38,8 +38,8 @@
     },
     {
       "path": "IA_Local/ARQUITECTURA_MEMORIA_RAG_V8.md",
-      "sha256": "2a0654b95814c135a6c791f3124b9eaae52bd167e3fac01aaaba9fec83cd52c4",
-      "size": 6052
+      "sha256": "24e95e6169609529ee76dea9dfd6d501ec66176b489e7d3c2b54efaa0bb72d3e",
+      "size": 6200
     },
     {
       "path": "IA_Local/DETENER_IA.bat",
@@ -53,18 +53,18 @@
     },
     {
       "path": "IA_Local/DIAGNOSTICO_PRODUCTIVO.bat",
-      "sha256": "7895312d474afd7856dfaa4583a3e17d12b509db1f19a76d658827c41749688a",
-      "size": 113
+      "sha256": "54e06fe6d61efd81d100ceb0c9b7ad52f5a7f02cf0237b433ea1be8fac133299",
+      "size": 116
     },
     {
       "path": "IA_Local/ESTRUCTURA.txt",
-      "sha256": "41130e7a8fc396c05742b62654a0a186c6c38c40f453d272d1620fb1859367e2",
-      "size": 1668
+      "sha256": "32e508551bb6b4c457cc593c9af39df3e892653bc56c3a45ca48e0bdb53bc5dc",
+      "size": 1708
     },
     {
       "path": "IA_Local/GUIA_PRUEBAS_MEMORIA_RAG_V8.md",
-      "sha256": "5085b9f2a0c7e1be26cf45ae8d827dcd24208e2b092cd0d4cf209ce0f43a7578",
-      "size": 5108
+      "sha256": "92f7c9f894a3a5cd55c86844f2b8ca3a8f1bbf67c13934afef1e0448c980dfcc",
+      "size": 5276
     },
     {
       "path": "IA_Local/INICIAR_IA.bat",
@@ -78,43 +78,43 @@
     },
     {
       "path": "IA_Local/LEEME_PRIMERO.txt",
-      "sha256": "db92b9a73eb4a91d44c9d3da70e27fcbb12ab226ea8e49ad4d0f969e552ef63a",
-      "size": 236
+      "sha256": "b37c48cb1ba414ce6518d49fa64f31c0223d5c2dc53d7e459fb811fa33892b15",
+      "size": 242
     },
     {
       "path": "IA_Local/MOSTRAR_TOKEN_LOCAL.bat",
-      "sha256": "1b1a278eae3a998d06af9cbbd9bae2e1ddb6214c44d3c1ca56114c5eca466d74",
-      "size": 185
+      "sha256": "c950aee1814902ede1cd48839492df643e34451113431a4aa712ebf092cd642c",
+      "size": 193
     },
     {
       "path": "IA_Local/PROBAR_MEMORIA_RAG.bat",
-      "sha256": "a77d6405e72d58bb9c908291ac7708f295fd9236204f09607f2866ed2afb0e41",
-      "size": 282
+      "sha256": "fa4c6e84a5a7e94dd1760700e71aac17163766086ea6d8f449ecaac0ea9622c6",
+      "size": 293
     },
     {
       "path": "IA_Local/PROMPT_ANALISIS_MELAZA.txt",
-      "sha256": "cb8e02558d12c26ca4380dcd2043ccf2a017aa280748a9ea340004bc1f23ae64",
-      "size": 1604
+      "sha256": "d28656fb371431465a9f36aecec8983dbfab948d8a1d0a8f67b04f63fc7ec52e",
+      "size": 1651
     },
     {
       "path": "IA_Local/PROMPT_PRUEBA_EXCEL.txt",
-      "sha256": "23bf14ac866c4b96ae53ef6292171402b8bc943f15f5c3072b23d37de35b52b8",
-      "size": 866
+      "sha256": "eaec89be596da90dbbbfd5492382c588319708558ee0cf7b59fcbc352562f5a3",
+      "size": 880
     },
     {
       "path": "IA_Local/README_INSTALACION.txt",
-      "sha256": "80b30f641445923efd245618ffc03c5c383e27ca7044608d0241617742966c6b",
-      "size": 1125
+      "sha256": "3d46407ecc680303bd2b3664eeffdadd81ee05f484023bc468f747361d52e71a",
+      "size": 1160
     },
     {
       "path": "IA_Local/RESPALDAR_IA.bat",
-      "sha256": "72bba18fd00e5eb02b1341e1c5c735a318d3f5c098827d9dd7606185cc355a3e",
-      "size": 171
+      "sha256": "cc9b4bb2ba8f6be463aaf278d03ab3b05406ee60cf12e12539a1a8a16ccaded7",
+      "size": 179
     },
     {
       "path": "IA_Local/VERSION.txt",
-      "sha256": "f2cf608cd62ec81254faa623de8fbb0351080a56159b417e71952d900e711537",
-      "size": 6
+      "sha256": "fe14e0234ec06dfca592a8246f53d6df4b53a23f42c7944b9889a7b49b942e94",
+      "size": 320
     },
     {
       "path": "IA_Local/config/.keep",
@@ -138,178 +138,178 @@
     },
     {
       "path": "IA_Local/requirements-local.txt",
-      "sha256": "81997efa722aa3b0f9e6c140da57185255ed454e43f106b18b90ea1888698b21",
-      "size": 178
+      "sha256": "2ad171c687804bf54f7f99180d31792a9c012e31e4d0b34a36c043f9b9a882fb",
+      "size": 208
     },
     {
       "path": "IA_Local/requirements-optional.txt",
-      "sha256": "ec8afdf6ec2d22bb8dbc2581455ad9cc29cea724092bf23d082b48815bc99bb3",
-      "size": 152
+      "sha256": "f39b6f817b5564634d8908e010fa10551056cefc0dfd5ca5ae8589abd3c2e909",
+      "size": 155
     },
     {
       "path": "IA_Local/scripts/Actualizar.ps1",
-      "sha256": "39c1082e8341743a3b57eb2b3c58d281e6f29c9798acca16031a6582f481e58e",
-      "size": 1266
+      "sha256": "a8d56f20f9fa65fa35aaf80aba46abaff107e5f616fa6e20f70d66626bd3e44e",
+      "size": 1300
     },
     {
       "path": "IA_Local/scripts/BackupIA.ps1",
-      "sha256": "742b106672f79b79747f5b2acb2cd79b5a06f77fc201ae42c2e9f7dde5f892e5",
-      "size": 2620
+      "sha256": "cbdff0a816f5471c2bc69f48983ba2dff6aa0169c187932ad6e4d91b4b1b7768",
+      "size": 2678
     },
     {
       "path": "IA_Local/scripts/Comun.ps1",
-      "sha256": "720b1006754f78c77e66e5408c4ac5b310982286636412103eb46aa00bfa3525",
-      "size": 3955
+      "sha256": "0ab0142953da50f84e911483f21a982acc3956488a2dfc49131b9bed5e844fdc",
+      "size": 4084
     },
     {
       "path": "IA_Local/scripts/Detener.ps1",
-      "sha256": "4f57772a246af262eb8c9b3a189c0900256c8f1c7d34bd7751f293ea53d8cceb",
-      "size": 1115
+      "sha256": "3984331a3b537bf2c490832d395eaed8544c452f0c784e3e3cd4b59ee5b5ab95",
+      "size": 1145
     },
     {
       "path": "IA_Local/scripts/Diagnostico.ps1",
-      "sha256": "7c10b119f6d54d02d940750a5e8043354339417c13d39b9fa93cb52de1de63bd",
-      "size": 3030
+      "sha256": "b3f0231ea64a21c08747ca9d2dd6b173121b917dadc5bf516f3e504186531438",
+      "size": 3094
     },
     {
       "path": "IA_Local/scripts/DiagnosticoProductivo.ps1",
-      "sha256": "6e8b36929c5b25ae8261622313c524b2dad6091a574bcdcafe9f1df7997449e9",
-      "size": 1477
+      "sha256": "863e22a2c1f8abc084ba5fe2e0456bf18ddca604605758e1af0e7e2f78874605",
+      "size": 1493
     },
     {
       "path": "IA_Local/scripts/Iniciar.ps1",
-      "sha256": "6bbbf8cbd5e843e180353056799102c6ea369ab7c37251bc0974058f21847fa1",
-      "size": 10620
+      "sha256": "7208c2e9e19ad6bc5a1423ea5cb6ae164cbdf87c646d1a1ca2f9f8e9bcffd0cc",
+      "size": 10848
     },
     {
       "path": "IA_Local/scripts/Instalar.ps1",
-      "sha256": "b8a64efa617195ae0e9c52642015c0dc568f345512bae1cf4b33577807d7c341",
-      "size": 6162
+      "sha256": "6fa0d2a8f4720a047d6f80a5513ec42208e289428c01e769e406271c3dcc1068",
+      "size": 6311
     },
     {
       "path": "IA_Local/scripts/analizador_app.py",
-      "sha256": "2d85655099504d5f4264546f61238e6df855e0e997b2feaa1d1766b778632c7d",
-      "size": 48473
+      "sha256": "859804c6b6ce1c96db703e9c731ebc6620bb1784083a0ca216e16e06b2378213",
+      "size": 56987
     },
     {
       "path": "IA_Local/scripts/analizador_universal.py",
-      "sha256": "ecdfb43727e456acac0e3cdcf7a99006aae796e6470128f7d3436698f440a073",
-      "size": 49950
+      "sha256": "e747d16c54c6b739e3b58cb09ff3b3d06c7aea21b6cd767a6091ca6c830110ff",
+      "size": 105104
     },
     {
       "path": "IA_Local/scripts/bi_productivo.py",
-      "sha256": "f40ceddd9377f8e614168e578668716341b94ad84af38f73b245e4f8754b14ea",
-      "size": 54458
+      "sha256": "e180fdbe6e46e6d6a023fce9b340a06f57e30dc68b884a4ff219028fcf15df50",
+      "size": 59265
     },
     {
       "path": "IA_Local/scripts/bootstrap_enterprise.py",
-      "sha256": "d7e1f23e324cf92dd1e661ac5a35730cd51b64fd4dc611fe21843e94d9534cef",
-      "size": 2292
+      "sha256": "768fef3714e109983ebfe7ba714560f71a66d621eda7be2326ad9b8e6d823f88",
+      "size": 2349
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/__init__.py",
-      "sha256": "60564caa2c20ccfbced3e8064c29d6af4f599075ec049ff584531f06c3e3dcf1",
-      "size": 101
+      "sha256": "42d667981b4ac8066b4570faf5f740f73a854430dbe4473d162617c7eb7e9098",
+      "size": 103
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/api.py",
-      "sha256": "337c6a7d49accf80783809b4ff271a042f53254d93edbf2326247ff8643ce424",
-      "size": 39569
+      "sha256": "ab4ebc887214aa9c8d4e6cd90cb29ba742cf4416cb7cea577aeeded9a9bff2a7",
+      "size": 58759
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/config.py",
-      "sha256": "2f9c86dfe1b35fed855c8fa9021d9d1f5f6e58df3f0363c02492d68868c1078d",
-      "size": 5347
+      "sha256": "6a05046d6af66e24714f05af8d9a02af011cd55e16f4abf81557525c457b4635",
+      "size": 5496
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/context_engine.py",
-      "sha256": "854f4c57db81eb5a43cfe929b4b2921236a180ec9106ce2d3f1c597548d87177",
-      "size": 5676
+      "sha256": "02114308b911406923a87f0b6d77a3973e07cb22832b11a6f0856943290967d4",
+      "size": 8900
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/database.py",
-      "sha256": "87131d864b156810e5f88a5eecd18e2919946ff01c8fe34c8e987533b63b71d5",
-      "size": 7865
+      "sha256": "eb23164b8f17b55b451f5f19a91c0ef8745a8a6186b0b2d0fedf268ac277d576",
+      "size": 8095
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/documents.py",
-      "sha256": "f05ce08fa878d8209c0cdd49e1daef1873c9e805cb011d48510a25b79fce3a2f",
-      "size": 16873
+      "sha256": "40ffd7c498519693e68c9ed9d4bf1a1f33a4dc05736c823f2d0a525fc2bfca5b",
+      "size": 17179
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/factory.py",
-      "sha256": "4e834a8fafcbd24d82aea425894becb519910108056ce15ff5709494329ed653",
-      "size": 1928
+      "sha256": "d467a080690edf4f57716a460069decd2ecb4cdd85d997ff18d602103eb64f4f",
+      "size": 3236
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/memory.py",
-      "sha256": "018603c91831b0b134d76e507a4bf3ef7750dc26be89e55c9cd7ede9ef6c2198",
-      "size": 16438
+      "sha256": "203e7e8a2955d8ae52cccde4ad405b44a791726a1849033c1fceb74791c0813a",
+      "size": 16761
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/observability.py",
-      "sha256": "6a9cc518546155dcfe2ee204759dffaf97ef46f8746fbc59741a073812b3f60e",
-      "size": 3331
+      "sha256": "f94e8ea32d8cb1c4d7553f609d735c6b2d08ff7a09a67b56a0d6d9581be6bcc0",
+      "size": 3421
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/providers.py",
-      "sha256": "05cbb18275dcf0c06b0ca49e75431016c0de79100cb8c682142e32e92cfbeb93",
-      "size": 15169
+      "sha256": "f570b58159ccba352279887bbaf764c7ee9fee40efad58bbde4f251800ec4755",
+      "size": 15529
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/security.py",
-      "sha256": "0d365a3fcf130c530803fca2ff58364275a5a53c624255f4b57b022807b29ff5",
-      "size": 3575
+      "sha256": "cda8c4c0a72825101916d8d2b52f5da3d814c6fdf4f2ddf9917606dc23c37820",
+      "size": 3683
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/service.py",
-      "sha256": "e82bcd58e6c7b61bb89f16182020e8d9604c748d9df94a241875a01944f764c2",
-      "size": 43972
+      "sha256": "4c9a8e8165b7fbae44496878f5ae5718268795d8c10b1101423a7a2bc4f93f02",
+      "size": 44814
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/structured_data.py",
-      "sha256": "93d7637b9c7378c43e8e596f759da32aa5024b812ee5f73b7080d5426b4d263c",
-      "size": 15647
+      "sha256": "146d4b701c0dd3d5aee45acae1cc7de63fff050db047ecd90409b1d4eded17ae",
+      "size": 21402
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/vector_store.py",
-      "sha256": "e97c0c5f23b7914c0717d67db0b56fc4e18ca47f9763163c67a012ab93e06bc5",
-      "size": 7982
+      "sha256": "39c672737eb11d15fdec9ccfb9c7723db407a4f68fa6f7d406237444f7746118",
+      "size": 8592
     },
     {
       "path": "IA_Local/scripts/enterprise_cli.py",
-      "sha256": "25b12d0c18882b960548c8eb86ef70eaf758adaee7d3d0b8543f1044527e624a",
-      "size": 3568
+      "sha256": "0bc173dc7e8ac983ab93d29c2ca50b92a1a36253d82ea0edd33da9ea79627a98",
+      "size": 3637
     },
     {
       "path": "IA_Local/scripts/prueba_regresion_v7.py",
-      "sha256": "55dbd1d38f3f410a9345fd746359d0d0978b14f010bcedf75d4ef4f1c161992b",
-      "size": 1775
+      "sha256": "9b801230121c6576d081609ca2b277eaf68f5e41c759f54b574a0e8bd07f76ad",
+      "size": 1820
     },
     {
       "path": "IA_Local/scripts/reportes_profesionales.py",
-      "sha256": "ac15be8e40fe95fd578bb8e9f0eb019ab7e534ce49e0bccf5165c43cc9139fda",
-      "size": 39451
+      "sha256": "66f6d2ea0dd8efdbc065f23070fee6fcbeae3fbf7bba7c9d0bd0519d5b370a2a",
+      "size": 50136
     },
     {
       "path": "IA_Local/scripts/run_enterprise_tests.py",
-      "sha256": "f2f28214caf325eac0ec9a577d4bf9cc2def446b027a3d3306670e0565918f30",
-      "size": 384
+      "sha256": "4c27ca10c1b1940302df7511f6293bd9e99912e0bda09b92d6c52591434d5223",
+      "size": 394
     },
     {
       "path": "IA_Local/scripts/templates/dashboard_bi.html",
-      "sha256": "02f03d715b2eb5d3b3219166a89ccc2d0e3392c9bf69e98960249d8f4f635f64",
-      "size": 45322
+      "sha256": "e0371c23b3b712f3cca6d9b1f8dcdc08ab2019293db986df5c9f49566a8389af",
+      "size": 45383
     },
     {
       "path": "IA_Local/tests/test_bi_productivo.py",
-      "sha256": "d46ad4f3e3861c46a0ae02dba16541a012afdc89dd6ba5cd7899ee72794626df",
-      "size": 7467
+      "sha256": "ea1d25149e41e57d5ded1ca0f2f278343f2ae54aa475c54fdd8558cd778e8f65",
+      "size": 34417
     },
     {
       "path": "IA_Local/tests/test_enterprise_ai.py",
-      "sha256": "198d5f6ee1ec02ac326a0d3d88491063c1c0b22d5af045cb9cc9dfebfc3978c1",
-      "size": 21537
+      "sha256": "29d1549adf1a77e9544081f8e6ee0909485caf6b2a6529f40b912333ac2ba5f0",
+      "size": 21922
     },
     {
       "path": "IA_Local/workspace/Conocimiento/.keep",
@@ -333,23 +333,28 @@
     },
     {
       "path": "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
-      "sha256": "16d92ed214aaad8be658e95b3b1a8dd86470f5b7fe72065aed5eaeef97586502",
-      "size": 853
+      "sha256": "6b4b445b65af8a6df6d6ba1b84370ebd875849afa215cb9bff246ec1063819bf",
+      "size": 884
     },
     {
       "path": "InstalarLimpio.ps1",
-      "sha256": "bbc247cf881fd3729a08cdcf62cf1475501c71ab17d58f3be40b673e00ddc76b",
-      "size": 3290
+      "sha256": "a1a76166ce9d086fc0ae959adc566717d28200b13d1cb5010f708fa579699657",
+      "size": 3658
+    },
+    {
+      "path": "InstallerR1020C1.ps1",
+      "sha256": "03bbda7475db9783f56548fe1b7a5c31868c5eda83c10f84c6c498e4dc48d4ad",
+      "size": 3034
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",
-      "sha256": "0285ca6cb9b3cc94a8a91217b6b05913284b308ad3ffdedb20ecd0ee8869dc25",
-      "size": 2180
+      "sha256": "871fefb91c134e12ad2b606dae6393852e338a2c3fe909d1e429349f8b998c43",
+      "size": 2241
     },
     {
       "path": "ValidarInstalador.ps1",
-      "sha256": "145e420de03bac9f48cc8ad4b684cf4a56358ab195b99b1c2b7b02316efc0b91",
-      "size": 733
+      "sha256": "6cf3528bc34ab9f5cc7146e94476ef6efb3befa4533068280e48ffda2750e07b",
+      "size": 756
     }
   ]
 }
