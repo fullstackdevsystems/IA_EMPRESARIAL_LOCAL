@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
 from enterprise_deliverable_registry import normalize_deliverable_scope
+from enterprise_tenant_registry import EnterpriseTenantRegistry, assert_tenant_active
 
 
 ENTERPRISE_SQL_GATEWAY_VERSION = "r10.19c"
@@ -92,9 +93,9 @@ def _safe(value: Any, code: str) -> str:
 
 
 class EnterpriseSqlConnectionStore:
-    def __init__(self, root: Path): self.root = Path(root)
+    def __init__(self, root: Path, tenant_registry: Optional[EnterpriseTenantRegistry] = None): self.root = Path(root); self.tenant_registry = tenant_registry
     def _dir(self, scope: Dict[str, Any], create: bool = False) -> Path:
-        s = normalize_deliverable_scope(scope)
+        s = normalize_deliverable_scope(scope); assert_tenant_active(s, self.tenant_registry)
         if create: self.root.mkdir(parents=True, exist_ok=True)
         root = self.root.resolve(); target = root / s["company_id"] / s["user_id"] / (s.get("business_unit") or "_") / (s.get("branch") or "_")
         if create: target.mkdir(parents=True, exist_ok=True)

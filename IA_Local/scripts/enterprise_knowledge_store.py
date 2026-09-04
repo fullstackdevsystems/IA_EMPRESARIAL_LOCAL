@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from enterprise_deliverable_registry import normalize_deliverable_scope
+from enterprise_tenant_registry import EnterpriseTenantRegistry, assert_tenant_active
 
 
 ENTERPRISE_KNOWLEDGE_STORE_VERSION = "r10.19b"
@@ -58,11 +59,13 @@ def _fingerprint(record: Dict[str, Any]) -> str:
 class EnterpriseKnowledgeStore:
     """Registro local, determinista y aislado por scope para conocimiento gobernado."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, tenant_registry: Optional[EnterpriseTenantRegistry] = None):
         self.root = Path(root)
+        self.tenant_registry = tenant_registry
 
     def _scope_dir(self, scope: Dict[str, Any], create: bool = False) -> Path:
         normalized = normalize_deliverable_scope(scope)
+        assert_tenant_active(normalized, self.tenant_registry)
         if create:
             self.root.mkdir(parents=True, exist_ok=True)
         root = self.root.resolve()

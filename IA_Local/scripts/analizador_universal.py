@@ -47,6 +47,7 @@ from enterprise_sql_gateway import (
     EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor,
     SqlServerPyodbcProvider,
 )
+from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -1578,6 +1579,86 @@ except Exception as _enterprise_exc:
     print(f"ADVERTENCIA V8: capa enterprise_ai no pudo inicializarse: {_enterprise_exc}")
 
 app = base.app
+
+# R10.20B.1: the default is explicitly fail-closed until the local host wires
+# a real admin authority in the following phase.
+_tenant_admin_guard = lambda: False
+
+
+def configure_tenant_admin_guard(guard) -> None:
+    global _tenant_admin_guard
+    _tenant_admin_guard = guard if callable(guard) else (lambda: False)
+
+
+def _tenant_registry() -> EnterpriseTenantRegistry:
+    return EnterpriseTenantRegistry(base.REPORTES / ".tenants")
+
+
+def _require_tenant_admin() -> None:
+    if not bool(_tenant_admin_guard()):
+        raise base.HTTPException(status_code=403, detail={"code": "TENANT_ADMIN_REQUIRED", "message": "Autorización administrativa requerida"})
+
+
+def _tenant_http_error(exc: TenantRegistryError):
+    status = 404 if exc.code == "TENANT_NOT_FOUND" else (409 if exc.code == "TENANT_ALREADY_EXISTS" else 400)
+    raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+@app.get("/api/admin/tenants")
+def list_admin_tenants() -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        return {"tenants": _tenant_registry().list()}
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
+
+
+@app.post("/api/admin/tenants")
+def create_admin_tenant(payload: Dict[str, Any]) -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        return _tenant_registry().create(tenant_id=payload.get("tenant_id"), name=payload.get("name"), settings=payload.get("settings"), default_business_unit=payload.get("default_business_unit"), default_branch=payload.get("default_branch"))
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
+
+
+@app.get("/api/admin/tenants/{tenant_id}")
+def get_admin_tenant(tenant_id: str) -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        return _tenant_registry().get(tenant_id)
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
+
+
+@app.patch("/api/admin/tenants/{tenant_id}")
+def update_admin_tenant(tenant_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        allowed = {"name", "settings", "default_business_unit", "default_branch"}
+        if set(payload) - allowed:
+            raise TenantRegistryError("TENANT_INVALID_SETTINGS", "Campos de actualización no permitidos")
+        return _tenant_registry().update(tenant_id, **payload)
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
+
+
+@app.post("/api/admin/tenants/{tenant_id}/disable")
+def disable_admin_tenant(tenant_id: str) -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        return _tenant_registry().disable(tenant_id)
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
+
+
+@app.post("/api/admin/tenants/{tenant_id}/enable")
+def enable_admin_tenant(tenant_id: str) -> Dict[str, Any]:
+    _require_tenant_admin()
+    try:
+        return _tenant_registry().enable(tenant_id)
+    except TenantRegistryError as exc:
+        _tenant_http_error(exc)
 
 
 @app.get("/api/deliverables")

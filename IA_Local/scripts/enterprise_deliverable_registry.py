@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from enterprise_tenant_registry import EnterpriseTenantRegistry, assert_tenant_active
+
 
 ENTERPRISE_DELIVERABLE_REGISTRY_VERSION = "r10.18b"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
@@ -73,9 +75,10 @@ def verify_manifest_fingerprint(manifest: Any) -> str:
 
 
 class GovernedDeliverableRegistry:
-    def __init__(self, artifacts_root: Path, registry_root: Optional[Path] = None):
+    def __init__(self, artifacts_root: Path, registry_root: Optional[Path] = None, tenant_registry: Optional[EnterpriseTenantRegistry] = None):
         self.artifacts_root = Path(artifacts_root)
         self.registry_root = Path(registry_root) if registry_root is not None else self.artifacts_root / ".registry"
+        self.tenant_registry = tenant_registry
 
     def _roots(self) -> tuple[Path, Path]:
         self.artifacts_root.mkdir(parents=True, exist_ok=True)
@@ -89,6 +92,7 @@ class GovernedDeliverableRegistry:
         return artifacts, registry
 
     def _scope_dir(self, scope: Dict[str, Optional[str]], create: bool) -> Path:
+        assert_tenant_active(scope, self.tenant_registry)
         _, registry = self._roots()
         parts = [scope["company_id"], scope["user_id"], scope.get("business_unit") or "_", scope.get("branch") or "_"]
         target = registry.joinpath(*[str(part) for part in parts])
