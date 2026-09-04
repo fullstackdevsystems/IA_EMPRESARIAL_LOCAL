@@ -38,6 +38,7 @@ from enterprise_deliverable_registry import (
     deliverable_registry_public_audit,
 )
 from enterprise_knowledge_qa import answer_unified_enterprise_question
+from enterprise_agent_orchestrator import answer_enterprise_question_orchestrated
 from enterprise_knowledge_store import (
     EnterpriseKnowledgeError,
     EnterpriseKnowledgeStore,
@@ -1694,16 +1695,18 @@ def ask_enterprise_question(
         knowledge_store = EnterpriseKnowledgeStore(
             base.REPORTES / ".knowledge"
         )
-        result = answer_unified_enterprise_question(
+        result = answer_enterprise_question_orchestrated(
             registry=registry,
             knowledge_store=knowledge_store,
             scope=scope,
             run_id=run_id,
             question=question,
+            sql_context=payload.get("sql"),
+            sql_executor=_sql_executor() if payload.get("sql") is not None else None,
         )
 
         return {
-            "api_version": "r10.19b",
+            "api_version": "r10.19d",
             "run_id": run_id,
             "result": result,
         }
