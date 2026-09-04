@@ -296,7 +296,16 @@ def _validate_plan(plan: Optional[Dict[str, Any]], df: pd.DataFrame, fallback: D
         if d not in cols:
             continue
         if c['type'] == 'comparison_bar':
-            measures = [m for m in c.get('measures', []) if m in cols]
+            measures = []
+            for item in c.get('measures', []):
+                if isinstance(item, str):
+                    measure = item
+                elif isinstance(item, dict):
+                    measure = next((item.get(key) for key in ('column', 'measure', 'field', 'id') if isinstance(item.get(key), str)), None)
+                else:
+                    measure = None
+                if measure in cols and measure not in measures:
+                    measures.append(measure)
             if len(measures) < 2:
                 continue
             cc = dict(c); cc['measures'] = measures[:3]
@@ -469,16 +478,8 @@ _HTML = r'''<!doctype html>
 <div class="app">
 <aside class="sidebar">
 <div class="brandbox"><img id="logo" class="logo" alt="IA Empresarial Local"></div>
-<nav class="nav">
-<a class="active" href="#resumen"><span class="ico">▣</span><span>Resumen</span></a>
-<a href="#graficas"><span class="ico">⌁</span><span>Tendencias</span></a>
-<a href="#analitica"><span class="ico">◫</span><span>Análisis</span></a>
-<a href="#componentes"><span class="ico">⇄</span><span>Indicadores</span></a>
-<a href="#analitica"><span class="ico">▪</span><span>Análisis avanzado</span></a>
-<a href="#detalle"><span class="ico">≡</span><span>Detalle</span></a>
-<a href="#pregunta"><span class="ico">?</span><span>Preguntar</span></a>
-<a href="#auditoria"><span class="ico">✓</span><span>Datos y validación</span></a>
-</nav>
+<nav class="nav" id="dynamic-nav" aria-label="Secciones del dashboard"></nav>
+<script>document.addEventListener('DOMContentLoaded',()=>{const n=document.getElementById('dynamic-nav');if(!n)return;const sections=[...document.querySelectorAll('main [id]')].filter(x=>x.id&&x.offsetParent!==null);n.innerHTML=sections.map((x,i)=>`<a class="${i?'':'active'}" href="#${encodeURIComponent(x.id)}" aria-label="Ir a ${x.textContent.trim().slice(0,60)||x.id}"><span class="ico">${i+1}</span><span>${x.querySelector('h1,h2')?.textContent.trim()||x.id}</span></a>`).join('')||'<a class="active" href="#resumen"><span class="ico">1</span><span>Resumen</span></a>';});</script>
 <div class="side-bottom"><div class="ai-badge"><strong>IA EMPRESARIAL LOCAL</strong>Análisis inteligente de datos</div></div>
 </aside>
 <main class="main">
@@ -500,7 +501,7 @@ _HTML = r'''<!doctype html>
 <section class="nl-card view-secondary" id="pregunta"><div class="nl-head"><div><h2>Pregúntale al Dashboard</h2><div class="small">Consulta en lenguaje natural sobre la selección actual. Los cálculos se hacen de forma determinística sobre los datos filtrados.</div></div><span class="nl-badge">R10.2 · Consulta local</span></div><div class="nl-form"><input id="nlQuestion" type="text" placeholder="Ej. ¿Cuál fue el producto con mayor utilidad?"><button class="btn" id="nlAsk">Analizar pregunta</button></div><div class="nl-examples"><button class="nl-example">¿Cuál fue el producto con mayor utilidad?</button><button class="nl-example">¿Qué cliente tuvo mayor venta?</button><button class="nl-example">¿Cuál es la utilidad total?</button><button class="nl-example">Top 5 vendedores por toneladas</button></div><div class="nl-result" id="nlResult"><div class="nl-answer">Escribe una pregunta sobre ventas, utilidad, costos, toneladas, fletes, clientes, productos, vendedores, zonas, categorías, proveedores o almacenes.</div></div></section>
 <section class="component-grid view-secondary" id="componentes"><div id="dynamicComponents" style="display:contents"></div></section>
 <div class="modal" id="drillModal"><div class="modal-box"><div class="modal-head"><h2 id="drillTitle">Detalle</h2><button class="closebtn" id="drillClose">Cerrar</button></div><div id="drillBody"></div></div></div>
-<footer class="footer"><span><strong>PRIMOS & COUSINS</strong> · Innovando Juntos</span><span>Dashboard generado automáticamente por IA Empresarial Local</span></footer>
+<footer class="footer"><span><strong>IA Empresarial Local</strong> · Análisis gobernado</span><span>Dashboard generado automáticamente desde datos autorizados</span></footer>
 </main></div>
 <script>
 const DATA=__PAYLOAD__;
