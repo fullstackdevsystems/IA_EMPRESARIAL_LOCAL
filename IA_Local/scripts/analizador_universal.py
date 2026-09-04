@@ -46,7 +46,8 @@ from enterprise_knowledge_store import (
 )
 from enterprise_sql_gateway import (
     EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor,
-    SqlServerPyodbcProvider,
+    EnterpriseSecretStore, SqlServerPyodbcProvider, discover_schema,
+    public_sql_profile, test_connection,
 )
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
@@ -1781,6 +1782,180 @@ def _sql_http_error(exc: EnterpriseSqlError):
 
 def _sql_executor():
     return EnterpriseSqlExecutor(EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections"), SqlServerPyodbcProvider())
+
+
+# R10.20B.3.3: SQL administration is deliberately wired through the B.2
+# identity boundary and the B.3.1/B.3.2 gateway.  The configuration hook is
+# only an injectable local seam for deterministic tests; production has no
+# implicit plaintext secret provider.
+_sql_admin_overrides: Dict[str, Any] = {}
+_sql_admin_events: List[Dict[str, Any]] = []
+
+
+def configure_sql_admin_services(*, store=None, provider=None, secret_store=None, audit_events=None) -> None:
+    global _sql_admin_overrides, _sql_admin_events
+    _sql_admin_overrides = {"store": store, "provider": provider, "secret_store": secret_store}
+    _sql_admin_events = audit_events if audit_events is not None else []
+
+
+def _sql_admin_services():
+    store = _sql_admin_overrides.get("store") or EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections", _tenant_registry())
+    secrets = _sql_admin_overrides.get("secret_store") or EnterpriseSecretStore()
+    provider = _sql_admin_overrides.get("provider") or SqlServerPyodbcProvider(secrets)
+    return store, provider, secrets
+
+
+def _sql_admin_audit(event: str, actor: Dict[str, Any], connection_id: str, tenant_id: str) -> None:
+    _sql_admin_events.append({"event": event, "actor_user_id": actor["user_id"], "tenant_id": tenant_id, "connection_id": connection_id, "at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
+
+
+def _sql_admin_scope(actor: Dict[str, Any], tenant_id: Optional[str]) -> Dict[str, Any]:
+    requested = str(tenant_id or "").strip().lower() or None
+    system = "SYSTEM_ADMIN" in actor["roles"]
+    if system:
+        if not requested:
+            raise base.HTTPException(status_code=400, detail={"code": "TENANT_REQUIRED", "message": "tenant_id es obligatorio para SYSTEM_ADMIN"})
+        try: _tenant_registry().assert_active(requested)
+        except TenantRegistryError as exc: _tenant_http_error(exc)
+        company_id = requested
+    else:
+        if requested and requested != actor["tenant_id"]:
+            raise base.HTTPException(status_code=403, detail={"code": "TENANT_SCOPE_DENIED", "message": "Tenant no permitido"})
+        company_id = actor["tenant_id"]
+    return {"company_id": company_id, "user_id": "sql-admin", "business_unit": None, "branch": None}
+
+
+def _sql_admin_actor(authorization: str, permission: str) -> Dict[str, Any]:
+    actor = _bearer(authorization)
+    if not _identity_store().has_permission(actor, permission):
+        raise base.HTTPException(status_code=403, detail={"code": "SQL_PERMISSION_DENIED", "message": "Permiso SQL denegado"})
+    return actor
+
+
+def _sql_admin_http_error(exc: EnterpriseSqlError):
+    if exc.code == "SQL_CONNECTION_NOT_FOUND": status = 404
+    elif exc.code in {"SQL_SECRET_UNAVAILABLE", "SQL_DRIVER_NOT_AVAILABLE"}: status = 503
+    elif exc.code in {"SQL_SCOPE_DENIED"}: status = 403
+    elif exc.code == "SQL_CONNECTION_ALREADY_EXISTS": status = 409
+    else: status = 400
+    raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+def _sql_profile_or_error(store, scope, connection_id):
+    try: return store.get(scope, connection_id)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+
+
+@app.get("/api/admin/sql/connections")
+def admin_sql_connections(tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:read"); scope = _sql_admin_scope(actor, tenant_id); store, _, _ = _sql_admin_services()
+    try: return {"items": [public_sql_profile(item) for item in store.list(scope)]}
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+
+
+@app.post("/api/admin/sql/connections")
+def admin_sql_create_connection(payload: Dict[str, Any], tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:configure"); scope = _sql_admin_scope(actor, tenant_id); store, _, secrets = _sql_admin_services()
+    allowed = {"connection_id", "server", "database", "auth_mode", "allowed_schemas", "allowed_tables", "display_name", "driver", "timeout_seconds", "max_rows", "trust_server_certificate", "username", "secret", "password"}
+    if not isinstance(payload, dict) or set(payload) - allowed:
+        raise base.HTTPException(status_code=400, detail={"code": "SQL_CONNECTION_PROFILE_INVALID", "message": "Campos SQL no permitidos"})
+    mode = str(payload.get("auth_mode") or "").upper()
+    secret_reference = ""
+    secret = payload.get("secret", payload.get("password"))
+    if mode == "SQL_AUTH":
+        if not isinstance(secret, str) or not secret:
+            raise base.HTTPException(status_code=400, detail={"code": "SQL_SECRET_UNAVAILABLE", "message": "Secret SQL requerido"})
+        secret_reference = "sql:" + uuid.uuid4().hex
+        try: secrets.set(secret_reference, secret)
+        except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    try:
+        record = store.register(scope=scope, connection_id=payload.get("connection_id"), server=payload.get("server"), database=payload.get("database"), auth_mode=mode, allowed_schemas=payload.get("allowed_schemas"), allowed_tables=payload.get("allowed_tables"), display_name=payload.get("display_name", ""), driver=payload.get("driver", "ODBC Driver 18 for SQL Server"), timeout_seconds=payload.get("timeout_seconds", 30), max_rows=payload.get("max_rows", 500), trust_server_certificate=bool(payload.get("trust_server_certificate", False)), secret_reference=secret_reference, username=payload.get("username", ""))
+    except EnterpriseSqlError as exc:
+        if secret_reference:
+            try: secrets.delete(secret_reference)
+            except EnterpriseSqlError: pass
+        _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_CONNECTION_CREATED", actor, record["connection_id"], scope["company_id"])
+    return {"profile": public_sql_profile(record)}
+
+
+@app.get("/api/admin/sql/connections/{connection_id}")
+def admin_sql_get_connection(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:read"); scope = _sql_admin_scope(actor, tenant_id); store, _, _ = _sql_admin_services()
+    return {"profile": public_sql_profile(_sql_profile_or_error(store, scope, connection_id))}
+
+
+@app.patch("/api/admin/sql/connections/{connection_id}")
+def admin_sql_update_connection(connection_id: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:configure"); scope = _sql_admin_scope(actor, tenant_id); store, _, _ = _sql_admin_services()
+    allowed = {"display_name", "server", "database", "driver", "timeout_seconds", "max_rows", "trust_server_certificate", "username"}
+    if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+        raise base.HTTPException(status_code=400, detail={"code": "SQL_CONNECTION_PROFILE_INVALID", "message": "Campos SQL no permitidos"})
+    try: record = store.update(scope, connection_id, **payload)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_CONNECTION_UPDATED", actor, connection_id, scope["company_id"])
+    return {"profile": public_sql_profile(record)}
+
+
+@app.patch("/api/admin/sql/connections/{connection_id}/allowlist")
+def admin_sql_allowlist(connection_id: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:configure"); scope = _sql_admin_scope(actor, tenant_id); store, _, _ = _sql_admin_services()
+    if not isinstance(payload, dict) or set(payload) != {"schemas", "objects"}:
+        raise base.HTTPException(status_code=400, detail={"code": "SQL_CONNECTION_PROFILE_INVALID", "message": "Allowlist inválida"})
+    try: record = store.update(scope, connection_id, allowed_schemas=payload["schemas"], allowed_tables=payload["objects"])
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_ALLOWLIST_CHANGED", actor, connection_id, scope["company_id"])
+    return {"profile": public_sql_profile(record)}
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/secret")
+def admin_sql_rotate_secret(connection_id: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:configure"); scope = _sql_admin_scope(actor, tenant_id); store, _, secrets = _sql_admin_services(); profile = _sql_profile_or_error(store, scope, connection_id)
+    if profile.get("auth_mode") != "SQL_AUTH":
+        raise base.HTTPException(status_code=400, detail={"code": "SQL_CONNECTION_PROFILE_INVALID", "message": "Secret no aplica a Windows Integrated"})
+    secret = payload.get("secret", payload.get("password")) if isinstance(payload, dict) else None
+    if not isinstance(secret, str) or not secret:
+        raise base.HTTPException(status_code=400, detail={"code": "SQL_SECRET_UNAVAILABLE", "message": "Secret SQL requerido"})
+    try: secrets.set(profile["secret_reference"], secret)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_SECRET_ROTATED", actor, connection_id, scope["company_id"])
+    return {"connection_id": connection_id, "secret_rotated": True}
+
+
+def _admin_sql_state_change(connection_id: str, enabled: bool, tenant_id: Optional[str], authorization: str) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:configure"); scope = _sql_admin_scope(actor, tenant_id); store, _, _ = _sql_admin_services()
+    try: record = store.enable(scope, connection_id) if enabled else store.disable(scope, connection_id)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_CONNECTION_ENABLED" if enabled else "SQL_CONNECTION_DISABLED", actor, connection_id, scope["company_id"])
+    return {"profile": public_sql_profile(record)}
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/disable")
+def admin_sql_disable(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    return _admin_sql_state_change(connection_id, False, tenant_id, authorization)
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/enable")
+def admin_sql_enable(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    return _admin_sql_state_change(connection_id, True, tenant_id, authorization)
+
+
+def _admin_sql_run(connection_id: str, discovery: bool, tenant_id: Optional[str], authorization: str) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:read"); scope = _sql_admin_scope(actor, tenant_id); store, provider, _ = _sql_admin_services()
+    try: result = discover_schema(store, provider, scope, connection_id) if discovery else test_connection(store, provider, scope, connection_id)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    _sql_admin_audit("SQL_DISCOVERY_RUN" if discovery else "SQL_CONNECTION_TESTED", actor, connection_id, scope["company_id"])
+    return result
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/test")
+def admin_sql_test(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    return _admin_sql_run(connection_id, False, tenant_id, authorization)
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/discover")
+def admin_sql_discover(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    return _admin_sql_run(connection_id, True, tenant_id, authorization)
 
 
 @app.get("/api/sql/connections")

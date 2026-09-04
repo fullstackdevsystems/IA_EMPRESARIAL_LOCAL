@@ -38,7 +38,9 @@ class EnterpriseSecretStore:
         self.provider.delete(reference)
 
 def public_sql_profile(record: Dict[str,Any]) -> Dict[str,Any]:
-    return {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","enabled","display_name","secret_reference","created_at","updated_at")}
+    public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count")}
+    public["secret_configured"] = bool(record.get("secret_reference"))
+    return public
 
 
 class SqlServerProvider(Protocol):
@@ -210,6 +212,14 @@ class EnterpriseSqlConnectionStore:
         if set(changes)-allowed: raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Campo administrativo no permitido")
         if "timeout_seconds" in changes and (isinstance(changes["timeout_seconds"],bool) or not 1<=int(changes["timeout_seconds"])<=120): raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Timeout inválido")
         if "max_rows" in changes and (isinstance(changes["max_rows"],bool) or not 1<=int(changes["max_rows"])<=5000): raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","max_rows inválido")
+        schemas = changes.get("allowed_schemas", record.get("allowed_schemas") or [])
+        tables = changes.get("allowed_tables", record.get("allowed_tables") or [])
+        if "allowed_schemas" in changes or "allowed_tables" in changes:
+            if not isinstance(schemas, list) or not isinstance(tables, list): raise EnterpriseSqlError("SQL_ALLOWLIST_REQUIRED", "Allowlist de schemas/tables inválida")
+            valid_schemas = [str(x).strip() for x in schemas if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(x).strip())]
+            valid_tables = [str(x).strip() for x in tables if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*", str(x).strip())]
+            if len(valid_schemas) != len(schemas) or len(valid_tables) != len(tables) or not valid_schemas or not valid_tables or any(item.split(".")[0] not in valid_schemas for item in valid_tables): raise EnterpriseSqlError("SQL_ALLOWLIST_REQUIRED", "Allowlist de schemas/tables inválida")
+            changes["allowed_schemas"], changes["allowed_tables"] = valid_schemas, valid_tables
         for key,value in changes.items(): record[key]=value
         record["updated_at"]=datetime.now(timezone.utc).isoformat(); record["fingerprint_sha256"]=_fingerprint(record); self._write(scope,connection_id,record); return dict(record)
     def disable(self,scope:Dict[str,Any],connection_id:str)->Dict[str,Any]:
