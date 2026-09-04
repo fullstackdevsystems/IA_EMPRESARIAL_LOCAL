@@ -6,6 +6,23 @@ _STATUS={"SUPPORTED":("Supported","success","✓"),"DERIVABLE":("Derivable","war
 def get_design_tokens(theme="professional-light"):
     colors=dict(_DARK if theme=="professional-dark" else _LIGHT)
     return {"version":DESIGN_SYSTEM_VERSION,"theme":theme,"colors":colors,"typography":{"title":"clamp(26px,3vw,40px)","section":"18px","metric":"32px","body":"14px","caption":"11px"},"layout":{"max_width":"1600px","spacing":"16px","grid_gap":"16px","card_padding":"18px","radius":"16px","shadow":"0 10px 28px rgba(16,35,58,.10)"},"table":{"header":colors["surface_alt"],"row":colors["surface"],"border":colors["border"],"zebra":colors["background"]},"print":{"page":"#fff","background":"#fff","text":"#111827","spacing":"10px"}}
+def get_excel_design_tokens(theme="professional-light"):
+    """Presentation values shared by local Excel deliverables.
+
+    These are values rather than workbook-bound formats so every generator can
+    create its native format objects without maintaining a second palette.
+    """
+    colors=get_design_tokens(theme)["colors"]
+    return {"version":DESIGN_SYSTEM_VERSION,"theme":theme,"colors":colors,
+            "title":{"font_size":22,"background":colors["primary"],"font_color":"#FFFFFF"},
+            "subtitle":{"font_size":9,"font_color":colors["text_secondary"]},
+            "section":{"font_size":13,"font_color":colors["primary"],"border_color":colors["accent"]},
+            "header":{"background":colors["primary"],"font_color":"#FFFFFF"},
+            "body":{"font_color":colors["text_primary"],"border_color":colors["border"]},
+            "metadata":{"background":colors["surface_alt"],"font_color":colors["text_secondary"]},
+            "status":{"SUPPORTED":colors["success"],"DERIVABLE":colors["warning"],"BLOCKED":colors["danger"],"UNRESOLVED":colors["neutral"],"CONFLICT":colors["danger"]},
+            "formats":{"integer":"#,##0;[Red]-#,##0","decimal":"#,##0.00;[Red]-#,##0.00","percentage":"0.00%","date":"yyyy-mm-dd","datetime":"yyyy-mm-dd hh:mm","text":"@"},
+            "width":{"minimum":10,"maximum":45}}
 def status_presentation(status):
     label,tone,symbol=_STATUS.get(str(status or "").upper(),_STATUS["UNRESOLVED"])
     return {"status":str(status or "UNRESOLVED").upper(),"label":label,"class_name":"status-"+tone,"symbol":symbol}

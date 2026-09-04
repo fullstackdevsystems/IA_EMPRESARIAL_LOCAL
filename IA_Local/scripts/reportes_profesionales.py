@@ -3,6 +3,7 @@ from __future__ import annotations
 """Reportes ejecutivos profesionales para IA Local Empresarial V7."""
 
 from io import BytesIO
+from datetime import datetime, timezone
 import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -19,6 +20,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from enterprise_deliverable_manifest import deliverable_manifest_component_rows, deliverable_manifest_summary_rows
+from enterprise_design_system import get_excel_design_tokens, status_presentation
 
 NAVY="#0B1F33"; BLUE="#0F62FE"; TEAL="#007D79"; GREEN="#198038"; ORANGE="#FF832B"; RED="#DA1E28"; PURPLE="#6929C4"
 LIGHT="#F4F7FB"; PALE_BLUE="#EDF5FF"; PALE_GREEN="#DEFBE6"; PALE_ORANGE="#FFF2E8"; PALE_RED="#FFF1F1"; MID="#697077"; BORDER="#DDE1E6"; WHITE="#FFFFFF"
@@ -326,38 +328,84 @@ def _column_kind(name: str, series: pd.Series) -> str:
     return "text"
 
 
-def _write_table_sheet(writer, sheet_name: str, df: pd.DataFrame, title: str, tab: str) -> Dict[str,Any]:
+def _write_table_sheet(writer, sheet_name: str, df: pd.DataFrame, title: str, tab: str, tokens: Optional[Dict[str,Any]]=None) -> Dict[str,Any]:
     wb=writer.book; ws=wb.add_worksheet(sheet_name); writer.sheets[sheet_name]=ws; ws.hide_gridlines(2); ws.set_zoom(90); ws.set_tab_color(tab); ws.set_row(0,28)
-    ws.write(0,0,title,wb.add_format({"bold":True,"font_size":16,"font_color":NAVY})); ws.write(1,0,"Datos calculados automáticamente a partir del archivo fuente. Use filtros para explorar el detalle.",wb.add_format({"font_size":9,"font_color":MID}))
+    tokens=tokens or get_excel_design_tokens(); colors=tokens["colors"]; fmt=tokens["formats"]; width=tokens["width"]
+    ws.write(0,0,title,wb.add_format({"bold":True,"font_size":16,"font_color":colors["primary"]})); ws.write(1,0,"Datos calculados automáticamente a partir del archivo fuente. Use filtros para explorar el detalle.",wb.add_format({"font_size":9,"font_color":colors["text_secondary"]}))
     show=_display_df(df); sr=3; show.to_excel(writer,sheet_name=sheet_name,startrow=sr,index=False)
     if len(show.columns)==0: return {"sheet":sheet_name,"startrow":sr,"rows":0,"cols":0,"df":show}
-    hf=wb.add_format({"bold":True,"font_color":WHITE,"bg_color":NAVY,"align":"left","valign":"vcenter"}); tf=wb.add_format({"valign":"top"}); nf=wb.add_format({"num_format":"#,##0.00;[Red]-#,##0.00"}); inf=wb.add_format({"num_format":"#,##0;[Red]-#,##0"}); pf=wb.add_format({"num_format":"0.00\"%\";[Red]-0.00\"%\""}); dfmt=wb.add_format({"num_format":"yyyy-mm-dd"})
+    hf=wb.add_format({"bold":True,"font_color":tokens["header"]["font_color"],"bg_color":tokens["header"]["background"],"align":"left","valign":"vcenter"}); tf=wb.add_format({"valign":"top","text_wrap":True,"font_color":colors["text_primary"]}); nf=wb.add_format({"num_format":fmt["decimal"]}); inf=wb.add_format({"num_format":fmt["integer"]}); pf=wb.add_format({"num_format":fmt["percentage"]}); dfmt=wb.add_format({"num_format":fmt["date"]})
     for j,c in enumerate(show.columns):
         ws.write(sr,j,str(c),hf); kind=_column_kind(str(c),show[c])
-        if kind=="id": width,fmt=min(22,max(12,len(str(c))+2)),tf
-        elif kind=="percent": width,fmt=14,pf
-        elif kind=="amount": width,fmt=18,nf
-        elif kind=="integer": width,fmt=16,inf
-        elif kind=="date": width,fmt=14,dfmt
-        elif kind=="number": width,fmt=16,nf
+        if kind=="id": col_width,cell_fmt=min(22,max(width["minimum"],len(str(c))+2)),tf
+        elif kind=="percent": col_width,cell_fmt=14,pf
+        elif kind=="amount": col_width,cell_fmt=18,nf
+        elif kind=="integer": col_width,cell_fmt=16,inf
+        elif kind=="date": col_width,cell_fmt=14,dfmt
+        elif kind=="number": col_width,cell_fmt=16,nf
         else:
-            sample=max([len(str(c))]+[len(str(x)) for x in show[c].dropna().astype(str).head(100)]); width,fmt=min(38,max(14,sample+2)),tf
-        ws.set_column(j,j,width,fmt)
+            sample=max([len(str(c))]+[len(str(x)) for x in show[c].dropna().astype(str).head(100)]); col_width,cell_fmt=min(width["maximum"],max(width["minimum"],sample+2)),tf
+        ws.set_column(j,j,col_width,cell_fmt)
     er=sr+len(show)
     if len(show):
         name=re.sub(r"[^A-Za-z0-9]","",sheet_name)[:20]+"Tbl"; ws.add_table(sr,0,er,len(show.columns)-1,{"name":name,"style":"Table Style Medium 2","columns":[{"header":str(c)} for c in show.columns]}); ws.freeze_panes(sr+1,0)
-        green=wb.add_format({"font_color":GREEN,"bg_color":PALE_GREEN}); red=wb.add_format({"font_color":RED,"bg_color":PALE_RED})
+        green=wb.add_format({"font_color":colors["success"],"bg_color":"#DEFBE6"}); red=wb.add_format({"font_color":colors["danger"],"bg_color":"#FFF1F1"})
         for j,c in enumerate(show.columns):
             n=_norm(c)
             if any(k in n for k in ("variacion","variación","margen","participacion","participación","%")):
                 ws.conditional_format(sr+1,j,er,j,{"type":"cell","criteria":">","value":0,"format":green}); ws.conditional_format(sr+1,j,er,j,{"type":"cell","criteria":"<","value":0,"format":red})
             elif _column_kind(str(c),show[c])=="amount" and len(show)<=100: ws.conditional_format(sr+1,j,er,j,{"type":"data_bar","bar_color":BLUE,"bar_solid":True})
+    ws.set_landscape(); ws.fit_to_pages(1, 0); ws.repeat_rows(sr, sr)
     return {"sheet":sheet_name,"startrow":sr,"rows":len(show),"cols":len(show.columns),"df":show}
+
+
+def _governed_summary_rows(manifest: Dict[str,Any], plan: Dict[str,Any]) -> List[Dict[str,Any]]:
+    """Render only values already authorized by the dashboard plan/manifest."""
+    components=list(manifest.get("components") or []) if isinstance(manifest,dict) else []
+    if not components and isinstance(plan,dict):
+        spec=plan.get("dashboard_spec") if isinstance(plan.get("dashboard_spec"),dict) else {}
+        components=list(spec.get("components") or [])
+    rows=[]
+    for component in components:
+        if not isinstance(component,dict):
+            continue
+        status=str(component.get("status") or "UNRESOLVED").upper()
+        presentation=status_presentation(status)
+        value=component.get("value")
+        if status in {"BLOCKED","UNRESOLVED","CONFLICT"}:
+            value=None
+        provenance=component.get("provenance") if isinstance(component.get("provenance"),dict) else {}
+        rows.append({
+            "Component ID":component.get("component_id") or component.get("id") or "",
+            "Name":component.get("title") or component.get("name") or "",
+            "Status":presentation["status"],
+            "Value":value,
+            "Unit":component.get("unit") or "",
+            "Format":component.get("format") or "",
+            "Reason":component.get("reason") or "",
+            "Provenance":component.get("provenance_source") or provenance.get("source") or "",
+        })
+    return rows
+
+
+def _safe_metadata_rows(profile: Dict[str,Any], manifest: Dict[str,Any]) -> List[Dict[str,Any]]:
+    source=manifest.get("source") if isinstance(manifest,dict) and isinstance(manifest.get("source"),dict) else {}
+    return [
+        {"Field":"source","Value":source.get("filename") or profile.get("archivo") or ""},
+        {"Field":"source_sheet","Value":source.get("sheet") or profile.get("hoja_analizada") or ""},
+        {"Field":"row_count","Value":source.get("row_count") or profile.get("filas") or 0},
+        {"Field":"run_id","Value":profile.get("run_id") or ""},
+        {"Field":"generated_at","Value":datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)},
+        {"Field":"design_system_version","Value":get_excel_design_tokens()["version"]},
+        {"Field":"integrity_status","Value":manifest.get("status") if isinstance(manifest,dict) else ""},
+        {"Field":"provenance","Value":source.get("source_fingerprint_sha256") or ""},
+    ]
 
 
 def excel_report_professional(path,prompt: str,profile: Dict[str,Any],plan: Dict[str,Any],sections: Dict[str,pd.DataFrame],notes: List[str],narrative: str,source_preview: pd.DataFrame,work: pd.DataFrame,roles: Dict[str,Optional[str]],domain: str)->None:
     insights=executive_insights(profile,sections,notes,domain)
     manifest=profile.get("deliverable_manifest") if isinstance(profile.get("deliverable_manifest"),dict) else {}
+    tokens=get_excel_design_tokens()
     with pd.ExcelWriter(path,engine="xlsxwriter") as writer:
         wb=writer.book; wb.set_properties({"title":domain_title(domain),"subject":"Reporte ejecutivo generado por IA Empresarial Local","author":"IA Empresarial Local"})
         ws=wb.add_worksheet("Dashboard"); writer.sheets["Dashboard"]=ws; ws.hide_gridlines(2); ws.set_zoom(90); ws.set_tab_color(BLUE); ws.set_column("A:L",13); ws.set_row(0,30); ws.set_row(1,30)
@@ -369,15 +417,37 @@ def excel_report_professional(path,prompt: str,profile: Dict[str,Any],plan: Dict
         for col,card in zip((0,3,6,9),cards): ws.merge_range(8,col,8,col+2,card[2],wb.add_format({"font_size":8,"font_color":MID,"align":"center"}))
         ws.merge_range("A10:F10","Hallazgos clave",secf); r=10
         for ins in insights[:7]: ws.merge_range(r,0,r,5,"• "+ins,bullet); ws.set_row(r,30); r+=1
+        summary_rows=_governed_summary_rows(manifest,plan)
+        if summary_rows:
+            summary=pd.DataFrame(summary_rows)
+        else:
+            summary=pd.DataFrame([{"Context":"No governed components were supplied.","Source":profile.get("archivo") or "","Rows":profile.get("filas") or 0}])
+        _write_table_sheet(writer,"Resumen",summary,"Resumen gobernado",tokens["colors"]["accent"],tokens)
+        summary_ws=writer.sheets["Resumen"]
+        for row_index, row in enumerate(summary_rows, start=4):
+            status=str(row.get("Status") or "UNRESOLVED").upper()
+            if status in tokens["status"]:
+                summary_ws.write(row_index,2,status,wb.add_format({"bold":True,"font_color":tokens["status"][status]}))
+            value=row.get("Value")
+            format_name=str(row.get("Format") or "").lower()
+            number_format={"integer":tokens["formats"]["integer"],"decimal":tokens["formats"]["decimal"],"currency":tokens["formats"]["decimal"],"percentage":tokens["formats"]["percentage"],"date":tokens["formats"]["date"],"datetime":tokens["formats"]["datetime"]}.get(format_name)
+            if value is not None and number_format:
+                summary_ws.write(row_index,3,value,wb.add_format({"num_format":number_format}))
+        detail=source_preview if isinstance(source_preview,pd.DataFrame) and not source_preview.empty else work
+        if isinstance(detail,pd.DataFrame) and not detail.empty:
+            _write_table_sheet(writer,"Detalle",detail.head(1000),"Detalle de datos autorizado",tokens["colors"]["accent"],tokens)
+        _write_table_sheet(writer,"Metadata",pd.DataFrame(_safe_metadata_rows(profile,manifest)),"Metadata y provenance",tokens["colors"]["neutral"],tokens)
         meta={}; tabs=[BLUE,TEAL,GREEN,ORANGE,PURPLE,"#8A3FFC"]
-        for i,(key,sn) in enumerate(_sheet_mapping(sections,domain)): meta[key]=_write_table_sheet(writer,sn,sections[key],key.replace("_"," "),tabs[i%len(tabs)])
-        roles_df=pd.DataFrame([{"Rol semántico":k,"Columna detectada":v or ""} for k,v in profile.get("roles_detectados",{}).items()]); _write_table_sheet(writer,"Diccionario_Datos",roles_df,"Diccionario y mapeo semántico",MID)
-        trace=pd.DataFrame([{"Campo":"Solicitud","Valor":prompt},{"Campo":"Plan","Valor":str(plan)},{"Campo":"Cálculos derivados","Valor":str(profile.get("calculos_derivados",{}))},{"Campo":"Motor Excel","Valor":str(profile.get("motor_excel",""))}]); _write_table_sheet(writer,"Trazabilidad",trace,"Trazabilidad técnica",MID); _write_table_sheet(writer,"Muestra_Datos",source_preview.head(1000),"Muestra del archivo fuente (máx. 1,000 filas)",MID); writer.sheets["Trazabilidad"].hide(); writer.sheets["Muestra_Datos"].hide(); writer.sheets["Diccionario_Datos"].hide()
+        for i,(key,sn) in enumerate(_sheet_mapping(sections,domain)):
+            if sn not in writer.sheets:
+                meta[key]=_write_table_sheet(writer,sn,sections[key],key.replace("_"," "),tabs[i%len(tabs)],tokens)
+        roles_df=pd.DataFrame([{"Rol semántico":k,"Columna detectada":v or ""} for k,v in profile.get("roles_detectados",{}).items()]); _write_table_sheet(writer,"Diccionario_Datos",roles_df,"Diccionario y mapeo semántico",MID,tokens)
+        trace=pd.DataFrame([{"Campo":"Solicitud","Valor":prompt},{"Campo":"Plan","Valor":str(plan)},{"Campo":"Cálculos derivados","Valor":str(profile.get("calculos_derivados",{}))},{"Campo":"Motor Excel","Valor":str(profile.get("motor_excel",""))}]); _write_table_sheet(writer,"Trazabilidad",trace,"Trazabilidad técnica",MID,tokens); _write_table_sheet(writer,"Muestra_Datos",source_preview.head(1000),"Muestra del archivo fuente (máx. 1,000 filas)",MID,tokens); writer.sheets["Trazabilidad"].hide(); writer.sheets["Muestra_Datos"].hide(); writer.sheets["Diccionario_Datos"].hide()
         if manifest:
-            _write_table_sheet(writer,"Gobernanza",pd.DataFrame(deliverable_manifest_summary_rows(manifest)),"Manifiesto gobernado del entregable",TEAL)
+            _write_table_sheet(writer,"Gobernanza",pd.DataFrame(deliverable_manifest_summary_rows(manifest)),"Manifiesto gobernado del entregable",TEAL,tokens)
             writer.sheets["Gobernanza"].set_column("A:A",28)
             writer.sheets["Gobernanza"].set_column("B:B",72)
-            _write_table_sheet(writer,"Capacidades",pd.DataFrame(deliverable_manifest_component_rows(manifest)),"Capacidades autorizadas y bloqueadas",ORANGE)
+            _write_table_sheet(writer,"Capacidades",pd.DataFrame(deliverable_manifest_component_rows(manifest)),"Capacidades autorizadas y bloqueadas",ORANGE,tokens)
         if domain=="comercial" and "Tendencia_Mensual" in meta:
             m=meta["Tendencia_Mensual"]; d=m["df"]
             if not d.empty and "Mes" in d.columns and "Ventas" in d.columns:
