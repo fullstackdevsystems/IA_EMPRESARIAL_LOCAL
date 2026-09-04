@@ -51,6 +51,7 @@ from enterprise_sql_gateway import (
 )
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
+from enterprise_platform_config import EnterprisePlatformConfigStore, PlatformConfigError
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -1599,6 +1600,9 @@ def _tenant_registry() -> EnterpriseTenantRegistry:
 def _identity_store() -> EnterpriseIdentityStore:
     return EnterpriseIdentityStore(base.REPORTES / ".identity", _tenant_registry())
 
+def _platform_config() -> EnterprisePlatformConfigStore:
+    return EnterprisePlatformConfigStore(base.REPORTES / ".platform_config", _tenant_registry())
+
 def _auth_error(exc: IdentityError):
     status=401 if exc.code.startswith("AUTH_") or exc.code=="USER_DISABLED" else (404 if exc.code=="USER_NOT_FOUND" else (409 if exc.code=="USER_ALREADY_EXISTS" else 403))
     raise base.HTTPException(status_code=status,detail={"code":exc.code,"message":str(exc)}) from exc
@@ -1687,6 +1691,53 @@ def _require_tenant_admin(authorization: str = "", tenant_id: Optional[str] = No
 def _tenant_http_error(exc: TenantRegistryError):
     status = 404 if exc.code == "TENANT_NOT_FOUND" else (409 if exc.code == "TENANT_ALREADY_EXISTS" else 400)
     raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+
+def _config_http_error(exc: PlatformConfigError):
+    status=503 if exc.code=="AI_PROVIDER_UNAVAILABLE" else (403 if exc.code in {"CONFIG_PERMISSION_DENIED","CONFIG_TENANT_SCOPE_DENIED"} else 400)
+    raise base.HTTPException(status_code=status,detail={"code":exc.code,"message":str(exc)}) from exc
+
+def _config_actor(authorization: str, permission: str):
+    actor=_bearer(authorization)
+    if not _identity_store().has_permission(actor,permission):raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso de configuración denegado"})
+    return actor
+
+@app.get("/api/admin/config")
+def get_platform_config(authorization: str=Header("")):
+    actor=_config_actor(authorization,"config:read")
+    if "SYSTEM_ADMIN" not in actor["roles"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso global denegado"})
+    return _platform_config().global_config()
+
+@app.patch("/api/admin/config")
+def update_platform_config(payload: Dict[str,Any],authorization: str=Header("")):
+    actor=_config_actor(authorization,"config:read")
+    if "SYSTEM_ADMIN" not in actor["roles"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso global denegado"})
+    try:return _platform_config().update_global(payload)
+    except PlatformConfigError as exc:_config_http_error(exc)
+
+@app.get("/api/admin/tenants/{tenant_id}/config")
+def get_tenant_config(tenant_id:str,authorization: str=Header("")):
+    actor=_config_actor(authorization,"config:read")
+    if "SYSTEM_ADMIN" not in actor["roles"] and tenant_id!=actor["tenant_id"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_TENANT_SCOPE_DENIED","message":"Tenant no permitido"})
+    return {"tenant":_platform_config().tenant_config(tenant_id),"effective":_platform_config().public_effective_config(tenant_id)}
+
+@app.patch("/api/admin/tenants/{tenant_id}/config")
+def update_tenant_config(tenant_id:str,payload:Dict[str,Any],authorization: str=Header("")):
+    actor=_config_actor(authorization,"config:write")
+    if "SYSTEM_ADMIN" not in actor["roles"] and tenant_id!=actor["tenant_id"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_TENANT_SCOPE_DENIED","message":"Tenant no permitido"})
+    try:return _platform_config().update_tenant(tenant_id,payload)
+    except (PlatformConfigError,TenantRegistryError) as exc:_config_http_error(exc) if isinstance(exc,PlatformConfigError) else _tenant_http_error(exc)
+
+@app.get("/api/admin/ai/providers")
+def get_ai_provider(tenant_id:Optional[str]=None,authorization: str=Header("")):
+    actor=_config_actor(authorization,"config:read"); target=tenant_id or actor["tenant_id"]
+    if "SYSTEM_ADMIN" not in actor["roles"] and target!=actor["tenant_id"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_TENANT_SCOPE_DENIED","message":"Tenant no permitido"})
+    return {"provider":_platform_config().resolve_effective_config(target).get("ai_provider")}
+
+@app.post("/api/admin/ai/provider/test")
+def test_ai_provider(payload:Dict[str,Any],authorization: str=Header("")):
+    _config_actor(authorization,"config:read")
+    try:return _platform_config().test_provider(payload.get("provider") or {})
+    except PlatformConfigError as exc:_config_http_error(exc)
 
 
 @app.get("/api/admin/tenants")

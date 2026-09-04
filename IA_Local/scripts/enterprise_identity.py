@@ -7,7 +7,7 @@ from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryE
 
 IDENTITY_VERSION="r10.20b.2"
 ROLES={"SYSTEM_ADMIN","TENANT_ADMIN","ANALYST","VIEWER"}
-PERMISSIONS={"SYSTEM_ADMIN":{"*"},"TENANT_ADMIN":{"tenant:list","tenant:update","user:list","user:create","user:update","user:disable","user:role_assign","analysis:run","knowledge:read","knowledge:write","sql:read","sql:configure","deliverable:read","admin:audit"},"ANALYST":{"analysis:run","knowledge:read","knowledge:write","sql:read","deliverable:read"},"VIEWER":{"knowledge:read","deliverable:read"}}
+PERMISSIONS={"SYSTEM_ADMIN":{"*"},"TENANT_ADMIN":{"tenant:list","tenant:update","user:list","user:create","user:update","user:disable","user:role_assign","analysis:run","knowledge:read","knowledge:write","sql:read","sql:configure","deliverable:read","admin:audit","config:read","config:write"},"ANALYST":{"analysis:run","knowledge:read","knowledge:write","sql:read","deliverable:read","config:read"},"VIEWER":{"knowledge:read","deliverable:read"}}
 _ID=re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
 class IdentityError(ValueError):
  def __init__(self,code,message): super().__init__(message); self.code=code
