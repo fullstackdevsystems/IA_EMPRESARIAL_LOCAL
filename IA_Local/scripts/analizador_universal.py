@@ -47,7 +47,7 @@ from enterprise_knowledge_store import (
 from enterprise_sql_gateway import (
     EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor,
     EnterpriseSecretStore, SqlServerPyodbcProvider, discover_schema,
-    public_sql_profile, test_connection,
+    execute_smoke_query, public_sql_profile, test_connection,
 )
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
@@ -1805,8 +1805,10 @@ def _sql_admin_services():
     return store, provider, secrets
 
 
-def _sql_admin_audit(event: str, actor: Dict[str, Any], connection_id: str, tenant_id: str) -> None:
-    _sql_admin_events.append({"event": event, "actor_user_id": actor["user_id"], "tenant_id": tenant_id, "connection_id": connection_id, "at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
+def _sql_admin_audit(event: str, actor: Dict[str, Any], connection_id: str, tenant_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    event_data = {"event": event, "actor_user_id": actor["user_id"], "tenant_id": tenant_id, "connection_id": connection_id, "at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}
+    if metadata: event_data.update(metadata)
+    _sql_admin_events.append(event_data)
 
 
 def _sql_admin_scope(actor: Dict[str, Any], tenant_id: Optional[str]) -> Dict[str, Any]:
@@ -1956,6 +1958,16 @@ def admin_sql_test(connection_id: str, tenant_id: Optional[str] = None, authoriz
 @app.post("/api/admin/sql/connections/{connection_id}/discover")
 def admin_sql_discover(connection_id: str, tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
     return _admin_sql_run(connection_id, True, tenant_id, authorization)
+
+
+@app.post("/api/admin/sql/connections/{connection_id}/smoke")
+def admin_sql_smoke(connection_id: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, authorization: str = Header("")) -> Dict[str, Any]:
+    actor = _sql_admin_actor(authorization, "sql:read"); scope = _sql_admin_scope(actor, tenant_id); store, provider, _ = _sql_admin_services()
+    try: result = execute_smoke_query(store, provider, scope, connection_id, payload)
+    except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+    provenance = result["provenance"]
+    _sql_admin_audit("SQL_SMOKE_RUN", actor, connection_id, scope["company_id"], {"object": f"{provenance['schema']}.{provenance['object']}", "row_count": result["row_count"], "truncated": result["truncated"], "query_fingerprint_sha256": provenance["query_fingerprint_sha256"], "result_status": result["status"], "query_ms": result["query_ms"]})
+    return result
 
 
 @app.get("/api/sql/connections")

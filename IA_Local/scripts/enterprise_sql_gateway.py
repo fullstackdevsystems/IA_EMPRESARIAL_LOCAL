@@ -38,7 +38,7 @@ class EnterpriseSecretStore:
         self.provider.delete(reference)
 
 def public_sql_profile(record: Dict[str,Any]) -> Dict[str,Any]:
-    public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count")}
+    public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count","last_query_at","last_query_status","last_query_ms","last_query_row_count")}
     public["secret_configured"] = bool(record.get("secret_reference"))
     return public
 
@@ -226,8 +226,8 @@ class EnterpriseSqlConnectionStore:
         record=self.update(scope,connection_id);record["enabled"]=False;record["status"]="DISABLED";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._write(scope,connection_id,record);return record
     def enable(self,scope:Dict[str,Any],connection_id:str)->Dict[str,Any]:
         record=self.update(scope,connection_id);record["enabled"]=True;record["status"]="ACTIVE";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._write(scope,connection_id,record);return record
-    def record_operation(self, scope: Dict[str, Any], connection_id: str, prefix: str, status: str, latency_ms: float, error_code: Optional[str] = None, discovered_object_count: Optional[int] = None) -> Dict[str, Any]:
-        if prefix not in {"last_test", "last_discovery"}:
+    def record_operation(self, scope: Dict[str, Any], connection_id: str, prefix: str, status: str, latency_ms: float, error_code: Optional[str] = None, discovered_object_count: Optional[int] = None, row_count: Optional[int] = None) -> Dict[str, Any]:
+        if prefix not in {"last_test", "last_discovery", "last_query"}:
             raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID", "Operación SQL inválida")
         record = self.get(scope, connection_id)
         record[f"{prefix}_at"] = datetime.now(timezone.utc).isoformat()
@@ -235,6 +235,7 @@ class EnterpriseSqlConnectionStore:
         record[f"{prefix}_ms"] = round(float(latency_ms), 3)
         if prefix == "last_test": record["last_latency_ms"] = record[f"{prefix}_ms"]; record["last_error_code"] = error_code
         if discovered_object_count is not None: record["discovered_object_count"] = int(discovered_object_count)
+        if row_count is not None: record["last_query_row_count"] = int(row_count)
         record["updated_at"] = datetime.now(timezone.utc).isoformat(); record["fingerprint_sha256"] = _fingerprint(record)
         self._write(scope, connection_id, record)
         return dict(record)
@@ -248,6 +249,7 @@ _PUBLIC_CONNECTION_ERRORS = {
     "SQL_SECRET_UNAVAILABLE", "SQL_DRIVER_NOT_AVAILABLE", "SQL_AUTH_FAILED",
     "SQL_DATABASE_UNAVAILABLE", "SQL_CONNECTION_TEST_FAILED",
     "SQL_SCHEMA_DISCOVERY_FAILED", "SQL_CONNECTION_DISABLED", "SQL_SCOPE_DENIED",
+    "SQL_EXECUTION_FAILED", "SQL_ALLOWLIST_DENIED", "SQL_QUERY_INVALID", "SQL_QUERY_POLICY_BLOCKED",
 }
 _PUBLIC_CONNECTION_MESSAGES = {
     "SQL_SECRET_UNAVAILABLE": "Secret SQL no disponible",
@@ -258,6 +260,10 @@ _PUBLIC_CONNECTION_MESSAGES = {
     "SQL_SCHEMA_DISCOVERY_FAILED": "Discovery SQL no disponible",
     "SQL_CONNECTION_DISABLED": "Conexión deshabilitada",
     "SQL_SCOPE_DENIED": "Scope SQL no autorizado",
+    "SQL_EXECUTION_FAILED": "Ejecución SQL no disponible",
+    "SQL_ALLOWLIST_DENIED": "Objeto SQL fuera de allowlist",
+    "SQL_QUERY_INVALID": "Plan SQL inválido",
+    "SQL_QUERY_POLICY_BLOCKED": "Plan SQL bloqueado por policy",
 }
 
 
@@ -279,6 +285,36 @@ def _metadata_objects(profile: Dict[str, Any], objects: List[Dict[str, Any]]) ->
             columns.append({"name": str(column.get("name") or ""), "type": str(column.get("type") or ""), "nullable": bool(column.get("nullable"))})
         safe_objects.append({"schema": schema, "name": name, "type": str(item.get("type") or ""), "columns": columns})
     return safe_objects
+
+
+_SMOKE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+
+
+def _smoke_identifier(value: Any) -> str:
+    text = str(value or "").strip()
+    if not _SMOKE_IDENTIFIER.fullmatch(text):
+        raise EnterpriseSqlError("SQL_QUERY_INVALID", "Identificador de smoke query inválido")
+    return text
+
+
+def build_smoke_query_plan(profile: Dict[str, Any], request: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(request, dict) or set(request) - {"schema", "object", "columns", "limit"}:
+        raise EnterpriseSqlError("SQL_QUERY_INVALID", "Plan estructurado inválido")
+    schema, object_name = _smoke_identifier(request.get("schema")), _smoke_identifier(request.get("object"))
+    columns = request.get("columns")
+    if not isinstance(columns, list) or not columns or any(not isinstance(item, str) for item in columns):
+        raise EnterpriseSqlError("SQL_QUERY_INVALID", "columns explícitas son obligatorias")
+    names = [_smoke_identifier(item) for item in columns]
+    if len(set(names)) != len(names):
+        raise EnterpriseSqlError("SQL_QUERY_INVALID", "columns duplicadas no permitidas")
+    requested = request.get("limit")
+    if isinstance(requested, bool) or not isinstance(requested, int) or requested < 1:
+        raise EnterpriseSqlError("SQL_QUERY_INVALID", "limit inválido")
+    if schema not in set(profile.get("allowed_schemas") or []) or f"{schema}.{object_name}" not in set(profile.get("allowed_tables") or []):
+        raise EnterpriseSqlError("SQL_ALLOWLIST_DENIED", "Objeto SQL fuera de allowlist")
+    effective_limit = min(requested, int(profile.get("max_rows") or 500), 5000)
+    sql = f"SELECT TOP ({effective_limit}) {', '.join(f'[{name}]' for name in names)} FROM [{schema}].[{object_name}]"
+    return {"operation": "SELECT", "sql": sql, "limit": effective_limit, "timeout_seconds": int(profile.get("timeout_seconds") or 30), "parameters": [], "schema": schema, "object": object_name, "selected_columns": names}
 
 
 def test_connection(store: EnterpriseSqlConnectionStore, provider: Any, scope: Dict[str, Any], connection_id: str) -> Dict[str, Any]:
@@ -311,6 +347,24 @@ def discover_schema(store: EnterpriseSqlConnectionStore, provider: SqlServerProv
         elapsed = (time.monotonic() - started) * 1000
         error = _safe_provider_error(exc, "SQL_SCHEMA_DISCOVERY_FAILED")
         store.record_operation(scope, connection_id, "last_discovery", "FAIL", elapsed, error.code)
+        raise error from exc
+
+
+def execute_smoke_query(store: EnterpriseSqlConnectionStore, provider: SqlServerProvider, scope: Dict[str, Any], connection_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    profile = assert_sql_profile_active(store.get(scope, connection_id))
+    plan = build_smoke_query_plan(profile, request)
+    started = time.monotonic()
+    try:
+        result = EnterpriseSqlExecutor(store, provider).execute(scope, connection_id, plan)
+        elapsed = (time.monotonic() - started) * 1000
+        store.record_operation(scope, connection_id, "last_query", "PASS", elapsed, row_count=result["row_count"])
+        provenance = dict(result["provenance"])
+        provenance.update({"schema": plan["schema"], "object": plan["object"], "selected_columns": plan["selected_columns"], "query_ms": round(elapsed, 3)})
+        return {"status": "PASS", "connection_id": profile["connection_id"], "columns": result["columns"], "rows": result["rows"], "row_count": result["row_count"], "truncated": result["truncated"], "query_ms": round(elapsed, 3), "provenance": provenance}
+    except Exception as exc:
+        elapsed = (time.monotonic() - started) * 1000
+        error = _safe_provider_error(exc, "SQL_EXECUTION_FAILED")
+        store.record_operation(scope, connection_id, "last_query", "FAIL", elapsed, error.code)
         raise error from exc
 
 
