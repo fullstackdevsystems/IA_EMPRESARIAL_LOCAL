@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
@@ -47,6 +48,18 @@ class SqlServerProvider(Protocol):
 
 class SqlServerPyodbcProvider:
     """Provider SQL Server opcional; el secret sólo se resuelve en runtime."""
+    def __init__(self, secret_store: Optional[EnterpriseSecretStore] = None):
+        self.secret_store = secret_store
+
+    @staticmethod
+    def _connection_error(exc: Exception) -> EnterpriseSqlError:
+        text = str(exc).lower()
+        if "login failed" in text or "authentication" in text:
+            return EnterpriseSqlError("SQL_AUTH_FAILED", "Autenticación SQL rechazada")
+        if "database" in text and ("cannot open" in text or "unavailable" in text):
+            return EnterpriseSqlError("SQL_DATABASE_UNAVAILABLE", "Base de datos SQL no disponible")
+        return EnterpriseSqlError("SQL_CONNECTION_TEST_FAILED", "No fue posible abrir la conexión SQL")
+
     def _connect(self, profile: Dict[str, Any], timeout_seconds: int):
         try:
             import pyodbc
@@ -54,15 +67,50 @@ class SqlServerPyodbcProvider:
             raise EnterpriseSqlError("SQL_DRIVER_NOT_AVAILABLE", "Driver SQL Server no disponible") from exc
         import os
         ref = str(profile.get("credential_ref") or "")
-        secret = os.environ.get(ref[4:]) if ref.startswith("env:") else None
-        if not secret:
+        legacy_secret = os.environ.get(ref[4:]) if ref.startswith("env:") else None
+        mode = str(profile.get("auth_mode") or "").upper()
+        if legacy_secret:
+            connection_string = legacy_secret
+        elif ref.startswith("env:"):
+            raise EnterpriseSqlError("SQL_CREDENTIAL_UNAVAILABLE", "Credencial SQL no disponible")
+        elif mode == "WINDOWS_INTEGRATED":
+            connection_string = (
+                f"DRIVER={{{profile.get('driver') or 'ODBC Driver 18 for SQL Server'}}};"
+                f"SERVER={profile.get('server')};DATABASE={profile.get('database')};"
+                "Trusted_Connection=yes;"
+                f"TrustServerCertificate={'yes' if profile.get('trust_server_certificate') else 'no'};"
+            )
+        elif mode == "SQL_AUTH":
+            reference = str(profile.get("secret_reference") or ref or "")
+            if not self.secret_store:
+                raise EnterpriseSqlError("SQL_SECRET_UNAVAILABLE", "Secret SQL no disponible")
+            password = self.secret_store.get(reference)
+            username = str(profile.get("username") or "")
+            if not username:
+                raise EnterpriseSqlError("SQL_SECRET_UNAVAILABLE", "Usuario SQL no disponible")
+            connection_string = (
+                f"DRIVER={{{profile.get('driver') or 'ODBC Driver 18 for SQL Server'}}};"
+                f"SERVER={profile.get('server')};DATABASE={profile.get('database')};"
+                f"UID={username};PWD={password};"
+                f"TrustServerCertificate={'yes' if profile.get('trust_server_certificate') else 'no'};"
+            )
+        else:
             raise EnterpriseSqlError("SQL_CREDENTIAL_UNAVAILABLE", "Credencial SQL no disponible")
         try:
-            return pyodbc.connect(secret, timeout=timeout_seconds, autocommit=False)
+            return pyodbc.connect(connection_string, timeout=timeout_seconds, autocommit=False)
         except Exception as exc:
-            raise EnterpriseSqlError("SQL_EXECUTION_FAILED", "No fue posible abrir la conexión SQL") from exc
+            raise self._connection_error(exc) from exc
+
+    def test_connection(self, profile: Dict[str, Any], timeout_seconds: int) -> Dict[str, Any]:
+        conn = self._connect(profile, timeout_seconds)
+        try:
+            return {"database": str(profile.get("database") or "")}
+        finally:
+            try: conn.close()
+            except Exception: pass
     def discover(self, profile: Dict[str, Any]) -> List[Dict[str, Any]]:
-        conn = self._connect(profile, 30)
+        conn = self._connect(profile, int(profile.get("timeout_seconds") or 30))
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute("SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES")
@@ -73,8 +121,11 @@ class SqlServerPyodbcProvider:
                 objects.append({"schema": schema, "name": name, "type": typ, "columns": columns})
             return objects
         except EnterpriseSqlError: raise
-        except Exception as exc: raise EnterpriseSqlError("SQL_SCHEMA_NOT_AVAILABLE", "Metadata SQL no disponible") from exc
+        except Exception as exc: raise EnterpriseSqlError("SQL_SCHEMA_DISCOVERY_FAILED", "Metadata SQL no disponible") from exc
         finally:
+            try:
+                if cur: cur.close()
+            except Exception: pass
             try: conn.close()
             except Exception: pass
     def execute(self, profile: Dict[str, Any], sql: str, parameters: List[Any], timeout_seconds: int) -> Dict[str, Any]:
@@ -128,7 +179,12 @@ class EnterpriseSqlConnectionStore:
         if not isinstance(record, dict) or _fingerprint(record) != record.get("fingerprint_sha256"):
             raise EnterpriseSqlError("SQL_CONNECTION_INTEGRITY_MISMATCH", "Profile SQL alterado")
         return record
-    def register(self, *, scope: Dict[str, Any], connection_id: str, server: str, database: str, auth_mode: str, credential_ref: str = "", allowed_schemas: List[str]=None, allowed_tables: List[str]=None, enabled: bool = True, display_name: str="", driver: str="ODBC Driver 18 for SQL Server", timeout_seconds:int=30, max_rows:int=500, trust_server_certificate:bool=False, secret_reference:str="") -> Dict[str, Any]:
+    def _write(self, scope: Dict[str, Any], connection_id: str, record: Dict[str, Any]) -> None:
+        path = self._path(scope, connection_id, True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_bytes(_canonical(record))
+        temporary.replace(path)
+    def register(self, *, scope: Dict[str, Any], connection_id: str, server: str, database: str, auth_mode: str, credential_ref: str = "", allowed_schemas: List[str]=None, allowed_tables: List[str]=None, enabled: bool = True, display_name: str="", driver: str="ODBC Driver 18 for SQL Server", timeout_seconds:int=30, max_rows:int=500, trust_server_certificate:bool=False, secret_reference:str="", username:str="") -> Dict[str, Any]:
         s = normalize_deliverable_scope(scope); path = self._path(s, connection_id, True)
         if path.exists(): raise EnterpriseSqlError("SQL_CONNECTION_ALREADY_EXISTS", "Conexión ya registrada")
         mode=str(auth_mode).upper(); mode="WINDOWS_INTEGRATED" if mode in {"INTEGRATED","WINDOWS"} else mode; allowed_tables=allowed_tables or []; allowed_schemas=allowed_schemas or []
@@ -140,8 +196,8 @@ class EnterpriseSqlConnectionStore:
         schemas = [str(x).strip() for x in allowed_schemas if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(x).strip())]
         if not tables or not schemas or any(item.split(".")[0] not in schemas for item in tables):
             raise EnterpriseSqlError("SQL_ALLOWLIST_REQUIRED", "Allowlist de schemas/tables inválida")
-        record = {"schema_version": ENTERPRISE_SQL_GATEWAY_VERSION, "connection_id": _safe(connection_id, "SQL_CONNECTION_INVALID"), "scope": s, "provider": "sqlserver", "server": str(server).strip(), "database": str(database).strip(), "auth_mode":mode, "credential_ref": str(credential_ref).strip(), "secret_reference":str(secret_reference or credential_ref).strip() or None, "allowed_schemas": schemas, "allowed_tables": tables, "read_only": True, "enabled": bool(enabled), "display_name":str(display_name).strip() or None,"driver":driver,"timeout_seconds":timeout_seconds,"max_rows":max_rows,"trust_server_certificate":bool(trust_server_certificate),"created_at": datetime.now(timezone.utc).isoformat(),"updated_at":datetime.now(timezone.utc).isoformat()}
-        record["fingerprint_sha256"] = _fingerprint(record); path.write_bytes(_canonical(record)); return dict(record)
+        record = {"schema_version": ENTERPRISE_SQL_GATEWAY_VERSION, "connection_id": _safe(connection_id, "SQL_CONNECTION_INVALID"), "scope": s, "provider": "sqlserver", "server": str(server).strip(), "database": str(database).strip(), "auth_mode":mode, "credential_ref": str(credential_ref).strip(), "secret_reference":str(secret_reference or credential_ref).strip() or None, "username":str(username).strip() or None, "allowed_schemas": schemas, "allowed_tables": tables, "read_only": True, "enabled": bool(enabled), "status":"ACTIVE" if enabled else "DISABLED", "display_name":str(display_name).strip() or None,"driver":driver,"timeout_seconds":timeout_seconds,"max_rows":max_rows,"trust_server_certificate":bool(trust_server_certificate),"created_at": datetime.now(timezone.utc).isoformat(),"updated_at":datetime.now(timezone.utc).isoformat()}
+        record["fingerprint_sha256"] = _fingerprint(record); self._write(s, connection_id, record); return dict(record)
     def get(self, scope: Dict[str, Any], connection_id: str) -> Dict[str, Any]:
         path = self._path(scope, connection_id)
         if not path.is_file(): raise EnterpriseSqlError("SQL_CONNECTION_NOT_FOUND", "Conexión SQL no encontrada")
@@ -150,20 +206,102 @@ class EnterpriseSqlConnectionStore:
         directory = self._dir(scope)
         return [] if not directory.exists() else [self._read(p) for p in sorted(directory.glob("*.json"))]
     def update(self, scope: Dict[str,Any], connection_id: str, **changes) -> Dict[str,Any]:
-        record=self.get(scope,connection_id); allowed={"display_name","server","database","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","secret_reference"}
+        record=self.get(scope,connection_id); allowed={"display_name","server","database","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","secret_reference","username"}
         if set(changes)-allowed: raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Campo administrativo no permitido")
         if "timeout_seconds" in changes and (isinstance(changes["timeout_seconds"],bool) or not 1<=int(changes["timeout_seconds"])<=120): raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Timeout inválido")
         if "max_rows" in changes and (isinstance(changes["max_rows"],bool) or not 1<=int(changes["max_rows"])<=5000): raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","max_rows inválido")
         for key,value in changes.items(): record[key]=value
-        record["updated_at"]=datetime.now(timezone.utc).isoformat(); record["fingerprint_sha256"]=_fingerprint(record); self._path(scope,connection_id).write_bytes(_canonical(record)); return dict(record)
+        record["updated_at"]=datetime.now(timezone.utc).isoformat(); record["fingerprint_sha256"]=_fingerprint(record); self._write(scope,connection_id,record); return dict(record)
     def disable(self,scope:Dict[str,Any],connection_id:str)->Dict[str,Any]:
-        record=self.update(scope,connection_id);record["enabled"]=False;record["status"]="DISABLED";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._path(scope,connection_id).write_bytes(_canonical(record));return record
+        record=self.update(scope,connection_id);record["enabled"]=False;record["status"]="DISABLED";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._write(scope,connection_id,record);return record
     def enable(self,scope:Dict[str,Any],connection_id:str)->Dict[str,Any]:
-        record=self.update(scope,connection_id);record["enabled"]=True;record["status"]="ACTIVE";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._path(scope,connection_id).write_bytes(_canonical(record));return record
+        record=self.update(scope,connection_id);record["enabled"]=True;record["status"]="ACTIVE";record["updated_at"]=datetime.now(timezone.utc).isoformat();record["fingerprint_sha256"]=_fingerprint(record);self._write(scope,connection_id,record);return record
+    def record_operation(self, scope: Dict[str, Any], connection_id: str, prefix: str, status: str, latency_ms: float, error_code: Optional[str] = None, discovered_object_count: Optional[int] = None) -> Dict[str, Any]:
+        if prefix not in {"last_test", "last_discovery"}:
+            raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID", "Operación SQL inválida")
+        record = self.get(scope, connection_id)
+        record[f"{prefix}_at"] = datetime.now(timezone.utc).isoformat()
+        record[f"{prefix}_status"] = status
+        record[f"{prefix}_ms"] = round(float(latency_ms), 3)
+        if prefix == "last_test": record["last_latency_ms"] = record[f"{prefix}_ms"]; record["last_error_code"] = error_code
+        if discovered_object_count is not None: record["discovered_object_count"] = int(discovered_object_count)
+        record["updated_at"] = datetime.now(timezone.utc).isoformat(); record["fingerprint_sha256"] = _fingerprint(record)
+        self._write(scope, connection_id, record)
+        return dict(record)
 
 def assert_sql_profile_active(profile:Dict[str,Any])->Dict[str,Any]:
     if not profile.get("enabled",True) or profile.get("status")=="DISABLED": raise EnterpriseSqlError("SQL_CONNECTION_DISABLED","Conexión deshabilitada")
     return profile
+
+
+_PUBLIC_CONNECTION_ERRORS = {
+    "SQL_SECRET_UNAVAILABLE", "SQL_DRIVER_NOT_AVAILABLE", "SQL_AUTH_FAILED",
+    "SQL_DATABASE_UNAVAILABLE", "SQL_CONNECTION_TEST_FAILED",
+    "SQL_SCHEMA_DISCOVERY_FAILED", "SQL_CONNECTION_DISABLED", "SQL_SCOPE_DENIED",
+}
+_PUBLIC_CONNECTION_MESSAGES = {
+    "SQL_SECRET_UNAVAILABLE": "Secret SQL no disponible",
+    "SQL_DRIVER_NOT_AVAILABLE": "Driver SQL Server no disponible",
+    "SQL_AUTH_FAILED": "Autenticación SQL rechazada",
+    "SQL_DATABASE_UNAVAILABLE": "Base de datos SQL no disponible",
+    "SQL_CONNECTION_TEST_FAILED": "Prueba de conexión SQL falló",
+    "SQL_SCHEMA_DISCOVERY_FAILED": "Discovery SQL no disponible",
+    "SQL_CONNECTION_DISABLED": "Conexión deshabilitada",
+    "SQL_SCOPE_DENIED": "Scope SQL no autorizado",
+}
+
+
+def _safe_provider_error(exc: Exception, fallback: str) -> EnterpriseSqlError:
+    if isinstance(exc, EnterpriseSqlError) and exc.code in _PUBLIC_CONNECTION_ERRORS:
+        return EnterpriseSqlError(exc.code, _PUBLIC_CONNECTION_MESSAGES[exc.code])
+    return EnterpriseSqlError(fallback, "Operación SQL no disponible")
+
+
+def _metadata_objects(profile: Dict[str, Any], objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    allowed = {str(item).lower() for item in profile.get("allowed_tables") or []}
+    safe_objects: List[Dict[str, Any]] = []
+    for item in objects:
+        schema, name = str(item.get("schema") or ""), str(item.get("name") or "")
+        if f"{schema}.{name}".lower() not in allowed:
+            continue
+        columns = []
+        for column in list(item.get("columns") or []):
+            columns.append({"name": str(column.get("name") or ""), "type": str(column.get("type") or ""), "nullable": bool(column.get("nullable"))})
+        safe_objects.append({"schema": schema, "name": name, "type": str(item.get("type") or ""), "columns": columns})
+    return safe_objects
+
+
+def test_connection(store: EnterpriseSqlConnectionStore, provider: Any, scope: Dict[str, Any], connection_id: str) -> Dict[str, Any]:
+    profile = assert_sql_profile_active(store.get(scope, connection_id))
+    started = time.monotonic()
+    try:
+        tester = getattr(provider, "test_connection", None)
+        if not callable(tester):
+            raise EnterpriseSqlError("SQL_CONNECTION_TEST_FAILED", "Provider SQL no permite prueba de conexión")
+        tester(profile, int(profile.get("timeout_seconds") or 30))
+        elapsed = (time.monotonic() - started) * 1000
+        store.record_operation(scope, connection_id, "last_test", "PASS", elapsed)
+        return {"status": "PASS", "connection_id": profile["connection_id"], "database": profile["database"], "driver": profile.get("driver"), "authentication_mode": profile.get("auth_mode"), "connection_ms": round(elapsed, 3), "tested_at": datetime.now(timezone.utc).isoformat()}
+    except Exception as exc:
+        elapsed = (time.monotonic() - started) * 1000
+        error = _safe_provider_error(exc, "SQL_CONNECTION_TEST_FAILED")
+        store.record_operation(scope, connection_id, "last_test", "FAIL", elapsed, error.code)
+        raise error from exc
+
+
+def discover_schema(store: EnterpriseSqlConnectionStore, provider: SqlServerProvider, scope: Dict[str, Any], connection_id: str) -> Dict[str, Any]:
+    profile = assert_sql_profile_active(store.get(scope, connection_id))
+    started = time.monotonic()
+    try:
+        objects = _metadata_objects(profile, provider.discover(profile))
+        elapsed = (time.monotonic() - started) * 1000
+        store.record_operation(scope, connection_id, "last_discovery", "PASS", elapsed, discovered_object_count=len(objects))
+        return {"status": "PASS", "connection_id": profile["connection_id"], "database": profile["database"], "objects": objects, "discovery_ms": round(elapsed, 3), "discovered_at": datetime.now(timezone.utc).isoformat()}
+    except Exception as exc:
+        elapsed = (time.monotonic() - started) * 1000
+        error = _safe_provider_error(exc, "SQL_SCHEMA_DISCOVERY_FAILED")
+        store.record_operation(scope, connection_id, "last_discovery", "FAIL", elapsed, error.code)
+        raise error from exc
 
 
 def validate_query_plan(profile: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
