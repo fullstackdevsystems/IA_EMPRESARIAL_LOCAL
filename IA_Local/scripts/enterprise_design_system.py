@@ -23,6 +23,14 @@ def get_excel_design_tokens(theme="professional-light"):
             "status":{"SUPPORTED":colors["success"],"DERIVABLE":colors["warning"],"BLOCKED":colors["danger"],"UNRESOLVED":colors["neutral"],"CONFLICT":colors["danger"]},
             "formats":{"integer":"#,##0;[Red]-#,##0","decimal":"#,##0.00;[Red]-#,##0.00","percentage":"0.00%","date":"yyyy-mm-dd","datetime":"yyyy-mm-dd hh:mm","text":"@"},
             "width":{"minimum":10,"maximum":45}}
+def get_pdf_design_tokens(theme="professional-light"):
+    """Presentation values shared by the local ReportLab deliverable."""
+    base=get_design_tokens(theme)
+    colors=base["colors"]
+    return {"version":DESIGN_SYSTEM_VERSION,"theme":theme,"colors":colors,
+            "typography":{"cover":26,"title":20,"section":13,"body":9,"caption":7.5},
+            "spacing":{"margin_cm":1.1,"section_cm":0.25},
+            "status":{"SUPPORTED":colors["success"],"DERIVABLE":colors["warning"],"BLOCKED":colors["danger"],"UNRESOLVED":colors["neutral"],"CONFLICT":colors["danger"]}}
 def status_presentation(status):
     label,tone,symbol=_STATUS.get(str(status or "").upper(),_STATUS["UNRESOLVED"])
     return {"status":str(status or "UNRESOLVED").upper(),"label":label,"class_name":"status-"+tone,"symbol":symbol}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from datetime import datetime, timezone
+from html import escape
 import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -20,7 +21,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from enterprise_deliverable_manifest import deliverable_manifest_component_rows, deliverable_manifest_summary_rows
-from enterprise_design_system import get_excel_design_tokens, status_presentation
+from enterprise_design_system import get_excel_design_tokens, get_pdf_design_tokens, status_presentation
 
 NAVY="#0B1F33"; BLUE="#0F62FE"; TEAL="#007D79"; GREEN="#198038"; ORANGE="#FF832B"; RED="#DA1E28"; PURPLE="#6929C4"
 LIGHT="#F4F7FB"; PALE_BLUE="#EDF5FF"; PALE_GREEN="#DEFBE6"; PALE_ORANGE="#FFF2E8"; PALE_RED="#FFF1F1"; MID="#697077"; BORDER="#DDE1E6"; WHITE="#FFFFFF"
@@ -485,27 +486,49 @@ def _chart_image(kind: str,df: pd.DataFrame,title: str,x_col: str,y_col: str,col
     ax.set_title(title,loc="left",fontsize=11,fontweight="bold",color=NAVY); ax.spines[["top","right","left"]].set_visible(False); ax.grid(axis="y" if kind=="line" else "x",alpha=.18); ax.tick_params(colors="#525252",labelsize=7); ax.set_facecolor("white"); fig.patch.set_facecolor("white"); fig.tight_layout(); b=BytesIO(); fig.savefig(b,format="png",dpi=160,bbox_inches="tight"); plt.close(fig); b.seek(0); return b
 
 
-def _pdf_table(df: pd.DataFrame, styles, max_rows: int=10)->Table:
+def _pdf_table(df: pd.DataFrame, styles, max_rows: int=10, tokens: Optional[Dict[str,Any]]=None)->Table:
+    tokens=tokens or get_pdf_design_tokens(); palette=tokens["colors"]
     show=_display_df(df.head(max_rows).copy()); body=[[Paragraph(f"<b>{str(c).replace(chr(95), chr(32))}</b>",styles["TableHead"]) for c in show.columns]]
     for _,r in show.iterrows():
         row=[]
         for c,v in r.items():
             kind=_column_kind(str(c),show[c]); fmt_kind="id" if kind=="id" else "percent" if kind=="percent" else "integer" if kind=="integer" else "number"; row.append(Paragraph(_fmt(v,fmt_kind),styles["TableCell"]))
         body.append(row)
-    widths=[25.2*cm/max(1,len(show.columns))]*max(1,len(show.columns)); t=Table(body,colWidths=widths,repeatRows=1,hAlign="LEFT"); t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor(NAVY)),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),.35,colors.HexColor(BORDER)),("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#FAFAFA")]),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)])); return t
+    widths=[25.2*cm/max(1,len(show.columns))]*max(1,len(show.columns)); t=Table(body,colWidths=widths,repeatRows=1,hAlign="LEFT"); t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor(palette["primary"])),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),.35,colors.HexColor(palette["border"])),("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor(palette["background"])]),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)])); return t
+
+
+def _pdf_governed_rows(manifest: Dict[str,Any]) -> List[Dict[str,Any]]:
+    rows=[]
+    for item in list(manifest.get("components") or []) if isinstance(manifest,dict) else []:
+        if not isinstance(item,dict):
+            continue
+        status=str(item.get("status") or "UNRESOLVED").upper()
+        value=None if status in {"BLOCKED","UNRESOLVED","CONFLICT"} else item.get("value")
+        rows.append({"Component ID":item.get("component_id") or item.get("id") or "","Indicator":item.get("title") or item.get("name") or "","Status":status,"Value":"" if value is None else value,"Unit":item.get("unit") or "","Reason":item.get("reason") or "","Provenance":item.get("provenance_source") or (item.get("provenance") or {}).get("source") or ""})
+    return rows
+
+
+def _pdf_metadata_rows(profile: Dict[str,Any], manifest: Dict[str,Any], tokens: Dict[str,Any]) -> List[Dict[str,Any]]:
+    source=manifest.get("source") if isinstance(manifest,dict) and isinstance(manifest.get("source"),dict) else {}
+    return [{"Field":"Source","Value":source.get("filename") or profile.get("archivo") or ""},{"Field":"Sheet","Value":source.get("sheet") or profile.get("hoja_analizada") or ""},{"Field":"Rows","Value":source.get("row_count") or profile.get("filas") or 0},{"Field":"Run ID","Value":profile.get("run_id") or ""},{"Field":"Generated at","Value":datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")},{"Field":"Design system","Value":tokens["version"]},{"Field":"Integrity","Value":manifest.get("status") if isinstance(manifest,dict) else ""},{"Field":"Provenance","Value":source.get("source_fingerprint_sha256") or ""}]
 
 
 def pdf_report_professional(path,prompt: str,profile: Dict[str,Any],sections: Dict[str,pd.DataFrame],notes: List[str],narrative: str,domain: str)->None:
-    insights=executive_insights(profile,sections,notes,domain); cards=_kpi_cards(profile,sections,domain); doc=SimpleDocTemplate(str(path),pagesize=landscape(A4),rightMargin=1.1*cm,leftMargin=1.1*cm,topMargin=1.5*cm,bottomMargin=1.25*cm,title=domain_title(domain),author="IA Empresarial Local")
+    tokens=get_pdf_design_tokens(); c=tokens["colors"]; insights=executive_insights(profile,sections,notes,domain); cards=_kpi_cards(profile,sections,domain); doc=SimpleDocTemplate(str(path),pagesize=landscape(A4),rightMargin=tokens["spacing"]["margin_cm"]*cm,leftMargin=tokens["spacing"]["margin_cm"]*cm,topMargin=1.5*cm,bottomMargin=1.25*cm,title=domain_title(domain),author="IA Empresarial Local")
     manifest=profile.get("deliverable_manifest") if isinstance(profile.get("deliverable_manifest"),dict) else {}
-    st=getSampleStyleSheet(); st.add(ParagraphStyle(name="ExecTitle",parent=st["Title"],fontName="Helvetica-Bold",fontSize=21,leading=24,textColor=colors.HexColor(NAVY),alignment=TA_LEFT,spaceAfter=4)); st.add(ParagraphStyle(name="ExecSub",parent=st["BodyText"],fontSize=8.5,leading=11,textColor=colors.HexColor(MID),spaceAfter=5)); st.add(ParagraphStyle(name="Sec",parent=st["Heading2"],fontName="Helvetica-Bold",fontSize=13,leading=16,textColor=colors.HexColor(NAVY),spaceBefore=6,spaceAfter=7)); st.add(ParagraphStyle(name="Insight",parent=st["BodyText"],fontSize=9.2,leading=13,textColor=colors.HexColor("#343A3F"),leftIndent=8,firstLineIndent=-6,spaceAfter=4)); st.add(ParagraphStyle(name="Small",parent=st["BodyText"],fontSize=7.5,leading=10,textColor=colors.HexColor(MID))); st.add(ParagraphStyle(name="TableHead",parent=st["BodyText"],fontSize=7,leading=8,textColor=colors.white)); st.add(ParagraphStyle(name="TableCell",parent=st["BodyText"],fontSize=7,leading=8.5,textColor=colors.HexColor("#343A3F"))); st.add(ParagraphStyle(name="Card",parent=st["BodyText"],fontSize=9,leading=12,alignment=TA_CENTER,textColor=colors.HexColor(NAVY)))
+    st=getSampleStyleSheet(); st.add(ParagraphStyle(name="ExecTitle",parent=st["Title"],fontName="Helvetica-Bold",fontSize=tokens["typography"]["title"],leading=24,textColor=colors.HexColor(c["primary"]),alignment=TA_LEFT,spaceAfter=4)); st.add(ParagraphStyle(name="CoverTitle",parent=st["Title"],fontName="Helvetica-Bold",fontSize=tokens["typography"]["cover"],leading=31,textColor=colors.HexColor(c["primary"]),alignment=TA_LEFT,spaceAfter=8)); st.add(ParagraphStyle(name="ExecSub",parent=st["BodyText"],fontSize=8.5,leading=11,textColor=colors.HexColor(c["text_secondary"]),spaceAfter=5)); st.add(ParagraphStyle(name="Sec",parent=st["Heading2"],fontName="Helvetica-Bold",fontSize=tokens["typography"]["section"],leading=16,textColor=colors.HexColor(c["primary"]),spaceBefore=6,spaceAfter=7)); st.add(ParagraphStyle(name="Insight",parent=st["BodyText"],fontSize=9.2,leading=13,textColor=colors.HexColor(c["text_primary"]),leftIndent=8,firstLineIndent=-6,spaceAfter=4)); st.add(ParagraphStyle(name="Small",parent=st["BodyText"],fontSize=tokens["typography"]["caption"],leading=10,textColor=colors.HexColor(c["text_secondary"]))); st.add(ParagraphStyle(name="TableHead",parent=st["BodyText"],fontSize=7,leading=8,textColor=colors.white)); st.add(ParagraphStyle(name="TableCell",parent=st["BodyText"],fontSize=7,leading=8.5,textColor=colors.HexColor(c["text_primary"]))); st.add(ParagraphStyle(name="Card",parent=st["BodyText"],fontSize=9,leading=12,alignment=TA_CENTER,textColor=colors.HexColor(c["primary"])))
     def page(can,doc_):
-        can.saveState(); w,h=landscape(A4); can.setFillColor(colors.HexColor(NAVY)); can.rect(0,h-.55*cm,w,.55*cm,stroke=0,fill=1); can.setFillColor(colors.HexColor(MID)); can.setFont("Helvetica",7); can.drawString(1.1*cm,.55*cm,"IA Empresarial Local | Reporte generado localmente"); can.drawRightString(w-1.1*cm,.55*cm,f"Página {doc_.page}"); can.restoreState()
-    story=[Paragraph(domain_title(domain),st["ExecTitle"])]; period=profile.get("periodo") if isinstance(profile.get("periodo"),dict) else {}; meta=f"Archivo: <b>{profile.get('archivo','')}</b> &nbsp; | &nbsp; Filas: <b>{int(profile.get('filas',0)):,}</b>"; meta+=f" &nbsp; | &nbsp; Periodo: <b>{str(period.get('desde',''))[:10]} a {str(period.get('hasta',''))[:10]}</b>" if period else ""; story+=[Paragraph(meta,st["ExecSub"]),Spacer(1,.1*cm)]
+        can.saveState(); w,h=landscape(A4); can.setFillColor(colors.HexColor(c["primary"])); can.rect(0,h-.55*cm,w,.55*cm,stroke=0,fill=1); can.setFillColor(colors.HexColor(c["text_secondary"])); can.setFont("Helvetica",7); can.drawString(1.1*cm,.55*cm,"IA Empresarial Local | Reporte generado localmente"); can.drawRightString(w-1.1*cm,.55*cm,f"Página {doc_.page}"); can.restoreState()
+    period=profile.get("periodo") if isinstance(profile.get("periodo"),dict) else {}; period_text=f"{str(period.get('desde',''))[:10]} a {str(period.get('hasta',''))[:10]}" if period else "No especificado"; source=escape(str(profile.get("archivo") or "Fuente no especificada")); cover_data=[[Paragraph("IA Empresarial Local",st["ExecSub"])],[Paragraph(domain_title(domain),st["CoverTitle"])],[Paragraph(f"Fuente: <b>{source}</b><br/>Periodo: {escape(period_text)}<br/>Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}<br/>Design system: {tokens['version']}",st["ExecSub"])]]; cover=Table(cover_data,colWidths=[25.2*cm],rowHeights=[1.5*cm,4.0*cm,3.2*cm],hAlign="LEFT"); cover.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),colors.HexColor(c["surface_alt"])),("BOX",(0,0),(-1,-1),.6,colors.HexColor(c["border"])),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LEFTPADDING",(0,0),(-1,-1),24),("RIGHTPADDING",(0,0),(-1,-1),24)])); story=[Spacer(1,3.5*cm),cover,PageBreak(),Paragraph(domain_title(domain),st["ExecTitle"])]; meta=f"Archivo: <b>{source}</b> &nbsp; | &nbsp; Filas: <b>{int(profile.get('filas',0)):,}</b>"; meta+=f" &nbsp; | &nbsp; Periodo: <b>{escape(period_text)}</b>" if period else ""; story+=[Paragraph(meta,st["ExecSub"]),Spacer(1,.1*cm)]
     cells=[Paragraph(f"<font size='7' color='{MID}'><b>{a}</b></font><br/><font size='17' color='{NAVY}'><b>{b}</b></font><br/><font size='6.5' color='{MID}'>{c}</font>",st["Card"]) for a,b,c,_ in cards]; ct=Table([cells],colWidths=[6.1*cm]*4,rowHeights=[2.2*cm]); cs=[("BOX",(0,0),(-1,-1),.5,colors.HexColor(BORDER)),("VALIGN",(0,0),(-1,-1),"MIDDLE")];
     for i,fill in enumerate([PALE_BLUE,"#E5F6FF",PALE_GREEN,PALE_ORANGE]): cs.append(("BACKGROUND",(i,0),(i,0),colors.HexColor(fill)))
     ct.setStyle(TableStyle(cs)); story += [ct,Spacer(1,.25*cm),Paragraph("Hallazgos ejecutivos",st["Sec"])]
     for x in insights: story.append(Paragraph("• "+x,st["Insight"]))
+    governed_rows=_pdf_governed_rows(manifest)
+    if governed_rows:
+        story += [Spacer(1,.15*cm),Paragraph("Indicadores gobernados",st["Sec"])]
+        governed=pd.DataFrame(governed_rows)
+        story.append(_pdf_table(governed[["Component ID","Indicator","Status","Value","Unit","Reason","Provenance"]],st,20,tokens))
     trend=sections.get("Tendencia_Mensual") if domain=="comercial" else sections.get("Tendencia_Generica")
     if trend is not None and not trend.empty:
         x="Mes" if "Mes" in trend.columns else str(trend.columns[0]); y="Ventas" if "Ventas" in trend.columns else str(trend.columns[1]); b=_chart_image("line",trend,"Evolución temporal",x,y,BLUE,36)
@@ -553,10 +576,11 @@ def pdf_report_professional(path,prompt: str,profile: Dict[str,Any],sections: Di
     if manifest:
         story += [PageBreak(),Paragraph("Gobernanza y trazabilidad",st["ExecTitle"]),Paragraph("Este entregable usa la misma autoridad analítica que el dashboard HTML. Las capacidades BLOCKED no se presentan como valores calculados.",st["Small"]),Spacer(1,.2*cm)]
         summary_df=pd.DataFrame(deliverable_manifest_summary_rows(manifest))
-        story += [_pdf_table(summary_df,st,20),Spacer(1,.25*cm)]
+        story += [_pdf_table(summary_df,st,20,tokens),Spacer(1,.25*cm)]
         components_df=pd.DataFrame(deliverable_manifest_component_rows(manifest))
         blocked=components_df.loc[components_df["Estado"].eq("BLOCKED")] if not components_df.empty else components_df
         story += [Paragraph("Capacidades bloqueadas",st["Sec"])]
         if blocked.empty: story.append(Paragraph("No existen capacidades bloqueadas en esta solicitud.",st["Small"]))
-        else: story.append(_pdf_table(blocked[["Componente","Título","Estado","Motivo","Dependencias","Provenance"]],st,20))
+        else: story.append(_pdf_table(blocked[["Componente","Título","Estado","Motivo","Dependencias","Provenance"]],st,20,tokens))
+    story += [Spacer(1,.25*cm),Paragraph("Información del análisis",st["Sec"]),_pdf_table(pd.DataFrame(_pdf_metadata_rows(profile,manifest,tokens)),st,20,tokens)]
     doc.build(story,onFirstPage=page,onLaterPages=page)
