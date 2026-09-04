@@ -404,6 +404,7 @@ def _safe_inline_json(obj: Any) -> str:
 
 
 def generate_dynamic_dashboard(output_path: Path, df: pd.DataFrame, prompt: str, filename: str, sheet: str = '', semantic_context: Optional[Dict[str, Any]] = None, prepared_plan: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    from enterprise_design_system import build_dashboard_css
     plan = dict(prepared_plan) if isinstance(prepared_plan, dict) else build_dashboard_plan(df, prompt, filename, sheet, semantic_context)
     from dynamic_renderer import attach_dynamic_renderer
     plan = attach_dynamic_renderer(plan)
@@ -412,11 +413,11 @@ def generate_dynamic_dashboard(output_path: Path, df: pd.DataFrame, prompt: str,
         'plan': plan,
         'rows': _prepare_rows(df),
         'meta': {'file': filename, 'sheet': sheet, 'rows': int(len(df)), 'embedded_rows': int(len(df)), 'prompt': prompt, 'column_kinds': kinds},
-        'brand': {'company': 'PRIMOS & COUSINS', 'logo': _logo_data_uri()},
+        'brand': {'company': 'IA Empresarial Local', 'logo': _logo_data_uri()},
     }
     data = _safe_inline_json(payload)
     title = html.escape(plan.get('title') or 'Dashboard Ejecutivo')
-    page = _HTML.replace('__TITLE__', title).replace('__PAYLOAD__', data)
+    page = _HTML.replace('__TITLE__', title).replace('__PAYLOAD__', data).replace('</style>', build_dashboard_css() + '</style>')
     from dynamic_renderer import runtime_markup
     page = page.replace('</body>', runtime_markup() + '\n</body>')
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -429,7 +430,7 @@ _HTML = r'''<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>__TITLE__ · Primos & Cousins</title>
+<title>__TITLE__ · IA Empresarial Local</title>
 <style>
 :root{--bg:#f4f8fb;--surface:#fff;--ink:#102540;--muted:#61768b;--line:#dce7ef;--teal:#0a93a4;--teal2:#19b8c4;--tealsoft:#e7f7f8;--blue:#3478d4;--green:#2eaa52;--orange:#ff9b2f;--red:#ef5350;--purple:#7a56c7;--shadow:0 8px 26px rgba(18,52,77,.08);--radius:16px}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:linear-gradient(180deg,#fbfdff,#f2f7fa);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif}button,select{font:inherit}
@@ -467,12 +468,12 @@ _HTML = r'''<!doctype html>
 <body>
 <div class="app">
 <aside class="sidebar">
-<div class="brandbox"><img id="logo" class="logo" alt="Primos & Cousins"></div>
+<div class="brandbox"><img id="logo" class="logo" alt="IA Empresarial Local"></div>
 <nav class="nav">
 <a class="active" href="#resumen"><span class="ico">▣</span><span>Resumen</span></a>
-<a href="#graficas"><span class="ico">⌁</span><span>Ventas</span></a>
-<a href="#analitica"><span class="ico">◫</span><span>Rentabilidad</span></a>
-<a href="#componentes"><span class="ico">⇄</span><span>Logística</span></a>
+<a href="#graficas"><span class="ico">⌁</span><span>Tendencias</span></a>
+<a href="#analitica"><span class="ico">◫</span><span>Análisis</span></a>
+<a href="#componentes"><span class="ico">⇄</span><span>Indicadores</span></a>
 <a href="#analitica"><span class="ico">▪</span><span>Análisis avanzado</span></a>
 <a href="#detalle"><span class="ico">≡</span><span>Detalle</span></a>
 <a href="#pregunta"><span class="ico">?</span><span>Preguntar</span></a>
