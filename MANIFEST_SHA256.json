@@ -158,8 +158,8 @@
     },
     {
       "path": "IA_Local/scripts/BackupIA.ps1",
-      "sha256": "cbdff0a816f5471c2bc69f48983ba2dff6aa0169c187932ad6e4d91b4b1b7768",
-      "size": 2678
+      "sha256": "35b703617374f1146248cb544751adc3771c0ff4dbd241b887b64337067e0046",
+      "size": 288
     },
     {
       "path": "IA_Local/scripts/Comun.ps1",
@@ -400,6 +400,11 @@
       "path": "IA_Local/scripts/enterprise_analytics.py",
       "sha256": "9244b57b4fc202b71836e9a6e3d4a4e5a596645c3faec36063ab133eff20e14e",
       "size": 9176
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_backup_recovery.py",
+      "sha256": "68f3401b8885ae593ae21bf8cb046f15eeed723e75c0c98908f769818cb1b362",
+      "size": 3245
     },
     {
       "path": "IA_Local/scripts/enterprise_cli.py",
@@ -643,8 +648,8 @@
     },
     {
       "path": "OperarIA.ps1",
-      "sha256": "ea178216228aa07963c42e5534234c262d517e261b4396e198491b104a432ff0",
-      "size": 21005
+      "sha256": "13a42b68da7bcbd01d63c1d4b93e2026ca06e2f983e5049380ed2b9d45e4c2f2",
+      "size": 21499
     },
     {
       "path": "ValidarInstalador.ps1",

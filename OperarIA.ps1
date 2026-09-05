@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai")]
+    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai","backup","restore")]
     [string]$Action = "status",
 
     [string]$RuntimeRoot = $PSScriptRoot,
@@ -25,7 +25,9 @@
     [string]$Provider,
     [string]$BaseUrl,
     [string]$Model,
-    [int]$Timeout = 30
+    [int]$Timeout = 30,
+    [string]$BackupPath,
+    [string]$RestorePath
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +39,7 @@ $Python   = Join-Path $ProductRoot ".venv\Scripts\python.exe"
 $Scripts  = Join-Path $RuntimeRoot "scripts"
 $Analyzer = Join-Path $Scripts "analizador_universal.py"
 $Onboarding = Join-Path $Scripts "enterprise_onboarding.py"
+$BackupEngine = Join-Path $Scripts "enterprise_backup_recovery.py"
 $Logs     = Join-Path $RuntimeRoot "logs"
 
 $PidFile  = Join-Path $Logs "analizador.pid"
@@ -771,6 +774,8 @@ function New-DiagnosticBundle {
 }
 
 switch ($Action) {
+    "backup" { if([string]::IsNullOrWhiteSpace($BackupPath)){exit 1}; & $Python $BackupEngine backup --runtime-root $ProductRoot --backup-path $BackupPath;exit $LASTEXITCODE }
+    "restore" { if([string]::IsNullOrWhiteSpace($RestorePath)){exit 1}; & $Python $BackupEngine restore --runtime-root $ProductRoot --restore-path $RestorePath;exit $LASTEXITCODE }
     "configuration" {
         & $Python $Onboarding status --runtime-root $ProductRoot
         exit $LASTEXITCODE
