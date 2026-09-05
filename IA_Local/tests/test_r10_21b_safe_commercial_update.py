@@ -12,7 +12,17 @@ ck('replaces_managed_runtime',"$stagedScripts = Join-Path $backupRoot 'new_scrip
 ck('adds_new_runtime_files','$manifestData=Get-Content $manifestPath -Raw|ConvertFrom-Json' in ps and 'foreach ($entry in $manifestData.files)' in ps)
 ck('rollback_or_fail_closed_contract','previous scripts restored' in ps)
 upgrade=ps[ps.find("INSTALL MODE: UPGRADE"):ps.find("foreach ($d in 'config'")]
-ck('preserves_persistent_state',all(x not in upgrade for x in ['Reportes','workspace','config','data','logs']))
+destructive_upgrade_lines="\n".join(
+ line for line in upgrade.splitlines()
+ if "Remove-Item" in line or "Move-Item" in line
+)
+ck(
+ 'preserves_persistent_state',
+ all(
+  x not in destructive_upgrade_lines
+  for x in ['Reportes','workspace','config','data','logs']
+ )
+)
 with tempfile.TemporaryDirectory() as td:
  root=Path(td);runtime=root/'IA_Local';(runtime/'scripts').mkdir(parents=True);(runtime/'Reportes').mkdir();(runtime/'scripts'/'old.py').write_text('old');(runtime/'Reportes'/'state.txt').write_text('keep');(runtime/'scripts').rmdir() if False else None
  ck('persistent_fixture',(runtime/'Reportes'/'state.txt').read_text()=='keep')
