@@ -81,7 +81,7 @@ if (-not $py) {
 }
 
 Note "Compatible Python detected: $($py.Version)"
-$manifest=Join-Path $root 'MANIFEST_SHA256.json';if(Test-Path $manifest){foreach($e in (Get-Content $manifest -Raw|ConvertFrom-Json).files){$f=Join-Path $root ([string]$e.path).Replace('/','\');if(-not(Test-Path $f)){Stop-Install "Manifest missing $($e.path)"};if((Get-FileHash $f -Algorithm SHA256).Hash -ne $e.sha256){Stop-Install "Manifest mismatch $($e.path)"}}}
+$manifestPath=Join-Path $root 'MANIFEST_SHA256.json';$manifestData=$null;if(Test-Path $manifestPath){$manifestData=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($e in $manifestData.files){$f=Join-Path $root ([string]$e.path).Replace('/','\');if(-not(Test-Path $f)){Stop-Install "Manifest missing $($e.path)"};if((Get-FileHash $f -Algorithm SHA256).Hash -ne $e.sha256){Stop-Install "Manifest mismatch $($e.path)"}}}
 if($ValidateOnly){Note 'VALIDATE-ONLY: PASS';exit 0}
 $ProductRoot = [System.IO.Path]::GetFullPath($InstallPath)
 $RuntimeRoot = Join-Path $ProductRoot 'IA_Local'
@@ -105,8 +105,10 @@ else {
     $stagedScripts = Join-Path $backupRoot 'new_scripts'
     $previousScripts = Join-Path $backupRoot 'previous_scripts'
     try {
+        if (-not $manifestData) { throw 'UPGRADE manifest data unavailable' }
         New-Item -ItemType Directory -Force $backupRoot | Out-Null
-        foreach ($entry in $manifest.files) {
+        $stagedCount = 0
+        foreach ($entry in $manifestData.files) {
             $relative = [string]$entry.path
             if ($relative -notlike 'IA_Local/*' -or $relative -notlike 'IA_Local/scripts/*') { continue }
             $from = Join-Path $root $relative
@@ -114,8 +116,9 @@ else {
             $to = Join-Path $stagedScripts $suffix
             New-Item -ItemType Directory -Force (Split-Path $to -Parent) | Out-Null
             Copy-Item $from $to -Force
+            $stagedCount++
         }
-        if (-not (Test-Path (Join-Path $stagedScripts 'analizador_universal.py') -PathType Leaf)) {
+        if ($stagedCount -lt 1 -or -not (Test-Path $stagedScripts) -or -not (Test-Path (Join-Path $stagedScripts 'analizador_universal.py') -PathType Leaf)) {
             throw 'UPGRADE staged runtime incomplete'
         }
         Move-Item (Join-Path $RuntimeRoot 'scripts') $previousScripts -Force
@@ -127,7 +130,7 @@ else {
             Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force -ErrorAction SilentlyContinue
             Move-Item $previousScripts (Join-Path $RuntimeRoot 'scripts') -Force
         }
-        Stop-Install 'UPGRADE runtime deployment failed; previous scripts restored'
+        Stop-Install "UPGRADE runtime deployment failed: $($_.Exception.Message); previous scripts restored"
     }
     finally { Remove-Item $backupRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
