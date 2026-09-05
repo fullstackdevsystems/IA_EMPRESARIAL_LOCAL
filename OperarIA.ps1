@@ -786,12 +786,22 @@ switch ($Action) {
     }
 
     "configure-sql" {
-        & $Python $Onboarding configure-sql --runtime-root $ProductRoot --tenant-id $TenantId --connection-id $ConnectionId --server $Server --database $Database --auth-mode $AuthMode --allowed-schemas ($AllowedSchemas -join ',') --allowed-tables ($AllowedTables -join ',') --secret-reference $SecretReference --username $SqlUsername
+        if (-not $AllowedSchemas -or -not $AllowedTables) { Write-Host "SQL allowlist schema/table requerida" -ForegroundColor Yellow; exit 1 }
+        if ($AuthMode -eq 'SQL_AUTH' -and ([string]::IsNullOrWhiteSpace($SecretReference) -or [string]::IsNullOrWhiteSpace($SqlUsername))) { Write-Host "SQL_AUTH requiere username y secret reference" -ForegroundColor Yellow; exit 1 }
+        $argsList = @($Onboarding, 'configure-sql', '--runtime-root', $ProductRoot, '--tenant-id', $TenantId, '--connection-id', $ConnectionId, '--server', $Server, '--database', $Database, '--auth-mode', $AuthMode)
+        if ($AllowedSchemas -and $AllowedSchemas.Count -gt 0) { $argsList += @('--allowed-schemas', ($AllowedSchemas -join ',')) }
+        if ($AllowedTables -and $AllowedTables.Count -gt 0) { $argsList += @('--allowed-tables', ($AllowedTables -join ',')) }
+        if (-not [string]::IsNullOrWhiteSpace($SecretReference)) { $argsList += @('--secret-reference', $SecretReference) }
+        if (-not [string]::IsNullOrWhiteSpace($SqlUsername)) { $argsList += @('--username', $SqlUsername) }
+        & $Python @argsList
         exit $LASTEXITCODE
     }
 
     "configure-ai" {
-        & $Python $Onboarding configure-ai --runtime-root $ProductRoot --tenant-id $TenantId --provider $Provider --base-url $BaseUrl --model $Model --timeout $Timeout
+        $argsList = @($Onboarding, 'configure-ai', '--runtime-root', $ProductRoot, '--tenant-id', $TenantId, '--provider', $Provider, '--timeout', $Timeout)
+        if (-not [string]::IsNullOrWhiteSpace($BaseUrl)) { $argsList += @('--base-url', $BaseUrl) }
+        if (-not [string]::IsNullOrWhiteSpace($Model)) { $argsList += @('--model', $Model) }
+        & $Python @argsList
         exit $LASTEXITCODE
     }
 
