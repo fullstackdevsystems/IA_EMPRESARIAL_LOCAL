@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "BuildReleaseR1021A.ps1",
-      "sha256": "7fa73b4c0b028b7946ed66efacd541684b28fc9b72cd9285ed565629a43602e3",
-      "size": 3295
+      "sha256": "917c3b23c3bc15ae2486733c47893410cfa4dad29c53b8f240e01757e32aa691",
+      "size": 3508
     },
     {
       "path": "IA_Local/ABRIR_ADMIN_MEMORIA_RAG.bat",

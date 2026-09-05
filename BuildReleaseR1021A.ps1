@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$OutputDir = "$PSScriptRoot\release"
 )
 
@@ -95,7 +95,6 @@ $forbiddenPatterns = @(
     "\.git",
     "\.venv",
     "__pycache__",
-    "\logs\",
     "diagnostics_",
     ".env",
     ".pyc"
@@ -105,6 +104,14 @@ $packagedFiles = Get-ChildItem $stageRoot -Recurse -File
 
 foreach ($file in $packagedFiles) {
     $relative = $file.FullName.Substring($stageRoot.Length).TrimStart("\","/")
+
+    # Dentro de logs solo se permite el placeholder .keep.
+    if (
+        $relative -like "IA_Local\logs\*" -and
+        $relative -ne "IA_Local\logs\.keep"
+    ) {
+        throw "FORBIDDEN_RELEASE_LOG_CONTENT: $relative"
+    }
 
     foreach ($pattern in $forbiddenPatterns) {
         if ($relative -match [regex]::Escape($pattern)) {
