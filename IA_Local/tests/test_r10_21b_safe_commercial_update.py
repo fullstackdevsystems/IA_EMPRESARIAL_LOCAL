@@ -8,7 +8,7 @@ manifest=json.loads((ROOT/'MANIFEST_SHA256.json').read_text(encoding='utf8'))
 scripts=[x['path'] for x in manifest['files'] if x['path'].startswith('IA_Local/scripts/')]
 ps=(ROOT/'InstallerR1020C1.ps1').read_text(encoding='utf8')
 ck('detects_existing_install','INSTALL MODE: UPGRADE' in ps)
-ck('replaces_managed_runtime','Remove-Item (Join-Path $RuntimeRoot \'scripts\')' in ps and scripts)
+ck('replaces_managed_runtime',"$stagedScripts = Join-Path $backupRoot 'new_scripts'" in ps and 'Move-Item $stagedScripts (Join-Path $RuntimeRoot \'scripts\')' in ps and scripts)
 ck('adds_new_runtime_files','foreach ($entry in $manifest.files)' in ps)
 ck('rollback_or_fail_closed_contract','previous scripts restored' in ps)
 upgrade=ps[ps.find("INSTALL MODE: UPGRADE"):ps.find("foreach ($d in 'config'")]

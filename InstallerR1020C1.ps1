@@ -102,24 +102,29 @@ if (-not $existingInstall) {
 else {
     Note 'INSTALL MODE: UPGRADE'
     $backupRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ia-update-" + [guid]::NewGuid().ToString())
+    $stagedScripts = Join-Path $backupRoot 'new_scripts'
+    $previousScripts = Join-Path $backupRoot 'previous_scripts'
     try {
         New-Item -ItemType Directory -Force $backupRoot | Out-Null
-        Copy-Item (Join-Path $RuntimeRoot 'scripts') (Join-Path $backupRoot 'scripts') -Recurse -Force
-        Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
-        New-Item -ItemType Directory -Force (Join-Path $RuntimeRoot 'scripts') | Out-Null
         foreach ($entry in $manifest.files) {
             $relative = [string]$entry.path
             if ($relative -notlike 'IA_Local/*' -or $relative -notlike 'IA_Local/scripts/*') { continue }
             $from = Join-Path $root $relative
-            $to = Join-Path $ProductRoot $relative
+            $suffix = $relative.Substring('IA_Local/scripts/'.Length)
+            $to = Join-Path $stagedScripts $suffix
             New-Item -ItemType Directory -Force (Split-Path $to -Parent) | Out-Null
             Copy-Item $from $to -Force
         }
+        if (-not (Test-Path (Join-Path $stagedScripts 'analizador_universal.py') -PathType Leaf)) {
+            throw 'UPGRADE staged runtime incomplete'
+        }
+        Move-Item (Join-Path $RuntimeRoot 'scripts') $previousScripts -Force
+        Move-Item $stagedScripts (Join-Path $RuntimeRoot 'scripts') -Force
     }
     catch {
-        if (Test-Path (Join-Path $backupRoot 'scripts')) {
+        if (Test-Path $previousScripts) {
             Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force -ErrorAction SilentlyContinue
-            Copy-Item (Join-Path $backupRoot 'scripts') (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
+            Move-Item $previousScripts (Join-Path $RuntimeRoot 'scripts') -Force
         }
         Stop-Install 'UPGRADE runtime deployment failed; previous scripts restored'
     }
