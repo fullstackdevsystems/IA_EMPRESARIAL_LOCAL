@@ -116,12 +116,11 @@ if(-not(Test-Path $vp)){
     }
 }
 & $vp -m pip install --disable-pip-version-check -r (Join-Path $RuntimeRoot 'requirements-local.txt');if($LASTEXITCODE){Stop-Install 'dependency install failed'}
-$env:IA_INSTALL_RUNTIME_SCRIPTS = Join-Path $RuntimeRoot 'scripts'
+$RuntimeScripts = Join-Path $RuntimeRoot 'scripts'
 
-& $vp -c 'import os,sys;sys.path.insert(0,os.environ["IA_INSTALL_RUNTIME_SCRIPTS"]);import fastapi,pandas,openpyxl,reportlab,pyodbc;import enterprise_sql_gateway,enterprise_platform_config,analizador_universal;print("HEALTH:PASS")'
+& $vp -c 'import sys;sys.path.insert(0,sys.argv[1]);import fastapi,pandas,openpyxl,reportlab,pyodbc;import enterprise_sql_gateway,enterprise_platform_config,analizador_universal;print("HEALTH:PASS")' $RuntimeScripts
 
 $healthExit = $LASTEXITCODE
-Remove-Item Env:IA_INSTALL_RUNTIME_SCRIPTS -ErrorAction SilentlyContinue
 
 if($healthExit){
     Stop-Install 'health imports failed'
