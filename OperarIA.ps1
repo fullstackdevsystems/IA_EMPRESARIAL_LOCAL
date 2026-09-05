@@ -474,7 +474,7 @@ function Start-Runtime {
     $process = Start-Process `
         -FilePath $Python `
         -ArgumentList @(
-            $Analyzer,
+            ('"{0}"' -f $Analyzer),
             "--host",
             $HostAddress,
             "--port",

@@ -638,8 +638,8 @@
     },
     {
       "path": "OperarIA.ps1",
-      "sha256": "4646a8c2cc95b5f4aeb384e69f6cffeb7ebb2385484126aac1e8c3c6a3626423",
-      "size": 18218
+      "sha256": "7e6688ace81df984ecb2c59ac94599b4873fa66854b95438eb6c5cf01c868a25",
+      "size": 18231
     },
     {
       "path": "ValidarInstalador.ps1",
