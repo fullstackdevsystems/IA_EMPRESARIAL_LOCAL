@@ -9,6 +9,19 @@ if(-not(Test-Path $source)){Stop-Install 'Critical IA_Local source missing'}
 function Resolve-CompatiblePython {
     $candidates = @()
 
+    foreach ($path in @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
+        'C:\Python312\python.exe',
+        'C:\Python311\python.exe',
+        'C:\Program Files\Python312\python.exe',
+        'C:\Program Files\Python311\python.exe'
+    )) {
+        if (Test-Path $path -PathType Leaf) {
+            $candidates += @{ Kind = "direct"; Command = $path; Args = @() }
+        }
+    }
+
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
 
     if ($pyLauncher -and $pyLauncher.Source) {
