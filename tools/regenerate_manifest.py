@@ -24,7 +24,7 @@ paths |= {
 # All canonical Python runtime modules under IA_Local/scripts.
 scripts_dir = ROOT / "IA_Local" / "scripts"
 
-for file in scripts_dir.glob("*.py"):
+for file in scripts_dir.rglob("*.py"):
     if file.is_file():
         paths.add(file.relative_to(ROOT).as_posix())
 

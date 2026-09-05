@@ -282,6 +282,21 @@
       "size": 103
     },
     {
+      "path": "IA_Local/scripts/enterprise_ai/admin_console.py",
+      "sha256": "6f8c96f0fdc7f934b9070dac90d843a3b946c4ddc95069de527c15126b2f6700",
+      "size": 18400
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/advanced_retrieval.py",
+      "sha256": "3563dbdd431055ce47925e3b209b06332e7baf4174f21a0b2d1f59cd1962082a",
+      "size": 11540
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/analytic_rules.py",
+      "sha256": "148130e881dfd04c4eabf85dfbcc3e5c1b255e4c4c8eab0e0ff40f64c5a69e11",
+      "size": 16841
+    },
+    {
       "path": "IA_Local/scripts/enterprise_ai/api.py",
       "sha256": "ab4ebc887214aa9c8d4e6cd90cb29ba742cf4416cb7cea577aeeded9a9bff2a7",
       "size": 58759
@@ -312,6 +327,21 @@
       "size": 3236
     },
     {
+      "path": "IA_Local/scripts/enterprise_ai/feedback.py",
+      "sha256": "f732137629339cf1b3cbb47f5c5aa32f889341c0a8667bc3902669a13e803052",
+      "size": 11939
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/fine_tuning_dataset.py",
+      "sha256": "4a57cbe5cfa87232aac0555cfbf97ec83337d1125bc72dceb30fd7e464cef953",
+      "size": 11833
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/knowledge_governance.py",
+      "sha256": "4dc0abf993847feab0f439f4132d87c053dec103d995a479dd6f195efe3a02a2",
+      "size": 19306
+    },
+    {
       "path": "IA_Local/scripts/enterprise_ai/memory.py",
       "sha256": "203e7e8a2955d8ae52cccde4ad405b44a791726a1849033c1fceb74791c0813a",
       "size": 16761
@@ -320,6 +350,16 @@
       "path": "IA_Local/scripts/enterprise_ai/observability.py",
       "sha256": "f94e8ea32d8cb1c4d7553f609d735c6b2d08ff7a09a67b56a0d6d9581be6bcc0",
       "size": 3421
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/performance.py",
+      "sha256": "7439470063055992d1d3761166d7cee7730173f613f89feb2ca03b87d302d045",
+      "size": 10035
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/precedence_engine.py",
+      "sha256": "49941fe347cc0b9684eed7ccfbf7f7c7da1fe9cf54b2813c4a8cdd35f6f54f71",
+      "size": 10100
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/providers.py",
@@ -332,6 +372,11 @@
       "size": 3683
     },
     {
+      "path": "IA_Local/scripts/enterprise_ai/semantic_registry.py",
+      "sha256": "3d4c1a97975ab85cf61a3d9cb4a100af92f3b8a8e475d41a9122937a86563e5a",
+      "size": 5254
+    },
+    {
       "path": "IA_Local/scripts/enterprise_ai/service.py",
       "sha256": "4c9a8e8165b7fbae44496878f5ae5718268795d8c10b1101423a7a2bc4f93f02",
       "size": 44814
@@ -340,6 +385,11 @@
       "path": "IA_Local/scripts/enterprise_ai/structured_data.py",
       "sha256": "146d4b701c0dd3d5aee45acae1cc7de63fff050db047ecd90409b1d4eded17ae",
       "size": 21402
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/traceability.py",
+      "sha256": "c6980c5059e3b3891bdbc686a10ec0ab6179dbebd4d3bc2d73cf8ec6ced30fba",
+      "size": 10107
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/vector_store.py",
