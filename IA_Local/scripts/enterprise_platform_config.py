@@ -35,6 +35,8 @@ def _branding(v):
  return out
 class EnterprisePlatformConfigStore:
  def __init__(self,root:Path,tenant_registry:Optional[EnterpriseTenantRegistry]=None):self.root=Path(root);self.path=self.root/"platform_config.json";self.tenants=tenant_registry
+ def _tenant_key(self,tenant_id):
+  return self.tenants.assert_active(tenant_id)["tenant_id"] if self.tenants else str(tenant_id)
  def _load(self):
   if not self.path.exists():return {"schema_version":CONFIG_VERSION,"global":dict(DEFAULTS),"tenants":{},"audit":[]}
   try:d=json.loads(self.path.read_text(encoding="utf8"))
@@ -62,11 +64,17 @@ class EnterprisePlatformConfigStore:
    if "secret" in k or "password" in k or "token" in k:raise PlatformConfigError("CONFIG_INVALID","Secret no permitido")
    g[k]=v
   self._event(d,"PLATFORM_CONFIG_UPDATED");self._save(d);return dict(g)
- def tenant_config(self,tenant_id):return dict(self._load()["tenants"].get(str(tenant_id),{}))
+ def tenant_config(self,tenant_id):
+  key=self._tenant_key(tenant_id);d=self._load();legacy=[k for k in d["tenants"] if k.lower()==key.lower() and k!=key]
+  if key in d["tenants"] and legacy:raise PlatformConfigError("CONFIG_INTEGRITY_MISMATCH","Configuración tenant duplicada")
+  if len(legacy)>1:raise PlatformConfigError("CONFIG_INTEGRITY_MISMATCH","Configuración tenant ambigua")
+  return dict(d["tenants"].get(key,d["tenants"].get(legacy[0],{}) if legacy else {}))
  def update_tenant(self,tenant_id,changes):
-  if self.tenants:self.tenants.assert_active(tenant_id)
+  key=self._tenant_key(tenant_id)
   if not isinstance(changes,dict) or set(changes)-_TENANT:raise PlatformConfigError("CONFIG_INVALID","Campos tenant inválidos")
-  d=self._load();current=dict(d["tenants"].get(str(tenant_id),{}))
+  d=self._load();legacy=[k for k in d["tenants"] if k.lower()==key.lower() and k!=key]
+  if key in d["tenants"] and legacy or len(legacy)>1:raise PlatformConfigError("CONFIG_INTEGRITY_MISMATCH","Configuración tenant duplicada")
+  current=dict(d["tenants"].pop(legacy[0],{}) if legacy else d["tenants"].get(key,{}))
   for k,v in changes.items():
    if k=="branding":v=_branding(v)
    if k=="theme" and v not in _THEMES:raise PlatformConfigError("CONFIG_INVALID","Theme inválido")
@@ -74,9 +82,9 @@ class EnterprisePlatformConfigStore:
    if k=="ai_model":v=_safe_model(v)
    if k=="enabled_features" and (not isinstance(v,dict) or set(v)-set(DEFAULTS["enabled_features"])):raise PlatformConfigError("CONFIG_INVALID","Features inválidas")
    current[k]=v
-  d["tenants"][str(tenant_id)]=current;self._event(d,"TENANT_CONFIG_UPDATED",str(tenant_id));
-  if "branding" in changes:self._event(d,"BRANDING_UPDATED",str(tenant_id))
-  if "ai_provider" in changes:self._event(d,"AI_PROVIDER_UPDATED",str(tenant_id))
+  d["tenants"][key]=current;self._event(d,"TENANT_CONFIG_UPDATED",key);
+  if "branding" in changes:self._event(d,"BRANDING_UPDATED",key)
+  if "ai_provider" in changes:self._event(d,"AI_PROVIDER_UPDATED",key)
   self._save(d);return dict(current)
  def resolve_effective_config(self,tenant_id=None,runtime_override=None):
   g=self.global_config();t=self.tenant_config(tenant_id) if tenant_id else {};out=dict(g);out.update({k:v for k,v in t.items() if k not in {"branding","enabled_features"}});out["enabled_features"]={**g["enabled_features"],**t.get("enabled_features",{})};out["branding"]={"display_name":t.get("display_name") or g["product_name"],"theme":t.get("theme") or g["default_theme"],**t.get("branding",{})}
