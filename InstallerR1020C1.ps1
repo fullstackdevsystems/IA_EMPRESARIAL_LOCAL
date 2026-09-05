@@ -117,10 +117,38 @@ if(-not(Test-Path $vp)){
 }
 & $vp -m pip install --disable-pip-version-check -r (Join-Path $RuntimeRoot 'requirements-local.txt');if($LASTEXITCODE){Stop-Install 'dependency install failed'}
 $RuntimeScripts = Join-Path $RuntimeRoot 'scripts'
+$HealthScript = Join-Path $ProductRoot '.installer_health_check.py'
 
-& $vp -c 'import sys;sys.path.insert(0,sys.argv[1]);import fastapi,pandas,openpyxl,reportlab,pyodbc;import enterprise_sql_gateway,enterprise_platform_config,analizador_universal;print("HEALTH:PASS")' $RuntimeScripts
+$HealthScriptContent = @"
+import sys
 
-$healthExit = $LASTEXITCODE
+sys.path.insert(0, sys.argv[1])
+
+import fastapi
+import pandas
+import openpyxl
+import reportlab
+import pyodbc
+import enterprise_sql_gateway
+import enterprise_platform_config
+import analizador_universal
+
+print("HEALTH:PASS")
+"@
+
+try {
+    [System.IO.File]::WriteAllText(
+        $HealthScript,
+        $HealthScriptContent,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    & $vp $HealthScript $RuntimeScripts
+    $healthExit = $LASTEXITCODE
+}
+finally {
+    Remove-Item $HealthScript -Force -ErrorAction SilentlyContinue
+}
 
 if($healthExit){
     Stop-Install 'health imports failed'
