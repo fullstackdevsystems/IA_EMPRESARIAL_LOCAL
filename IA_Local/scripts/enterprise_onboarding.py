@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-from enterprise_identity import EnterpriseIdentityStore, IdentityError
+from enterprise_identity import EnterpriseIdentityStore, IdentityError, validate_password
 from enterprise_platform_config import EnterprisePlatformConfigStore, PlatformConfigError
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 
@@ -58,6 +58,9 @@ class EnterpriseOnboarding:
 
     def configure(self, *, tenant_id: str, tenant_name: str, admin_user_id: str, admin_username: str, admin_display_name: str, password: str) -> Dict[str, Any]:
         try:
+            # Password policy remains centralized in enterprise_identity and is
+            # validated before this façade creates any persistent resource.
+            validate_password(password)
             try:
                 tenant = self.tenants.get(tenant_id)
                 if tenant["name"] != str(tenant_name).strip():

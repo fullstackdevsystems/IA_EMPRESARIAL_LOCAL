@@ -18,8 +18,11 @@ def _id(x,field):
  x=str(x or "").strip().lower()
  if not _ID.fullmatch(x): raise IdentityError("USER_INVALID_ID",f"{field} inválido")
  return x
-def _password(password):
+def validate_password(password):
  if not isinstance(password,str) or len(password)<12: raise IdentityError("PASSWORD_INVALID","Password debe tener al menos 12 caracteres")
+
+def _password(password):
+ validate_password(password)
  salt=secrets.token_bytes(16); key=hashlib.scrypt(password.encode(),salt=salt,n=2**14,r=8,p=1)
  return "scrypt$16384$8$1$"+salt.hex()+"$"+key.hex()
 def _verify(password,stored):

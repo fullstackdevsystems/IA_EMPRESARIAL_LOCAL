@@ -428,8 +428,8 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_identity.py",
-      "sha256": "2db7279491bf8f792bed71e8d55b185077134c341d1f407886806d3055215da9",
-      "size": 9390
+      "sha256": "111c530dde65864375038dfc5f187c4f57c39c888231e7f42da462c55fb0c8de",
+      "size": 9453
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_approval.py",
@@ -478,8 +478,8 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_onboarding.py",
-      "sha256": "5fc7761cddf42bae1cbabe635be5f486f49eb12a28e183a5d51b649ce10273d2",
-      "size": 5816
+      "sha256": "cd1d004562a41731c254026796f65fa755ab39ca1ea445f41712a85760d37756",
+      "size": 6032
     },
     {
       "path": "IA_Local/scripts/enterprise_platform_config.py",

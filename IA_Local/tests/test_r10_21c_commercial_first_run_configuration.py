@@ -27,6 +27,13 @@ with tempfile.TemporaryDirectory() as temporary:
     except OnboardingError as exc:
         check("configuration_validation", exc.code == "CONFIGURATION_REQUIRED")
 
+    try:
+        onboarding.configure(tenant_id="services", tenant_name="Servicios de Prueba", admin_user_id="services-admin", admin_username="services.admin", admin_display_name="Administración Servicios", password="corta")
+        raise AssertionError("failed_first_run_atomicity")
+    except OnboardingError as exc:
+        check("failed_first_run_atomicity", exc.code == "PASSWORD_INVALID" and onboarding.status()["status"] == "FIRST_RUN")
+        check("failed_first_run_empty", onboarding.status()["tenant_count"] == 0 and onboarding.status()["admin_count"] == 0)
+
     configured = onboarding.configure(
         tenant_id="services",
         tenant_name="Servicios de Prueba",
@@ -49,6 +56,17 @@ with tempfile.TemporaryDirectory() as temporary:
         tenant_id="services", tenant_name="Servicios de Prueba", admin_user_id="services-admin",
         admin_username="services.admin", admin_display_name="Administración Servicios", password="prueba-segura-2026"
     )["status"] == "CONFIGURED")
+    before_conflict = onboarding.status()
+    try:
+        onboarding.configure(tenant_id="services", tenant_name="Nombre Conflicto", admin_user_id="services-admin", admin_username="services.admin", admin_display_name="Administración Servicios", password="prueba-segura-2026")
+        raise AssertionError("conflict_fail_closed")
+    except OnboardingError as exc:
+        check("conflict_fail_closed", exc.code == "CONFIGURATION_CONFLICT" and onboarding.status() == before_conflict)
+    try:
+        onboarding.configure(tenant_id="other", tenant_name="Otra Empresa", admin_user_id="other-admin", admin_username="other.admin", admin_display_name="Otra Administración", password="corta")
+    except OnboardingError:
+        pass
+    check("preexisting_data_safety", onboarding.tenants.get("services")["name"] == "Servicios de Prueba" and onboarding.identity.get("services-admin")["tenant_id"] == "services")
     # R10.21B replaces scripts only; governed Reportes state remains untouched.
     before = {p.name: p.read_text(encoding="utf8") for p in reports.rglob("*.json")}
     check("upgrade_persistence", all(p.read_text(encoding="utf8") == text for p, text in ((reports / ".tenants" / "tenants.json", before["tenants.json"]), (reports / ".identity" / "identity.json", before["identity.json"]), (reports / ".platform_config" / "platform_config.json", before["platform_config.json"]))))
