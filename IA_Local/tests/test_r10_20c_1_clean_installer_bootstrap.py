@@ -9,7 +9,7 @@ ps=(ROOT/'InstallerR1020C1.ps1').read_text(encoding='utf8');bat=(ROOT/'INSTALAR_
 ck('installer_files',(ROOT/'InstallerR1020C1.ps1').is_file() and 'InstalarLimpio.ps1' in bat and 'InstallerR1020C1.ps1' in (ROOT/'InstalarLimpio.ps1').read_text(encoding='utf8') and (ROOT/'IA_Local'/'requirements-local.txt').is_file())
 ck('prechecks','Windows x64 required' in ps and 'Python 3.11 or 3.12 required' in ps and 'Install path not writable' in ps)
 ck('venv_dependencies','-m venv' in ps and 'pip install' in ps and 'requirements-local.txt' in ps and 'Resolve-CompatiblePython' in ps)
-ck("idempotent", "-not (Test-Path (Join-Path $RuntimeRoot 'scripts'))" in ps and "ValidateOnly" in ps)
+ck("idempotent", "INSTALL MODE: UPGRADE" in ps and "ValidateOnly" in ps)
 ck('product_layout','$ProductRoot' in ps and '$RuntimeRoot' in ps and "Join-Path $ProductRoot '.venv\\Scripts\\python.exe'" in ps and "Join-Path $RuntimeRoot 'requirements-local.txt'" in ps)
 ck('secure_bootstrap','No hardcoded tenant/admin/password' in ps and 'AdminPassword' not in ps and 'no model download' in ps)
 ck('health_optional','HEALTH:PASS' in ps and 'AI_PROVIDER: NOT CONFIGURED' in ps and 'SkipSqlCheck' in ps)

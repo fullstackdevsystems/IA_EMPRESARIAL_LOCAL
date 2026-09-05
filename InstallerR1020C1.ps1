@@ -93,9 +93,37 @@ catch {
     Stop-Install 'Install path not writable'
 }
 
-if (-not (Test-Path (Join-Path $RuntimeRoot 'scripts'))) {
+${existingInstall} = Test-Path (Join-Path $RuntimeRoot 'scripts')
+if (-not $existingInstall) {
+    Note 'INSTALL MODE: FRESH'
     New-Item -ItemType Directory -Force $RuntimeRoot | Out-Null
     Copy-Item (Join-Path $source '*') $RuntimeRoot -Recurse -Force
+}
+else {
+    Note 'INSTALL MODE: UPGRADE'
+    $backupRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ia-update-" + [guid]::NewGuid().ToString())
+    try {
+        New-Item -ItemType Directory -Force $backupRoot | Out-Null
+        Copy-Item (Join-Path $RuntimeRoot 'scripts') (Join-Path $backupRoot 'scripts') -Recurse -Force
+        Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
+        New-Item -ItemType Directory -Force (Join-Path $RuntimeRoot 'scripts') | Out-Null
+        foreach ($entry in $manifest.files) {
+            $relative = [string]$entry.path
+            if ($relative -notlike 'IA_Local/*' -or $relative -notlike 'IA_Local/scripts/*') { continue }
+            $from = Join-Path $root $relative
+            $to = Join-Path $ProductRoot $relative
+            New-Item -ItemType Directory -Force (Split-Path $to -Parent) | Out-Null
+            Copy-Item $from $to -Force
+        }
+    }
+    catch {
+        if (Test-Path (Join-Path $backupRoot 'scripts')) {
+            Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item (Join-Path $backupRoot 'scripts') (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
+        }
+        Stop-Install 'UPGRADE runtime deployment failed; previous scripts restored'
+    }
+    finally { Remove-Item $backupRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 foreach ($d in 'config','data','logs','workspace','Reportes') {
