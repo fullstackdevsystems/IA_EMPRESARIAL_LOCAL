@@ -72,3 +72,15 @@ with tempfile.TemporaryDirectory() as temporary:
     check("upgrade_persistence", all(p.read_text(encoding="utf8") == text for p, text in ((reports / ".tenants" / "tenants.json", before["tenants.json"]), (reports / ".identity" / "identity.json", before["identity.json"]), (reports / ".platform_config" / "platform_config.json", before["platform_config.json"]))))
 
 print("PASS R10.21C")
+
+with tempfile.TemporaryDirectory() as temporary:
+    onboarding = EnterpriseOnboarding(Path(temporary) / "IA_Local" / "Reportes")
+    result = onboarding.configure(tenant_id="BALOR", tenant_name="Balor", admin_user_id="balor-admin", admin_username="balor.admin", admin_display_name="Balor Admin", password="prueba-segura-2026")
+    tenant = onboarding.tenants.get("BALOR")
+    admin = onboarding.identity.get("balor-admin")
+    check("uppercase_tenant_input_normalized", tenant["tenant_id"] == "balor")
+    check("identity_uses_canonical_tenant_id", admin["tenant_id"] == "balor")
+    check("configured_state_after_valid_onboarding", result["status"] == "CONFIGURED")
+    check("tenant_admin_match", tenant["tenant_id"] == admin["tenant_id"])
+    check("lowercase_input_still_works", onboarding.tenants.get("balor")["tenant_id"] == "balor")
+    check("idempotent_mixed_case_reconfigure", onboarding.configure(tenant_id="balor", tenant_name="Balor", admin_user_id="balor-admin", admin_username="balor.admin", admin_display_name="Balor Admin", password="prueba-segura-2026")["status"] == "CONFIGURED" and onboarding.status()["tenant_count"] == 1 and onboarding.status()["admin_count"] == 1)

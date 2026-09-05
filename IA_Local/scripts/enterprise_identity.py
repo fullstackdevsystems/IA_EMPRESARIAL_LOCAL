@@ -52,11 +52,11 @@ class EnterpriseIdentityStore:
   if any("SYSTEM_ADMIN" in u["roles"] and u["status"]=="ACTIVE" for u in d["users"]): raise IdentityError("BOOTSTRAP_ALREADY_COMPLETE","Ya existe SYSTEM_ADMIN")
   return self.create_user(user_id=user_id,username=username,display_name=display_name,password=password,tenant_id=tenant_id,roles=["SYSTEM_ADMIN"])
  def create_user(self,*,user_id,username,display_name,password,tenant_id,roles, business_units=None, branches=None):
-  d=self._load(); uid=_id(user_id,"user_id"); uname=_id(username,"username"); self.tenants.assert_active(tenant_id)
+  d=self._load(); uid=_id(user_id,"user_id"); uname=_id(username,"username"); tenant=self.tenants.assert_active(tenant_id); canonical_tenant_id=tenant["tenant_id"]
   if any(u["user_id"]==uid or u["username"]==uname for u in d["users"]): raise IdentityError("USER_ALREADY_EXISTS","Usuario ya existe")
   roles=set(roles or []);
   if not roles or not roles<=ROLES: raise IdentityError("ROLE_INVALID","Rol inválido")
-  now=_now().isoformat();u={"user_id":uid,"username":uname,"display_name":str(display_name or "").strip(),"tenant_id":str(tenant_id),"status":"ACTIVE","roles":sorted(roles),"business_units":list(business_units or []),"branches":list(branches or []),"password_hash":_password(password),"failed_attempts":0,"locked_until":None,"created_at":now,"updated_at":now};d["users"].append(u);self._event(d,"USER_CREATED",uid);self._save(d);return _public(u)
+  now=_now().isoformat();u={"user_id":uid,"username":uname,"display_name":str(display_name or "").strip(),"tenant_id":canonical_tenant_id,"status":"ACTIVE","roles":sorted(roles),"business_units":list(business_units or []),"branches":list(branches or []),"password_hash":_password(password),"failed_attempts":0,"locked_until":None,"created_at":now,"updated_at":now};d["users"].append(u);self._event(d,"USER_CREATED",uid);self._save(d);return _public(u)
  def get(self,user_id):
   uid=_id(user_id,"user_id");u=next((x for x in self._load()["users"] if x["user_id"]==uid),None)
   if not u: raise IdentityError("USER_NOT_FOUND","Usuario no encontrado")
