@@ -119,7 +119,8 @@ else {
             throw 'UPGRADE staged runtime incomplete'
         }
         Move-Item (Join-Path $RuntimeRoot 'scripts') $previousScripts -Force
-        Move-Item $stagedScripts (Join-Path $RuntimeRoot 'scripts') -Force
+        New-Item -ItemType Directory -Force (Join-Path $RuntimeRoot 'scripts') | Out-Null
+        Copy-Item (Join-Path $stagedScripts '*') (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
     }
     catch {
         if (Test-Path $previousScripts) {
