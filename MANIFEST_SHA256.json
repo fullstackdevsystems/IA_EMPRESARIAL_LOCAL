@@ -348,8 +348,8 @@
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",
-      "sha256": "871fefb91c134e12ad2b606dae6393852e338a2c3fe909d1e429349f8b998c43",
-      "size": 2241
+      "sha256": "a60cfb5ecb56fbcb62dbc9098e9a409d0c9c8ef9bbe7587a204bce756f8873df",
+      "size": 3402
     },
     {
       "path": "OperarIA.ps1",

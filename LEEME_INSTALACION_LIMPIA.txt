@@ -57,5 +57,53 @@ VERSION
 IA Empresarial Local 8.5.5 R7 - instalacion limpia consolidada.
 
 MEJORAS DASHBOARD R7:
-- Toneladas exactas + porcentaje por artículo.
-- Tooltip al pasar el mouse en históricos, con valor exacto por mes y serie.
+- Toneladas exactas + porcentaje por artÃ­culo.
+- Tooltip al pasar el mouse en histÃ³ricos, con valor exacto por mes y serie.
+
+============================================================
+OPERACION DEL SISTEMA
+============================================================
+
+La operaciÃ³n diaria de IA Empresarial Local se realiza con:
+
+    .\OperarIA.ps1
+
+Comandos disponibles:
+
+Iniciar:
+    .\OperarIA.ps1 -Action start
+
+Detener:
+    .\OperarIA.ps1 -Action stop
+
+Reiniciar:
+    .\OperarIA.ps1 -Action restart
+
+Consultar estado:
+    .\OperarIA.ps1 -Action status
+
+Consultar salud:
+    .\OperarIA.ps1 -Action health
+
+Validar instalaciÃ³n y entorno:
+    .\OperarIA.ps1 -Action validate
+
+Generar diagnÃ³stico:
+    .\OperarIA.ps1 -Action diagnostics
+
+Generar paquete de diagnÃ³stico sanitizado:
+    .\OperarIA.ps1 -Action diagnostic-bundle
+
+El servicio escucha por defecto Ãºnicamente en:
+
+    http://127.0.0.1:8090
+
+Los logs se encuentran en:
+
+    IA_Local\logs
+
+IMPORTANTE:
+- No se abre acceso remoto automÃ¡ticamente.
+- No se modifica el firewall automÃ¡ticamente.
+- Los paquetes de diagnÃ³stico sanitizan passwords, tokens y secretos conocidos.
+- Si el puerto configurado estÃ¡ ocupado por otro proceso, el sistema falla de forma segura y no termina procesos ajenos.
