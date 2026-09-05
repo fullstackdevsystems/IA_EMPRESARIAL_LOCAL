@@ -2,6 +2,11 @@
   "version": "r10.20c.1",
   "files": [
     {
+      "path": "BuildReleaseR1021A.ps1",
+      "sha256": "7fa73b4c0b028b7946ed66efacd541684b28fc9b72cd9285ed565629a43602e3",
+      "size": 3295
+    },
+    {
       "path": "IA_Local/ABRIR_ADMIN_MEMORIA_RAG.bat",
       "sha256": "ccd293763b4afe7a94726606c9f2a875198bf684fddc712209bc38233dacddb4",
       "size": 318

@@ -2,7 +2,7 @@
 import hashlib,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];path=ROOT/'MANIFEST_SHA256.json';old=json.loads(path.read_text(encoding='utf8'))
-paths={item['path'] for item in old['files']}|{'InstalarLimpio.ps1','INSTALAR_IA_EMPRESARIAL_LOCAL.bat','InstallerR1020C1.ps1','OperarIA.ps1'}
+paths={item['path'] for item in old['files']}|{'InstalarLimpio.ps1','INSTALAR_IA_EMPRESARIAL_LOCAL.bat','InstallerR1020C1.ps1','OperarIA.ps1','BuildReleaseR1021A.ps1'}
 files=[]
 for rel in sorted(paths):
  p=ROOT/rel
