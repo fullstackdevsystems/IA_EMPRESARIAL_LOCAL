@@ -477,6 +477,11 @@
       "size": 6850
     },
     {
+      "path": "IA_Local/scripts/enterprise_onboarding.py",
+      "sha256": "5fc7761cddf42bae1cbabe635be5f486f49eb12a28e183a5d51b649ce10273d2",
+      "size": 5816
+    },
+    {
       "path": "IA_Local/scripts/enterprise_platform_config.py",
       "sha256": "15e414ce3045b6242fc0f5fd91d515301dd5938b7d6f73dfc591e917d87bdfae",
       "size": 8798
@@ -638,8 +643,8 @@
     },
     {
       "path": "OperarIA.ps1",
-      "sha256": "7e6688ace81df984ecb2c59ac94599b4873fa66854b95438eb6c5cf01c868a25",
-      "size": 18231
+      "sha256": "aec1bfdf47af0d51bff6e860ca2bd3526c3778b5a3221cf461811859b18f3462",
+      "size": 19050
     },
     {
       "path": "ValidarInstalador.ps1",

@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle")]
+    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration")]
     [string]$Action = "status",
 
     [string]$RuntimeRoot = $PSScriptRoot,
@@ -7,7 +7,13 @@
     [string]$HostAddress = "127.0.0.1",
 
     [ValidateRange(1,65535)]
-    [int]$Port = 8090
+    [int]$Port = 8090,
+
+    [string]$TenantId,
+    [string]$TenantName,
+    [string]$AdminUserId,
+    [string]$AdminUsername,
+    [string]$AdminDisplayName
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +24,7 @@ $RuntimeRoot = Join-Path $ProductRoot "IA_Local"
 $Python   = Join-Path $ProductRoot ".venv\Scripts\python.exe"
 $Scripts  = Join-Path $RuntimeRoot "scripts"
 $Analyzer = Join-Path $Scripts "analizador_universal.py"
+$Onboarding = Join-Path $Scripts "enterprise_onboarding.py"
 $Logs     = Join-Path $RuntimeRoot "logs"
 
 $PidFile  = Join-Path $Logs "analizador.pid"
@@ -752,6 +759,20 @@ function New-DiagnosticBundle {
 }
 
 switch ($Action) {
+    "configuration" {
+        & $Python $Onboarding status --runtime-root $ProductRoot
+        exit $LASTEXITCODE
+    }
+
+    "configure" {
+        if (-not $env:IA_ONBOARDING_ADMIN_PASSWORD) {
+            Write-Host "CONFIGURATION: REQUIRED (set IA_ONBOARDING_ADMIN_PASSWORD for this process)" -ForegroundColor Yellow
+            exit 1
+        }
+        & $Python $Onboarding configure --runtime-root $ProductRoot --tenant-id $TenantId --tenant-name $TenantName --admin-user-id $AdminUserId --admin-username $AdminUsername --admin-display-name $AdminDisplayName
+        exit $LASTEXITCODE
+    }
+
     "validate" {
         if (-not (Test-RuntimeConfiguration)) {
             exit 1
