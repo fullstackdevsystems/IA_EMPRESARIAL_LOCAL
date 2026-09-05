@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration")]
+    [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai")]
     [string]$Action = "status",
 
     [string]$RuntimeRoot = $PSScriptRoot,
@@ -13,7 +13,19 @@
     [string]$TenantName,
     [string]$AdminUserId,
     [string]$AdminUsername,
-    [string]$AdminDisplayName
+    [string]$AdminDisplayName,
+    [string]$ConnectionId,
+    [string]$Server,
+    [string]$Database,
+    [string]$AuthMode = "WINDOWS_INTEGRATED",
+    [string[]]$AllowedSchemas,
+    [string[]]$AllowedTables,
+    [string]$SecretReference,
+    [string]$SqlUsername,
+    [string]$Provider,
+    [string]$BaseUrl,
+    [string]$Model,
+    [int]$Timeout = 30
 )
 
 $ErrorActionPreference = "Stop"
@@ -770,6 +782,16 @@ switch ($Action) {
             exit 1
         }
         & $Python $Onboarding configure --runtime-root $ProductRoot --tenant-id $TenantId --tenant-name $TenantName --admin-user-id $AdminUserId --admin-username $AdminUsername --admin-display-name $AdminDisplayName
+        exit $LASTEXITCODE
+    }
+
+    "configure-sql" {
+        & $Python $Onboarding configure-sql --runtime-root $ProductRoot --tenant-id $TenantId --connection-id $ConnectionId --server $Server --database $Database --auth-mode $AuthMode --allowed-schemas ($AllowedSchemas -join ',') --allowed-tables ($AllowedTables -join ',') --secret-reference $SecretReference --username $SqlUsername
+        exit $LASTEXITCODE
+    }
+
+    "configure-ai" {
+        & $Python $Onboarding configure-ai --runtime-root $ProductRoot --tenant-id $TenantId --provider $Provider --base-url $BaseUrl --model $Model --timeout $Timeout
         exit $LASTEXITCODE
     }
 
