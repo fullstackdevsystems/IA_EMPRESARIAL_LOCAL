@@ -110,6 +110,7 @@ class EnterpriseIdentityStore:
  def change_password(self,user_id,password):
   d=self._load();u=self._find(d,user_id);u["password_hash"]=_password(password);u["updated_at"]=_now().isoformat();self._revoke(d,u["user_id"]);self._event(d,"PASSWORD_CHANGED",u["user_id"]);self._save(d)
  def has_permission(self,user,permission): return "*" in set().union(*(PERMISSIONS.get(r,set()) for r in user["roles"])) or permission in set().union(*(PERMISSIONS.get(r,set()) for r in user["roles"]))
+ def effective_permissions(self,user): return sorted(set().union(*(PERMISSIONS.get(r,set()) for r in user["roles"])))
  def scope(self,user, business_unit=None, branch=None):
   if business_unit and user["business_units"] and business_unit not in user["business_units"]:raise IdentityError("BUSINESS_UNIT_SCOPE_DENIED","Unidad no permitida")
   if branch and user["branches"] and branch not in user["branches"]:raise IdentityError("BRANCH_SCOPE_DENIED","Sucursal no permitida")

@@ -139,7 +139,7 @@ ASSISTANT_HTML = r"""
 <style>body{margin:0;background:#f4f7fb;color:#142033;font-family:Segoe UI,Arial,sans-serif}.wrap{max-width:1100px;margin:28px auto;padding:0 18px}.card{background:#fff;border:1px solid #dbe3ee;border-radius:16px;box-shadow:0 10px 34px #2342a315;padding:22px}.head{display:flex;justify-content:space-between;gap:12px;align-items:center}.badge{background:#dbeafe;color:#1d4ed8;padding:5px 9px;border-radius:999px;font-size:12px}.msgs{height:52vh;overflow:auto;border:1px solid #dbe3ee;border-radius:12px;padding:14px;background:#fbfdff;margin:18px 0}.m{padding:11px 13px;border-radius:12px;margin:8px 0}.u{white-space:pre-wrap}.u{background:#e8f0ff;margin-left:16%}.a{background:#eefbf3;margin-right:10%}.src{font-size:12px;color:#506176;border-top:1px dashed #ccd5e0;margin-top:8px;padding-top:7px}.row{display:flex;gap:10px}.row textarea{flex:1;min-height:80px;padding:12px;border:1px solid #cbd5e1;border-radius:10px}.btn{border:0;background:#2563eb;color:white;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}.stop{background:#b91c1c;display:none}.status{font-size:12px;color:#64748b;margin-top:6px}.warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px;margin:10px 0}.links a{margin-left:12px;color:#1d4ed8;text-decoration:none}.a p{margin:0 0 9px}.a p:last-child{margin-bottom:0}.a h3,.a h4{margin:10px 0 6px}.a ul,.a ol{margin:7px 0 7px 22px;padding:0}.a li{margin:3px 0}.a code{background:#e2e8f0;padding:1px 4px;border-radius:4px;font-family:Consolas,monospace}.a pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:8px;overflow:auto;white-space:pre-wrap}</style></head>
 <body><div class="wrap"><div class="card"><div class="head"><div><h2 style="margin:0">Asistente Empresarial Local <span class="badge">V8.5.5 Base Productiva + Streaming</span></h2><div style="color:#64748b">Memoria persistente, documentos fundamentados y cálculos determinísticos.</div></div><div class="links"><a href="/">Analizador</a><a id="admin" href="/admin">Administración</a></div></div><div id="auth" class="warn" style="display:none">Falta token de acceso. Abre esta pantalla con <b>ABRIR_ASISTENTE.bat</b>.</div><div id="msgs" class="msgs"></div><div class="row"><textarea id="q" placeholder="Pregunta sobre documentos, reglas del negocio o datasets..."></textarea><button class="btn" id="send">Enviar</button><button class="btn stop" id="stop">Detener</button></div></div></div>
 <script>
-const hp=new URLSearchParams(location.hash.replace(/^#/,'')),ht=hp.get('token')||'';if(ht){localStorage.setItem('iaToken',ht);history.replaceState(null,'',location.pathname)}const token=ht||localStorage.getItem('iaToken')||'';if(!token)document.getElementById('auth').style.display='block';document.getElementById('admin').href='/admin#token='+encodeURIComponent(token);
+let token=sessionStorage.getItem('iaEnterpriseSession')||'';if(!token)document.getElementById('auth').style.display='block';document.getElementById('admin').href='/admin';
 let hist=[];const msgs=document.getElementById('msgs');
 function escHtml(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function md(text){
@@ -181,7 +181,7 @@ ADMIN_HTML = r"""
 <div class="card"><h3>Configuración IA</h3><div class="settings"><label>Proveedor LLM<select id="llmp"><option value="ollama">Ollama</option><option value="lmstudio">LM Studio</option></select></label><label>Modelo Ollama<input id="ollamam"></label><label>Modelo LM Studio<input id="lmm"></label><label>Finalización de respuesta<select id="genmode"><option value="natural">Natural (hasta completar)</option></select></label><label>Contexto base LLM (tokens)<input id="numctx" type="number" min="2048" max="32768"></label><label>Contexto detallado LLM (tokens)<input id="detailctx" type="number" min="4096" max="65536"></label><label>Generaciones concurrentes<input id="maxgen" type="number" min="1" max="8"></label><label>Espera máxima de cola (s)<input id="queuetimeout" type="number" min="5" max="600"></label><label>Precalentar LLM<select id="warmup"><option value="true">Sí</option><option value="false">No</option></select></label><label>Open Terminal<select id="open_terminal"><option value="false">Desactivado</option><option value="true">Activado</option></select></label><label>Proveedor embeddings<select id="embp"><option value="ollama">Ollama</option><option value="lmstudio">LM Studio</option></select></label><label>Modelo embeddings Ollama<input id="embm"></label><label>Modelo embeddings LM Studio<input id="emblm"></label><label>Máx. recuerdos<input id="maxm" type="number" min="1" max="50"></label><label>Máx. fragmentos RAG<input id="maxr" type="number" min="1" max="50"></label><label>Límite contexto (caracteres)<input id="maxc" type="number" min="2000" max="100000"></label></div><button class="btn" style="margin-top:10px" onclick="saveSettings()">Guardar configuración</button><div id="vector" class="small" style="margin-top:8px"></div><div class="small">Los cambios de proveedor/modelos requieren reiniciar la IA.</div></div>
 <div class="grid"><div class="card"><h3>Datasets estructurados</h3><div id="datasets"></div></div><div class="card"><h3>Diagnóstico de producción</h3><button class="btn muted" onclick="loadDiagnostics()">Actualizar diagnóstico</button><div id="diag"></div></div></div><div class="card"><h3>Auditoría</h3><button class="btn muted" onclick="loadAudit()">Actualizar auditoría</button><div id="audit"></div></div></div>
 <script>
-const hp=new URLSearchParams(location.hash.replace(/^#/,'')),ht=hp.get('token')||'';if(ht){localStorage.setItem('iaToken',ht);history.replaceState(null,'',location.pathname)}const token=ht||localStorage.getItem('iaToken')||'';if(!token)document.getElementById('auth').style.display='block';document.getElementById('assistant').href='/assistant#token='+encodeURIComponent(token);const H={'Authorization':'Bearer '+token};let MEM=[];
+let token=sessionStorage.getItem('iaEnterpriseSession')||'';if(!token)document.getElementById('auth').style.display='block';document.getElementById('assistant').href='/assistant';const H={'Authorization':'Bearer '+token};let MEM=[];
 async function j(url,opt={}){opt.headers={...(opt.headers||{}),...H};const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.detail||d.error||'Error '+r.status);return d}
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function renderMemories(){const f=(mf.value||'').toLowerCase();mems.innerHTML=MEM.filter(x=>(x.content+' '+x.category+' '+(x.tags||[]).join(' ')).toLowerCase().includes(f)).map(x=>`<div class=item><b>${esc(x.category)}</b> <span class=pill>${esc(x.status)} | v${x.version} | importancia ${Number(x.importance).toFixed(2)}</span><br>${esc(x.content)}<div class=small>Fuente: ${esc(x.source_type||'N/D')}${x.source_ref?' / '+esc(x.source_ref):''} | actualizado: ${esc(x.updated_at||'')}</div><button class=btn onclick="editM('${x.id}')">Editar</button>${x.status==='pending'?`<button class="btn ok" onclick="confirmM('${x.id}')">Confirmar</button>`:''}${x.active?`<button class="btn muted" onclick="toggleM('${x.id}',false)">Desactivar</button>`:`<button class="btn ok" onclick="toggleM('${x.id}',true)">Activar</button>`}<button class="btn danger" onclick="forget('${x.id}')">Olvidar</button></div>`).join('')||'<div class=small>Sin memorias.</div>'}
@@ -228,6 +228,17 @@ def install_enterprise_routes(app, root: str | Path):
             raise HTTPException(status_code=403, detail="Permiso administrativo requerido")
         return principal
 
+    def require_permission(permission: str):
+        def dependency(principal: Principal = Depends(principal_dependency)) -> Principal:
+            try:
+                user = enterprise_identity.get(principal.user_id)
+            except IdentityError as exc:
+                raise HTTPException(status_code=401, detail="Sesión empresarial inválida") from exc
+            if user["tenant_id"] != principal.company_id or not enterprise_identity.has_permission(user, permission):
+                raise HTTPException(status_code=403, detail="Permiso empresarial insuficiente")
+            return principal
+        return dependency
+
     def control_plane_response(call):
         try:
             return call()
@@ -259,7 +270,7 @@ def install_enterprise_routes(app, root: str | Path):
         return JSONResponse({"ok": ok, "version": "8.5.5", "status": "ready" if ok else "degraded", "database": db_ok, "llm": llm_ok, "vector_store": type(components.vectors).__name__}, status_code=200 if ok else 503)
 
     @router.get("/api/enterprise/diagnostics")
-    def enterprise_diagnostics(principal: Principal = Depends(admin_dependency)):
+    def enterprise_diagnostics(principal: Principal = Depends(require_permission("admin:audit"))):
         recent = components.db.query("SELECT total_ms,first_token_ms,queue_ms,status,route FROM query_metrics WHERE company_id=? ORDER BY id DESC LIMIT 20", (principal.company_id,))
         ok_rows = [r for r in recent if r["status"] == "ok"]
         avg = lambda key: round(sum(float(r[key] or 0) for r in ok_rows) / len(ok_rows), 2) if ok_rows else None
@@ -309,7 +320,7 @@ def install_enterprise_routes(app, root: str | Path):
         return {"provider": control_plane_response(lambda: control_plane.ai_for(principal))}
 
     @router.post("/api/enterprise/chat")
-    def enterprise_chat(body: ChatRequest, principal: Principal = Depends(principal_dependency)):
+    def enterprise_chat(body: ChatRequest, principal: Principal = Depends(require_permission("analysis:run"))):
         try:
             with components.traceability.scope(principal, trace_type="chat", prompt=body.message) as trace_id:
                 result = components.service.chat(principal, body.message, body.history)
@@ -322,7 +333,7 @@ def install_enterprise_routes(app, root: str | Path):
             return JSONResponse({"ok": False, "error": "No se pudo completar la solicitud con el servicio local."}, status_code=500)
 
     @router.post("/api/enterprise/chat/stream")
-    def enterprise_chat_stream(body: ChatRequest, principal: Principal = Depends(principal_dependency)):
+    def enterprise_chat_stream(body: ChatRequest, principal: Principal = Depends(require_permission("analysis:run"))):
         def events():
             try:
                 with components.traceability.scope(principal, trace_type="chat_stream", prompt=body.message) as trace_id:
@@ -350,22 +361,22 @@ def install_enterprise_routes(app, root: str | Path):
         return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @router.get("/api/enterprise/memories")
-    def list_memories(include_inactive: bool = False, principal: Principal = Depends(principal_dependency)):
+    def list_memories(include_inactive: bool = False, principal: Principal = Depends(require_permission("knowledge:read"))):
         return {"memories": components.memory.list(principal, include_inactive=include_inactive)}
 
     @router.get("/api/enterprise/memories/search")
-    def search_memories(q: str, limit: int = 20, principal: Principal = Depends(principal_dependency)):
+    def search_memories(q: str, limit: int = 20, principal: Principal = Depends(require_permission("knowledge:read"))):
         return {"memories": components.memory.search(principal, q, limit=max(1, min(limit, 50)), min_score=0.0)}
 
     @router.post("/api/enterprise/memories")
-    def create_memory(body: MemoryCreateRequest, principal: Principal = Depends(principal_dependency)):
+    def create_memory(body: MemoryCreateRequest, principal: Principal = Depends(require_permission("knowledge:write"))):
         return components.memory.create(
             principal, body.content, body.category, scope=body.scope, confidence=body.confidence,
             importance=body.importance, tags=body.tags, expires_at=body.expires_at,
         )
 
     @router.patch("/api/enterprise/memories/{memory_id}")
-    def update_memory(memory_id: str, body: MemoryUpdateRequest, principal: Principal = Depends(principal_dependency)):
+    def update_memory(memory_id: str, body: MemoryUpdateRequest, principal: Principal = Depends(require_permission("knowledge:write"))):
         changes = {key: value for key, value in body.model_dump().items() if value is not None}
         try:
             return components.memory.update(principal, memory_id, **changes)
@@ -373,14 +384,14 @@ def install_enterprise_routes(app, root: str | Path):
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.post("/api/enterprise/memories/{memory_id}/confirm")
-    def confirm_memory(memory_id: str, principal: Principal = Depends(principal_dependency)):
+    def confirm_memory(memory_id: str, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.memory.confirm(principal, memory_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.delete("/api/enterprise/memories/{memory_id}")
-    def forget_memory(memory_id: str, principal: Principal = Depends(principal_dependency)):
+    def forget_memory(memory_id: str, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             components.memory.forget(principal, memory_id)
             return {"ok": True}
@@ -388,7 +399,7 @@ def install_enterprise_routes(app, root: str | Path):
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.post("/api/enterprise/documents")
-    async def upload_document(file: UploadFile = File(...), scope: str = Form("company"), principal: Principal = Depends(principal_dependency)):
+    async def upload_document(file: UploadFile = File(...), scope: str = Form("company"), principal: Principal = Depends(require_permission("knowledge:write"))):
         filename = safe_component(file.filename or "documento")
         temp_dir = components.cfg.root / "workspace" / "Entrada"
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -413,7 +424,7 @@ def install_enterprise_routes(app, root: str | Path):
                 pass
 
     @router.get("/api/enterprise/documents")
-    def list_documents(principal: Principal = Depends(principal_dependency)):
+    def list_documents(principal: Principal = Depends(require_permission("knowledge:read"))):
         docs = components.documents.list(principal)
         for item in docs:
             row = components.db.one("SELECT COUNT(*) AS n FROM document_chunks WHERE document_id=? AND active=1 AND version=?", (item["id"], item["current_version"]))
@@ -421,14 +432,14 @@ def install_enterprise_routes(app, root: str | Path):
         return {"documents": docs}
 
     @router.post("/api/enterprise/documents/{document_id}/reindex")
-    def reindex_document(document_id: str, principal: Principal = Depends(principal_dependency)):
+    def reindex_document(document_id: str, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.documents.reindex(principal, document_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.delete("/api/enterprise/documents/{document_id}")
-    def delete_document(document_id: str, principal: Principal = Depends(principal_dependency)):
+    def delete_document(document_id: str, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             components.documents.delete(principal, document_id)
             return {"ok": True}
@@ -437,37 +448,37 @@ def install_enterprise_routes(app, root: str | Path):
 
 
     @router.post("/api/enterprise/semantic/resolve")
-    def resolve_semantics(body: SemanticResolveRequest, principal: Principal = Depends(principal_dependency)):
+    def resolve_semantics(body: SemanticResolveRequest, principal: Principal = Depends(require_permission("analysis:run"))):
         return components.semantic.resolve(principal, body.columns, body.inferred_roles, on_date=body.on_date)
 
     @router.post("/api/enterprise/rules/{rule_id}/bind")
-    def bind_analytic_rule(rule_id: str, body: RuleBindingRequest, principal: Principal = Depends(admin_dependency)):
+    def bind_analytic_rule(rule_id: str, body: RuleBindingRequest, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.analytics.bind_rule(principal, rule_id, rule_type=body.rule_type, target=body.target, priority=body.priority, scope=body.scope)
         except (ValueError, KeyError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/analytic-rules")
-    def list_analytic_rules(principal: Principal = Depends(principal_dependency)):
+    def list_analytic_rules(principal: Principal = Depends(require_permission("analysis:run"))):
         return {"bindings": components.analytics.applicable_bindings(principal)}
 
     @router.get("/api/enterprise/datasets")
-    def list_datasets(principal: Principal = Depends(principal_dependency)):
+    def list_datasets(principal: Principal = Depends(require_permission("deliverable:read"))):
         return {"datasets": components.datasets.list(principal)}
 
     @router.get("/api/enterprise/feedback")
-    def list_feedback(limit: int = 100, principal: Principal = Depends(principal_dependency)):
+    def list_feedback(limit: int = 100, principal: Principal = Depends(require_permission("knowledge:read"))):
         return {"feedback": components.feedback.list(principal, limit=limit)}
 
     @router.post("/api/enterprise/feedback")
-    def submit_feedback(body: FeedbackRequest, principal: Principal = Depends(principal_dependency)):
+    def submit_feedback(body: FeedbackRequest, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.feedback.submit(principal, **body.model_dump())
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.post("/api/enterprise/feedback/{feedback_id}/validate")
-    def validate_feedback(feedback_id: str, body: FeedbackDecisionRequest, principal: Principal = Depends(principal_dependency)):
+    def validate_feedback(feedback_id: str, body: FeedbackDecisionRequest, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.feedback.validate_proposal(principal, feedback_id, replace_conflicts=body.replace_conflicts)
         except KeyError as exc:
@@ -476,7 +487,7 @@ def install_enterprise_routes(app, root: str | Path):
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @router.post("/api/enterprise/feedback/{feedback_id}/reject")
-    def reject_feedback(feedback_id: str, principal: Principal = Depends(principal_dependency)):
+    def reject_feedback(feedback_id: str, principal: Principal = Depends(require_permission("knowledge:write"))):
         try:
             return components.feedback.reject_proposal(principal, feedback_id)
         except KeyError as exc:
@@ -485,32 +496,32 @@ def install_enterprise_routes(app, root: str | Path):
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/feedback/{feedback_id}/provenance")
-    def feedback_provenance(feedback_id: str, principal: Principal = Depends(principal_dependency)):
+    def feedback_provenance(feedback_id: str, principal: Principal = Depends(require_permission("knowledge:read"))):
         try:
             return components.feedback.provenance(principal, feedback_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/traces")
-    def list_traces(limit: int = 100, principal: Principal = Depends(principal_dependency)):
+    def list_traces(limit: int = 100, principal: Principal = Depends(require_permission("admin:audit"))):
         return {"traces": components.traceability.list(principal, limit=limit)}
 
     @router.get("/api/enterprise/traces/{trace_id}")
-    def get_trace(trace_id: str, principal: Principal = Depends(principal_dependency)):
+    def get_trace(trace_id: str, principal: Principal = Depends(require_permission("admin:audit"))):
         try:
             return components.traceability.get(principal, trace_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/traces/{trace_id}/explain")
-    def explain_trace(trace_id: str, principal: Principal = Depends(principal_dependency)):
+    def explain_trace(trace_id: str, principal: Principal = Depends(require_permission("admin:audit"))):
         try:
             return components.traceability.explain(principal, trace_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/admin/overview")
-    def admin_overview(principal: Principal = Depends(principal_dependency)):
+    def admin_overview(principal: Principal = Depends(require_permission("admin:audit"))):
         rules = components.governance.list_rules(principal, include_inactive=True) if hasattr(components, "governance") else []
         sem = components.governance.list_semantic_definitions(principal, include_inactive=True) if hasattr(components, "governance") else []
         feedback = components.feedback.list(principal, limit=500) if hasattr(components, "feedback") else []
@@ -532,58 +543,58 @@ def install_enterprise_routes(app, root: str | Path):
         return {"counts":{"memories":len(memories),"documents":len(docs),"datasets":len(datasets),"rules":len(rules),"semantic_definitions":len(sem),"feedback_pending":sum(1 for x in feedback if x.get("proposal_status")=="PROPUESTO"),"traces":len(traces),"conflicts":conflicts},"statuses":statuses}
 
     @router.get("/api/enterprise/business-rules")
-    def list_business_rules(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(principal_dependency)):
+    def list_business_rules(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(require_permission("knowledge:read"))):
         return {"items": components.governance.list_rules(principal,status=status,include_inactive=include_inactive)}
 
     @router.post("/api/enterprise/business-rules")
-    def propose_business_rule(body: BusinessRuleCreateRequest, principal: Principal=Depends(principal_dependency)):
+    def propose_business_rule(body: BusinessRuleCreateRequest, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.propose_rule(principal,name=body.name,expression=body.expression,area=body.area,description=body.description,scope=body.scope,valid_from=body.valid_from,valid_to=body.valid_to,source_type="admin_console")
 
     @router.post("/api/enterprise/business-rules/{rule_id}/validate")
-    def validate_business_rule(rule_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(admin_dependency)):
+    def validate_business_rule(rule_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.validate_rule(principal,rule_id,replace_conflicts=body.replace_conflicts)
 
     @router.post("/api/enterprise/business-rules/{rule_id}/reject")
-    def reject_business_rule(rule_id: str, principal: Principal=Depends(admin_dependency)):
+    def reject_business_rule(rule_id: str, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.reject_rule(principal,rule_id)
 
     @router.post("/api/enterprise/business-rules/{rule_id}/obsolete")
-    def obsolete_business_rule(rule_id: str, principal: Principal=Depends(admin_dependency)):
+    def obsolete_business_rule(rule_id: str, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.obsolete_rule(principal,rule_id)
 
     @router.get("/api/enterprise/semantic-definitions")
-    def list_semantic_definitions(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(principal_dependency)):
+    def list_semantic_definitions(status: Optional[str]=None, include_inactive: bool=False, principal: Principal=Depends(require_permission("knowledge:read"))):
         return {"items": components.governance.list_semantic_definitions(principal,status=status,include_inactive=include_inactive)}
 
     @router.post("/api/enterprise/semantic-definitions")
-    def propose_semantic_definition(body: SemanticDefinitionCreateRequest, principal: Principal=Depends(principal_dependency)):
+    def propose_semantic_definition(body: SemanticDefinitionCreateRequest, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.propose_semantic_definition(principal,physical_name=body.physical_name,semantic_name=body.semantic_name,data_type=body.data_type,unit=body.unit,area=body.area,description=body.description,scope=body.scope,valid_from=body.valid_from,valid_to=body.valid_to,source_type="admin_console")
 
     @router.post("/api/enterprise/semantic-definitions/{item_id}/validate")
-    def validate_semantic_definition(item_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(admin_dependency)):
+    def validate_semantic_definition(item_id: str, body: GovernanceValidateRequest, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.validate_semantic_definition(principal,item_id,replace_conflicts=body.replace_conflicts)
 
     @router.post("/api/enterprise/semantic-definitions/{item_id}/reject")
-    def reject_semantic_definition(item_id: str, principal: Principal=Depends(admin_dependency)):
+    def reject_semantic_definition(item_id: str, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.governance.reject_semantic_definition(principal,item_id)
 
     @router.get("/api/enterprise/analytic-rules")
-    def list_analytic_rules(principal: Principal=Depends(principal_dependency)):
+    def list_analytic_rules(principal: Principal=Depends(require_permission("analysis:run"))):
         if not hasattr(components,"analytic_rules"): return {"items":[]}
         return {"items": components.analytic_rules.applicable_bindings(principal)}
 
     @router.post("/api/enterprise/rules/{rule_id}/bind")
-    def bind_analytic_rule(rule_id: str, body: AnalyticBindRequest, principal: Principal=Depends(admin_dependency)):
+    def bind_analytic_rule(rule_id: str, body: AnalyticBindRequest, principal: Principal=Depends(require_permission("knowledge:write"))):
         return components.analytic_rules.bind_rule(principal,rule_id,rule_type=body.rule_type,target=body.target,priority=body.priority,scope=body.scope)
 
     @router.get("/api/enterprise/knowledge/{object_type}/{object_id}/history")
-    def knowledge_history(object_type: str, object_id: str, principal: Principal=Depends(principal_dependency)):
+    def knowledge_history(object_type: str, object_id: str, principal: Principal=Depends(require_permission("knowledge:read"))):
         if object_type not in {"business_rule","semantic_definition"}: raise HTTPException(status_code=400,detail="object_type no válido")
         try: return components.governance.provenance(principal,object_type,object_id)
         except KeyError as exc: raise HTTPException(status_code=404,detail=str(exc)) from exc
 
     @router.get("/api/enterprise/settings")
-    def settings(principal: Principal = Depends(principal_dependency)):
+    def settings(principal: Principal = Depends(require_permission("config:read"))):
         return {
             "llm": components.cfg.section("llm"),
             "embeddings": components.cfg.section("embeddings"),
@@ -594,7 +605,7 @@ def install_enterprise_routes(app, root: str | Path):
         }
 
     @router.put("/api/enterprise/settings")
-    def update_settings(body: SettingsRequest, principal: Principal = Depends(admin_dependency)):
+    def update_settings(body: SettingsRequest, principal: Principal = Depends(require_permission("config:write"))):
         cfg_path = components.cfg.root / "config" / "enterprise_ai.json"
         raw = json.loads(cfg_path.read_text(encoding="utf-8-sig")) if cfg_path.exists() else components.cfg.raw
         data = body.model_dump(exclude_none=True)
@@ -638,7 +649,7 @@ def install_enterprise_routes(app, root: str | Path):
         return {"ok": True, "restart_required": True}
 
     @router.get("/api/enterprise/performance")
-    def enterprise_performance(principal: Principal = Depends(admin_dependency)):
+    def enterprise_performance(principal: Principal = Depends(require_permission("admin:audit"))):
         from .performance import optional_engines
         return {
             "ok": True,
@@ -653,39 +664,39 @@ def install_enterprise_routes(app, root: str | Path):
         }
 
     @router.get("/api/enterprise/fine-tuning/runs")
-    def finetune_runs(limit: int = 50, principal: Principal = Depends(admin_dependency)):
+    def finetune_runs(limit: int = 50, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         return {"runs": FineTuningDatasetManager(components.db, components.cfg.root).list_runs(principal, limit)}
 
     @router.post("/api/enterprise/fine-tuning/runs")
-    def finetune_build(body: FineTuningBuildRequest, principal: Principal = Depends(admin_dependency)):
+    def finetune_build(body: FineTuningBuildRequest, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         return FineTuningDatasetManager(components.db, components.cfg.root).build(principal)
 
     @router.get("/api/enterprise/fine-tuning/runs/{run_id}")
-    def finetune_run(run_id: str, principal: Principal = Depends(admin_dependency)):
+    def finetune_run(run_id: str, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         return FineTuningDatasetManager(components.db, components.cfg.root).get_run(principal, run_id)
 
     @router.post("/api/enterprise/fine-tuning/examples/{example_id}/decision")
-    def finetune_decision(example_id: str, body: FineTuningDecisionRequest, principal: Principal = Depends(admin_dependency)):
+    def finetune_decision(example_id: str, body: FineTuningDecisionRequest, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         try: return FineTuningDatasetManager(components.db, components.cfg.root).decide(principal, example_id, body.approve, body.reason)
         except (KeyError, ValueError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.post("/api/enterprise/fine-tuning/runs/{run_id}/approve-safe")
-    def finetune_approve_safe(run_id: str, principal: Principal = Depends(admin_dependency)):
+    def finetune_approve_safe(run_id: str, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         return FineTuningDatasetManager(components.db, components.cfg.root).approve_all_safe(principal, run_id)
 
     @router.post("/api/enterprise/fine-tuning/runs/{run_id}/export")
-    def finetune_export(run_id: str, body: FineTuningExportRequest, principal: Principal = Depends(admin_dependency)):
+    def finetune_export(run_id: str, body: FineTuningExportRequest, principal: Principal = Depends(require_permission("admin:audit"))):
         from .fine_tuning_dataset import FineTuningDatasetManager
         try: return FineTuningDatasetManager(components.db, components.cfg.root).export(principal, run_id, body.format)
         except (KeyError, ValueError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.get("/api/enterprise/audit")
-    def audit(limit: int = 100, principal: Principal = Depends(admin_dependency)):
+    def audit(limit: int = 100, principal: Principal = Depends(require_permission("admin:audit"))):
         rows = components.db.query(
             "SELECT * FROM audit_events WHERE company_id=? ORDER BY id DESC LIMIT ?",
             (principal.company_id, max(1, min(limit, 500))),

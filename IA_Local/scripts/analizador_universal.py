@@ -1654,7 +1654,9 @@ def auth_logout(authorization: str = Header("")):
     except IdentityError as exc:_auth_error(exc)
 
 @app.get("/api/auth/me")
-def auth_me(authorization: str = Header("")): return _bearer(authorization)
+def auth_me(authorization: str = Header("")):
+    user = _bearer(authorization)
+    return {**user, "effective_permissions": _identity_store().effective_permissions(user)}
 
 @app.get("/api/admin/users")
 def admin_users(authorization: str = Header("")):
