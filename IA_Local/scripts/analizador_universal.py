@@ -1700,7 +1700,9 @@ def update_admin_user(user_id: str,payload: Dict[str,Any],authorization: str = H
 def user_action(user_id:str,action:str,payload:Dict[str,Any]={},authorization:str=Header("")):
     store=_identity_store()
     try:
-        target=store.get(user_id);_admin_user(authorization,"user:disable",target)
+        target=store.get(user_id)
+        permission="user:update" if action=="reset-password" else "user:disable"
+        _admin_user(authorization,permission,target)
         if action=="disable":return store.set_status(user_id,"DISABLED")
         if action=="enable":return store.set_status(user_id,"ACTIVE")
         if action=="reset-password":store.change_password(user_id,payload.get("password"));return {"user_id":user_id,"password_reset":True}
@@ -1741,7 +1743,7 @@ def get_platform_config(authorization: str=Header("")):
 
 @app.patch("/api/admin/config")
 def update_platform_config(payload: Dict[str,Any],authorization: str=Header("")):
-    actor=_config_actor(authorization,"config:read")
+    actor=_config_actor(authorization,"config:write")
     if "SYSTEM_ADMIN" not in actor["roles"]:raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso global denegado"})
     try:return _platform_config().update_global(payload)
     except PlatformConfigError as exc:_config_http_error(exc)

@@ -11,7 +11,7 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 <button data-p="resumen" class="active">Resumen</button><button data-p="controlplane">Plataforma</button><button data-p="memoria">Memoria</button><button data-p="documentos">Documentos / RAG</button><button data-p="semantica">Diccionario</button><button data-p="reglas">Reglas empresariales</button><button data-p="analiticas">Reglas analíticas</button><button data-p="feedback">Feedback</button><button data-p="trazas">Trazabilidad</button><button data-p="historial">Historial</button><button data-p="auditoria">Auditoría</button></div></aside>
 <main class="main"><div class="top"><div><h2 style="margin:0">Administración empresarial</h2><div class="mutedtxt">Conocimiento, gobernanza, aprendizaje y trazabilidad en una sola consola.</div></div><div class="links"><a id="assistant" href="/assistant">Asistente</a><a href="/">Analizador</a><button class="btn muted" onclick="enterpriseLogout()">Cerrar sesión</button></div></div><div id="auth" class="notice error" style="display:none"></div><div id="msg"></div>
 <section id="resumen" class="panel active"><div class="grid" id="metrics"></div><div class="card"><h3>Estado de conocimiento</h3><div id="statusSummary"></div></div></section>
-<section id="controlplane" class="panel"><div class="card"><h3>Enterprise Control Plane</h3><div class="mutedtxt">Estado real y gobernado de plataforma, tenant, identidad, SQL e IA.</div><div id="controlSummary"></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div></div><div class="card table"><h3>Fuentes SQL Server</h3><div id="controlSql"></div></div><div class="card table"><h3>Proveedor IA</h3><div id="controlAi"></div></div></section>
+<section id="controlplane" class="panel"><div class="card"><h3>Enterprise Control Plane</h3><div class="mutedtxt">Administracion gobernada de empresa, usuarios, SQL Server e IA.</div><div id="controlSummary"></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contrasena<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div><div class="card table"><h3>Fuentes SQL Server</h3><div id="controlSql"></div><div id="cpSqlCreate" data-cp-permission="sql:configure" class="settings" style="margin-top:12px"><label>ID conexion<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticacion<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Windows Integrated</option><option value="SQL_AUTH">SQL Auth</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Secret SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Schemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Max filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" onclick="controlCreateSql()">Crear conexion SQL</button></div><div class="card"><h3>Proveedor IA</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">OpenAI compatible local</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Timeout<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Context window<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Si</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
 <section id="memoria" class="panel"><div class="card"><h3>Memoria permanente</h3><div class="formgrid"><input id="memText" placeholder="Conocimiento o preferencia"><select id="memCategory"><option>conocimiento_empresa</option><option>regla_negocio</option><option>definicion</option><option>preferencia</option><option>procedimiento</option></select></div><div style="margin-top:8px"><button class="btn" onclick="createMemory()">Guardar memoria</button></div></div><div class="card table" id="memoryTable"></div></section>
 <section id="documentos" class="panel"><div class="card"><h3>Documentos / RAG</h3><input type="file" id="docFile"><div style="margin-top:8px"><button class="btn" onclick="uploadDoc()">Indexar documento</button></div></div><div class="card table" id="docsTable"></div></section>
 <section id="semantica" class="panel"><div class="card"><h3>Diccionario empresarial</h3><div class="formgrid"><input id="semPhysical" placeholder="Nombre físico: Cve_Clie"><input id="semName" placeholder="Concepto: customer_id"><input id="semArea" placeholder="Área (opcional)"><input id="semDesc" placeholder="Descripción"></div><div style="margin-top:8px"><button class="btn" onclick="proposeSemantic()">Crear propuesta</button></div></div><div class="card table" id="semanticTable"></div></section>
@@ -28,7 +28,7 @@ const H=()=>({'Authorization':'Bearer '+token});const J=()=>({'Authorization':'B
 function toast(t,err=false){document.getElementById('msg').innerHTML='<div class="notice '+(err?'error':'')+'>'+esc(t)+'</div>';setTimeout(()=>document.getElementById('msg').innerHTML='',4500)}
 function showLogin(message=''){token='';currentUser=null;sessionStorage.removeItem('iaEnterpriseSession');document.querySelectorAll('.panel,.side').forEach(x=>x.style.display='none');const a=document.getElementById('auth');a.style.display='block';a.innerHTML='<h3>Acceso empresarial</h3><input id="authUser" autocomplete="username" placeholder="Usuario"><input id="authPassword" type="password" autocomplete="current-password" placeholder="Contraseña"><button class="btn" onclick="enterpriseLogin()">Iniciar sesión</button><div class="small">'+esc(message)+'</div>'}
 function can(permission){const p=(currentUser&&currentUser.effective_permissions)||[];return p.includes('*')||p.includes(permission)}
-function applyCapabilities(){const map={createMemory:'knowledge:write',confirmMem:'knowledge:write',deleteMem:'knowledge:write',uploadDoc:'knowledge:write',reindexDoc:'knowledge:write',deleteDoc:'knowledge:write',proposeSemantic:'knowledge:write',validateSem:'knowledge:write',rejectSem:'knowledge:write',proposeRule:'knowledge:write',validateRule:'knowledge:write',rejectRule:'knowledge:write',obsoleteRule:'knowledge:write',bindAnalytic:'knowledge:write',validateFeedback:'knowledge:write',rejectFeedback:'knowledge:write'};document.querySelectorAll('button[onclick]').forEach(b=>{const fn=(b.getAttribute('onclick')||'').match(/^(\w+)/);if(fn&&map[fn[1]])b.style.display=can(map[fn[1]])?'':'none'});document.querySelectorAll('#nav button').forEach(b=>{if(['resumen','trazas','auditoria'].includes(b.dataset.p))b.style.display=can('admin:audit')?'':'none'})}
+function applyCapabilities(){const map={createMemory:'knowledge:write',confirmMem:'knowledge:write',deleteMem:'knowledge:write',uploadDoc:'knowledge:write',reindexDoc:'knowledge:write',deleteDoc:'knowledge:write',proposeSemantic:'knowledge:write',validateSem:'knowledge:write',rejectSem:'knowledge:write',proposeRule:'knowledge:write',validateRule:'knowledge:write',rejectRule:'knowledge:write',obsoleteRule:'knowledge:write',bindAnalytic:'knowledge:write',validateFeedback:'knowledge:write',rejectFeedback:'knowledge:write'};document.querySelectorAll('button[onclick]').forEach(b=>{const fn=(b.getAttribute('onclick')||'').match(/^(\w+)/);if(fn&&map[fn[1]])b.style.display=can(map[fn[1]])?'':'none'});document.querySelectorAll('#nav button').forEach(b=>{if(['resumen','trazas','auditoria'].includes(b.dataset.p))b.style.display=can('admin:audit')?'':'none';if(b.dataset.p==='controlplane')b.style.display=(can('config:read')||can('tenant:list')||can('user:list')||can('sql:read'))?'':'none'});controlApplyCapabilities()}
 function showConsole(){document.getElementById('auth').style.display='none';document.querySelectorAll('.panel').forEach(x=>x.style.display='');document.querySelector('.side').style.display='';applyCapabilities()}
 async function establishSession(){try{const me=await fetch('/api/auth/me',{headers:H()});if(!me.ok){showLogin(me.status===401?'Sesión inválida.':'No se pudo validar la sesión.');return false}currentUser=await me.json();showConsole();return true}catch(e){showLogin('No se pudo conectar con el servidor local.');return false}}
 async function enterpriseLogin(){const u=document.getElementById('authUser').value,p=document.getElementById('authPassword');try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p.value})});let d={};try{d=await r.json()}catch{}if(!r.ok){showLogin('Credenciales inválidas o acceso no disponible.');return}token=d.token;sessionStorage.setItem('iaEnterpriseSession',token);if(await establishSession())refreshAll()}catch(e){showLogin('No se pudo conectar con el servidor local.')}finally{p.value=''}}
@@ -36,7 +36,855 @@ async function enterpriseLogout(){try{if(token)await fetch('/api/auth/logout',{m
 async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{}if(r.status===401){showLogin('La sesión expiró o fue revocada.');throw new Error('Sesión requerida')}if(!r.ok)throw new Error(d.detail||d.error||('HTTP '+r.status));return d}
 function pill(s){return '<span class="pill '+esc(s)+'">'+esc(s||'N/D')+'</span>'}function table(rows,cols,actions){if(!rows||!rows.length)return '<div class="empty">Sin registros.</div>';return '<table><thead><tr>'+cols.map(c=>'<th>'+esc(c[0])+'</th>').join('')+(actions?'<th>Acciones</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+(c[2]?c[2](r[c[1]],r):esc(r[c[1]]??''))+'</td>').join('')+(actions?'<td class="actions">'+actions(r)+'</td>':'')+'</tr>').join('')+'</tbody></table>'}
 async function refreshAll(){if(!token)return;try{const [m,d,s,r,a,f]=await Promise.all([api('/api/enterprise/memories?include_inactive=true',{headers:H()}),api('/api/enterprise/documents',{headers:H()}),api('/api/enterprise/semantic-definitions?include_inactive=true',{headers:H()}),api('/api/enterprise/business-rules?include_inactive=true',{headers:H()}),api('/api/enterprise/analytic-rules',{headers:H()}),api('/api/enterprise/feedback',{headers:H()})]);renderMem(m.memories);renderDocs(d.documents);renderSem(s.items);renderRules(r.items);renderAnalytic(a.items);renderFeedback(f.feedback||f.items);applyCapabilities();if(can('admin:audit')){const [ov,t]=await Promise.all([api('/api/enterprise/admin/overview',{headers:H()}),api('/api/enterprise/traces?limit=100',{headers:H()})]);renderOverview(ov);renderTraces(t.traces);loadAudit()}else{document.getElementById('metrics').innerHTML='';document.getElementById('statusSummary').innerHTML='<div class="empty">Resumen administrativo no autorizado.</div>'}}catch(e){toast(e.message,true)}}
-async function loadControlPlane(){try{const [o,t,u,s,a]=await Promise.all([api('/api/enterprise/control-plane/overview',{headers:H()}),api('/api/enterprise/control-plane/tenants',{headers:H()}),api('/api/enterprise/control-plane/users',{headers:H()}),api('/api/enterprise/control-plane/sql-sources',{headers:H()}),api('/api/enterprise/control-plane/ai',{headers:H()})]);controlSummary.innerHTML='<pre>'+esc(JSON.stringify({release:o.release,tenant:o.active_tenant,user:o.active_user,health:o.health},null,2))+'</pre>';controlTenants.innerHTML=table(t.tenants,[['Tenant','tenant_id'],['Nombre','name'],['Estado','status',(v)=>pill(v)]]);controlUsers.innerHTML=table(u.users,[['Usuario','username'],['Rol','roles',(v)=>esc((v||[]).join(', '))],['Estado','status',(v)=>pill(v)]]);controlSql.innerHTML=table(s.sources,[['Conexión','connection_id'],['Servidor','server'],['Base','database'],['Estado','status',(v)=>pill(v)],['Límite','max_rows']]);controlAi.innerHTML='<pre>'+esc(JSON.stringify(a.provider,null,2))+'</pre>'}catch(e){controlSummary.innerHTML='<div class="notice error">'+esc(e.message)+'</div>'}}
+let CONTROL_USERS=[];
+let CONTROL_SQL=[];
+
+function controlSystemAdmin(){
+    return Boolean(
+        currentUser &&
+        (currentUser.roles||[]).includes('SYSTEM_ADMIN')
+    )
+}
+
+function controlElement(id){
+    return document.getElementById(id)
+}
+
+function controlTenantId(){
+    const selector=controlElement('cpTenantSelect');
+    return String(
+        (selector&&selector.value) ||
+        (currentUser&&currentUser.tenant_id) ||
+        ''
+    ).trim().toLowerCase()
+}
+
+function controlTenantQuery(){
+    const tenant=controlTenantId();
+    if(!controlSystemAdmin())return '';
+    return tenant?'?tenant_id='+encodeURIComponent(tenant):''
+}
+
+function controlCsv(value){
+    return String(value||'')
+        .split(',')
+        .map(x=>x.trim())
+        .filter(Boolean)
+}
+
+function controlApplyCapabilities(){
+    document.querySelectorAll('[data-cp-permission]').forEach(el=>{
+        el.style.display=can(el.dataset.cpPermission)?'':'none'
+    })
+}
+
+function controlUnavailable(id,message){
+    const el=controlElement(id);
+    if(el)el.innerHTML='<div class="empty">'+esc(message)+'</div>'
+}
+
+async function controlLoadOverview(){
+    if(!can('config:read')){
+        controlUnavailable('controlSummary','Resumen no autorizado.');
+        return
+    }
+    try{
+        const o=await api(
+            '/api/enterprise/control-plane/overview',
+            {headers:H()}
+        );
+        const summary={
+            release:o.release,
+            tenant:o.active_tenant,
+            user:o.active_user,
+            health:o.health
+        };
+        controlElement('controlSummary').innerHTML=
+            '<pre>'+esc(JSON.stringify(summary,null,2))+'</pre>'
+    }catch(e){
+        controlUnavailable('controlSummary',e.message)
+    }
+}
+
+async function controlLoadTenants(){
+    if(!can('tenant:list')){
+        controlUnavailable(
+            'controlTenants',
+            'Empresas no autorizadas.'
+        );
+        return
+    }
+    try{
+        const data=await api(
+            '/api/enterprise/control-plane/tenants',
+            {headers:H()}
+        );
+        const tenants=data.tenants||[];
+        const selected=controlTenantId();
+
+        let selector='';
+
+        if(controlSystemAdmin()){
+            selector=
+                '<label class="small">Empresa activa para administrar '+
+                '<select id="cpTenantSelect" onchange="controlTenantChanged()">'+
+                tenants.map(t=>
+                    '<option value="'+esc(t.tenant_id)+'">'+
+                    esc(t.name||t.tenant_id)+
+                    '</option>'
+                ).join('')+
+                '</select></label>'
+        }else{
+            selector=
+                '<div class="small">Empresa activa: '+
+                esc(controlTenantId())+
+                '</div>'
+        }
+
+        controlElement('controlTenants').innerHTML=
+            selector+
+            table(
+                tenants,
+                [
+                    ['Tenant','tenant_id'],
+                    ['Nombre','name'],
+                    ['Estado','status',(v)=>pill(v)]
+                ]
+            );
+
+        const select=controlElement('cpTenantSelect');
+        if(select){
+            const exists=[...select.options]
+                .some(x=>x.value===selected);
+            if(exists)select.value=selected
+        }
+    }catch(e){
+        controlUnavailable('controlTenants',e.message)
+    }
+}
+
+async function controlTenantChanged(){
+    await Promise.allSettled([
+        controlLoadOverview(),
+        controlLoadUsers(),
+        controlLoadSql(),
+        controlLoadAi()
+    ]);
+    controlApplyCapabilities()
+}
+
+function controlUserActions(user){
+    const actions=[];
+
+    if(can('user:update')){
+        actions.push(
+            '<button class="btn" onclick="controlEditUser(\''+
+            esc(user.user_id)+
+            '\')">Editar</button>'
+        );
+        actions.push(
+            '<button class="btn muted" onclick="controlResetPassword(\''+
+            esc(user.user_id)+
+            '\')">Reset clave</button>'
+        )
+    }
+
+    if(can('user:disable')){
+        const action=user.status==='ACTIVE'?'disable':'enable';
+        const label=user.status==='ACTIVE'?'Deshabilitar':'Habilitar';
+        actions.push(
+            '<button class="btn" onclick="controlUserState(\''+
+            esc(user.user_id)+'\',\''+action+
+            '\')">'+label+'</button>'
+        )
+    }
+
+    return actions.join(' ')
+}
+
+async function controlLoadUsers(){
+    if(!can('user:list')){
+        controlUnavailable('controlUsers','Usuarios no autorizados.');
+        return
+    }
+
+    try{
+        const data=await api(
+            '/api/admin/users',
+            {headers:H()}
+        );
+
+        CONTROL_USERS=data.users||[];
+
+        const tenant=controlTenantId();
+
+        const visible=controlSystemAdmin()
+            ? CONTROL_USERS.filter(
+                x=>String(x.tenant_id||'').toLowerCase()===tenant
+              )
+            : CONTROL_USERS;
+
+        controlElement('controlUsers').innerHTML=
+            table(
+                visible,
+                [
+                    ['Usuario','username'],
+                    ['Nombre','display_name'],
+                    ['Rol','roles',(v)=>esc((v||[]).join(', '))],
+                    ['Estado','status',(v)=>pill(v)]
+                ],
+                controlUserActions
+            )
+    }catch(e){
+        controlUnavailable('controlUsers',e.message)
+    }
+}
+
+async function controlCreateUser(){
+    if(!can('user:create'))return;
+
+    const password=controlElement('cpUserPassword');
+    const tenant=controlTenantId();
+
+    try{
+        const body={
+            user_id:controlElement('cpUserId').value.trim(),
+            username:controlElement('cpUsername').value.trim(),
+            display_name:controlElement('cpDisplayName').value.trim(),
+            password:password.value,
+            tenant_id:tenant,
+            roles:controlCsv(controlElement('cpRoles').value)
+        };
+
+        if(!body.user_id||!body.username||!body.password||!body.roles.length){
+            throw new Error(
+                'ID, usuario, contrasena y rol son obligatorios.'
+            )
+        }
+
+        await api(
+            '/api/admin/users',
+            {
+                method:'POST',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            }
+        );
+
+        controlElement('cpUserId').value='';
+        controlElement('cpUsername').value='';
+        controlElement('cpDisplayName').value='';
+        controlElement('cpRoles').value='VIEWER';
+
+        toast('Usuario creado.');
+        await controlLoadUsers()
+    }catch(e){
+        toast(e.message,true)
+    }finally{
+        password.value=''
+    }
+}
+
+async function controlEditUser(userId){
+    const user=CONTROL_USERS.find(x=>x.user_id===userId);
+    if(!user||!can('user:update'))return;
+
+    const display=prompt(
+        'Nombre visible:',
+        user.display_name||''
+    );
+
+    if(display===null)return;
+
+    const body={display_name:display};
+
+    if(can('user:role_assign')){
+        const roles=prompt(
+            'Roles separados por coma:',
+            (user.roles||[]).join(',')
+        );
+
+        if(roles===null)return;
+
+        body.roles=controlCsv(roles)
+    }
+
+    try{
+        await api(
+            '/api/admin/users/'+encodeURIComponent(userId),
+            {
+                method:'PATCH',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            }
+        );
+
+        toast('Usuario actualizado.');
+        await controlLoadUsers()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlUserState(userId,action){
+    if(!can('user:disable'))return;
+
+    try{
+        await api(
+            '/api/admin/users/'+encodeURIComponent(userId)+'/'+action,
+            {method:'POST',headers:H()}
+        );
+
+        toast(
+            action==='disable'
+                ?'Usuario deshabilitado.'
+                :'Usuario habilitado.'
+        );
+
+        await controlLoadUsers()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlResetPassword(userId){
+    if(!can('user:update'))return;
+
+    let password=prompt('Nueva contrasena:');
+
+    if(password===null)return;
+
+    try{
+        if(!password)throw new Error('Contrasena requerida.');
+
+        await api(
+            '/api/admin/users/'+
+            encodeURIComponent(userId)+
+            '/reset-password',
+            {
+                method:'POST',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({password})
+            }
+        );
+
+        toast('Contrasena restablecida.')
+    }catch(e){
+        toast(e.message,true)
+    }finally{
+        password=''
+    }
+}
+
+function controlSqlActions(profile){
+    const actions=[];
+
+    if(can('sql:read')){
+        actions.push(
+            '<button class="btn" onclick="controlSqlRun(\''+
+            esc(profile.connection_id)+
+            '\',\'test\')">Probar</button>'
+        );
+        actions.push(
+            '<button class="btn" onclick="controlSqlRun(\''+
+            esc(profile.connection_id)+
+            '\',\'discover\')">Descubrir</button>'
+        )
+    }
+
+    if(can('sql:configure')){
+        actions.push(
+            '<button class="btn" onclick="controlEditSql(\''+
+            esc(profile.connection_id)+
+            '\')">Editar</button>'
+        );
+        actions.push(
+            '<button class="btn" onclick="controlSqlAllowlist(\''+
+            esc(profile.connection_id)+
+            '\')">Allowlist</button>'
+        );
+
+        const action=profile.enabled?'disable':'enable';
+        const label=profile.enabled?'Deshabilitar':'Habilitar';
+
+        actions.push(
+            '<button class="btn" onclick="controlSqlRun(\''+
+            esc(profile.connection_id)+
+            '\',\''+action+'\')">'+label+'</button>'
+        );
+
+        if(profile.auth_mode==='SQL_AUTH'){
+            actions.push(
+                '<button class="btn muted" onclick="controlRotateSqlSecret(\''+
+                esc(profile.connection_id)+
+                '\')">Rotar secret</button>'
+            )
+        }
+    }
+
+    return actions.join(' ')
+}
+
+async function controlLoadSql(){
+    if(!can('sql:read')){
+        controlUnavailable('controlSql','SQL no autorizado.');
+        return
+    }
+
+    try{
+        const data=await api(
+            '/api/admin/sql/connections'+controlTenantQuery(),
+            {headers:H()}
+        );
+
+        CONTROL_SQL=data.items||[];
+
+        controlElement('controlSql').innerHTML=
+            table(
+                CONTROL_SQL,
+                [
+                    ['Conexion','connection_id'],
+                    ['Servidor','server'],
+                    ['Base','database'],
+                    ['Estado','status',(v)=>pill(v)],
+                    ['Max filas','max_rows'],
+                    ['Secret','secret_configured',(v)=>v?'Configurado':'N/A']
+                ],
+                controlSqlActions
+            )
+    }catch(e){
+        controlUnavailable('controlSql',e.message)
+    }
+}
+
+async function controlCreateSql(){
+    if(!can('sql:configure'))return;
+
+    const secret=controlElement('cpSqlSecret');
+
+    try{
+        const auth=controlElement('cpSqlAuth').value;
+
+        const body={
+            connection_id:controlElement('cpSqlId').value.trim(),
+            display_name:controlElement('cpSqlDisplay').value.trim(),
+            server:controlElement('cpSqlServer').value.trim(),
+            database:controlElement('cpSqlDatabase').value.trim(),
+            auth_mode:auth,
+            username:controlElement('cpSqlUsername').value.trim(),
+            allowed_schemas:controlCsv(
+                controlElement('cpSqlSchemas').value
+            ),
+            allowed_tables:controlCsv(
+                controlElement('cpSqlTables').value
+            ),
+            max_rows:Number(controlElement('cpSqlMaxRows').value||500)
+        };
+
+        if(auth==='SQL_AUTH'){
+            body.secret=secret.value
+        }
+
+        if(
+            !body.connection_id ||
+            !body.server ||
+            !body.database ||
+            !body.allowed_schemas.length ||
+            !body.allowed_tables.length
+        ){
+            throw new Error(
+                'Conexion, servidor, base y allowlist son obligatorios.'
+            )
+        }
+
+        if(auth==='SQL_AUTH'&&!body.secret){
+            throw new Error('Secret SQL requerido.')
+        }
+
+        await api(
+            '/api/admin/sql/connections'+controlTenantQuery(),
+            {
+                method:'POST',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            }
+        );
+
+        controlElement('cpSqlId').value='';
+        controlElement('cpSqlDisplay').value='';
+        controlElement('cpSqlServer').value='';
+        controlElement('cpSqlDatabase').value='';
+        controlElement('cpSqlUsername').value='';
+        controlElement('cpSqlTables').value='';
+
+        toast('Conexion SQL creada.');
+        await controlLoadSql()
+    }catch(e){
+        toast(e.message,true)
+    }finally{
+        secret.value=''
+    }
+}
+
+async function controlEditSql(connectionId){
+    const profile=CONTROL_SQL.find(
+        x=>x.connection_id===connectionId
+    );
+
+    if(!profile||!can('sql:configure'))return;
+
+    const display=prompt(
+        'Nombre de la conexion:',
+        profile.display_name||''
+    );
+
+    if(display===null)return;
+
+    const server=prompt(
+        'Servidor:',
+        profile.server||''
+    );
+
+    if(server===null)return;
+
+    const database=prompt(
+        'Base de datos:',
+        profile.database||''
+    );
+
+    if(database===null)return;
+
+    try{
+        await api(
+            '/api/admin/sql/connections/'+
+            encodeURIComponent(connectionId)+
+            controlTenantQuery(),
+            {
+                method:'PATCH',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    display_name:display,
+                    server,
+                    database
+                })
+            }
+        );
+
+        toast('Conexion SQL actualizada.');
+        await controlLoadSql()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlSqlAllowlist(connectionId){
+    const profile=CONTROL_SQL.find(
+        x=>x.connection_id===connectionId
+    );
+
+    if(!profile||!can('sql:configure'))return;
+
+    const schemas=prompt(
+        'Schemas permitidos, separados por coma:',
+        (profile.allowed_schemas||[]).join(',')
+    );
+
+    if(schemas===null)return;
+
+    const objects=prompt(
+        'Objetos permitidos, separados por coma:',
+        (profile.allowed_tables||[]).join(',')
+    );
+
+    if(objects===null)return;
+
+    try{
+        await api(
+            '/api/admin/sql/connections/'+
+            encodeURIComponent(connectionId)+
+            '/allowlist'+controlTenantQuery(),
+            {
+                method:'PATCH',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    schemas:controlCsv(schemas),
+                    objects:controlCsv(objects)
+                })
+            }
+        );
+
+        toast('Allowlist actualizada.');
+        await controlLoadSql()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlRotateSqlSecret(connectionId){
+    if(!can('sql:configure'))return;
+
+    let secret=prompt('Nuevo secret SQL:');
+
+    if(secret===null)return;
+
+    try{
+        if(!secret)throw new Error('Secret SQL requerido.');
+
+        await api(
+            '/api/admin/sql/connections/'+
+            encodeURIComponent(connectionId)+
+            '/secret'+controlTenantQuery(),
+            {
+                method:'POST',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({secret})
+            }
+        );
+
+        toast('Secret SQL rotado.');
+        await controlLoadSql()
+    }catch(e){
+        toast(e.message,true)
+    }finally{
+        secret=''
+    }
+}
+
+async function controlSqlRun(connectionId,action){
+    const configure=['enable','disable'].includes(action);
+
+    if(configure&&!can('sql:configure'))return;
+    if(!configure&&!can('sql:read'))return;
+
+    try{
+        const result=await api(
+            '/api/admin/sql/connections/'+
+            encodeURIComponent(connectionId)+
+            '/'+action+
+            controlTenantQuery(),
+            {method:'POST',headers:H()}
+        );
+
+        if(action==='discover'){
+            const count=
+                result.discovered_object_count ??
+                (result.objects||[]).length ??
+                0;
+            toast('Discovery completado. Objetos: '+count)
+        }else if(action==='test'){
+            toast('Prueba SQL completada.')
+        }else{
+            toast(
+                action==='enable'
+                    ?'Conexion habilitada.'
+                    :'Conexion deshabilitada.'
+            )
+        }
+
+        await controlLoadSql()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+function controlAiFromForm(){
+    const type=controlElement('cpAiType').value;
+
+    if(type==='DISABLED'){
+        return {
+            provider_id:'disabled',
+            provider_type:'DISABLED',
+            enabled:false,
+            timeout:30
+        }
+    }
+
+    const contextRaw=controlElement('cpAiContext').value.trim();
+
+    return {
+        provider_id:type.toLowerCase(),
+        provider_type:type,
+        base_url:controlElement('cpAiUrl').value.trim(),
+        model:controlElement('cpAiModel').value.trim()||null,
+        enabled:controlElement('cpAiEnabled').value==='true',
+        timeout:Number(controlElement('cpAiTimeout').value||30),
+        context_window:contextRaw?Number(contextRaw):null
+    }
+}
+
+function controlRenderAi(provider){
+    const p=provider||{
+        provider_type:'DISABLED',
+        enabled:false,
+        timeout:30
+    };
+
+    controlElement('cpAiType').value=
+        p.provider_type||'DISABLED';
+
+    controlElement('cpAiUrl').value=
+        p.base_url||'';
+
+    controlElement('cpAiModel').value=
+        p.model||'';
+
+    controlElement('cpAiTimeout').value=
+        p.timeout||30;
+
+    controlElement('cpAiContext').value=
+        p.context_window||'';
+
+    controlElement('cpAiEnabled').value=
+        String(Boolean(p.enabled));
+
+    controlElement('controlAi').innerHTML=
+        '<pre>'+
+        esc(JSON.stringify({
+            provider_id:p.provider_id,
+            provider_type:p.provider_type,
+            base_url:p.base_url,
+            model:p.model,
+            enabled:p.enabled,
+            timeout:p.timeout,
+            context_window:p.context_window
+        },null,2))+
+        '</pre>'
+}
+
+async function controlLoadAi(){
+    if(!can('config:read')){
+        controlUnavailable(
+            'controlAi',
+            'Configuracion IA no autorizada.'
+        );
+        return
+    }
+
+    try{
+        let url='/api/admin/ai/providers';
+
+        const tenant=controlTenantId();
+
+        if(tenant){
+            url+='?tenant_id='+encodeURIComponent(tenant)
+        }
+
+        const data=await api(url,{headers:H()});
+
+        controlRenderAi(data.provider)
+    }catch(e){
+        controlUnavailable('controlAi',e.message)
+    }
+}
+
+async function controlTestAi(){
+    if(!can('config:read'))return;
+
+    try{
+        const provider=controlAiFromForm();
+
+        const result=await api(
+            '/api/admin/ai/provider/test',
+            {
+                method:'POST',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({provider})
+            }
+        );
+
+        toast(
+            'Proveedor IA: '+
+            (result.status||'sin estado')+
+            (
+                result.latency_ms!=null
+                    ?' / '+result.latency_ms+' ms'
+                    :''
+            )
+        )
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlSaveAi(){
+    if(!can('config:write'))return;
+
+    const tenant=controlTenantId();
+
+    if(!tenant){
+        toast('Empresa requerida.',true);
+        return
+    }
+
+    try{
+        const provider=controlAiFromForm();
+
+        await api(
+            '/api/admin/tenants/'+
+            encodeURIComponent(tenant)+
+            '/config',
+            {
+                method:'PATCH',
+                headers:{...H(),'Content-Type':'application/json'},
+                body:JSON.stringify({ai_provider:provider})
+            }
+        );
+
+        toast('Proveedor IA guardado.');
+        await controlLoadAi()
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function loadControlPlane(){
+    const jobs=[];
+
+    if(can('config:read')){
+        jobs.push(controlLoadOverview());
+        jobs.push(controlLoadAi())
+    }else{
+        controlUnavailable(
+            'controlSummary',
+            'Resumen no autorizado.'
+        );
+        controlUnavailable(
+            'controlAi',
+            'Configuracion IA no autorizada.'
+        )
+    }
+
+    if(can('tenant:list')){
+        jobs.push(controlLoadTenants())
+    }else{
+        controlUnavailable(
+            'controlTenants',
+            'Empresas no autorizadas.'
+        )
+    }
+
+    if(can('user:list')){
+        jobs.push(controlLoadUsers())
+    }else{
+        controlUnavailable(
+            'controlUsers',
+            'Usuarios no autorizados.'
+        )
+    }
+
+    if(can('sql:read')){
+        jobs.push(controlLoadSql())
+    }else{
+        controlUnavailable(
+            'controlSql',
+            'SQL no autorizado.'
+        )
+    }
+
+    await Promise.allSettled(jobs);
+
+    controlApplyCapabilities()
+}
 function renderOverview(o){const c=o.counts||{};document.getElementById('metrics').innerHTML=[['Memorias',c.memories],['Documentos',c.documents],['Reglas',c.rules],['Definiciones',c.semantic_definitions],['Feedback pendiente',c.feedback_pending],['Trazas',c.traces],['Datasets',c.datasets],['Conflictos',c.conflicts]].map(x=>'<div class="metric"><span class="mutedtxt">'+esc(x[0])+'</span><b>'+esc(x[1]??0)+'</b></div>').join('');document.getElementById('statusSummary').innerHTML=table(o.statuses||[],[['Tipo','type'],['Estado','status',(v)=>pill(v)],['Cantidad','count']])}
 function renderMem(rows){document.getElementById('memoryTable').innerHTML=table(rows,[['Categoría','category'],['Contenido','content'],['Confianza','confidence'],['Confirmada','confirmed',(v)=>v?'Sí':'No'],['Activa','active',(v)=>v?'Sí':'No']],r=>'<button class="btn ok" onclick="confirmMem(\''+r.id+'\')">Confirmar</button> <button class="btn danger" onclick="deleteMem(\''+r.id+'\')">Desactivar</button>')}
 function renderDocs(rows){document.getElementById('docsTable').innerHTML=table(rows,[['Documento','name'],['Versión','current_version'],['Chunks','chunk_count'],['Estado','active',(v)=>v?'Activo':'Inactivo']],r=>'<button class="btn" onclick="reindexDoc(\''+r.id+'\')">Reindexar</button> <button class="btn danger" onclick="deleteDoc(\''+r.id+'\')">Eliminar</button>')}
