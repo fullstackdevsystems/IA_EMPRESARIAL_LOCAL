@@ -10,9 +10,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .factory import build_components
-from .security import Principal, ensure_secret, safe_component, verify_token
+from .security import Principal, safe_component
 from .admin_console import UNIFIED_ADMIN_HTML
 from enterprise_control_plane import ControlPlaneError, EnterpriseControlPlane
+from enterprise_identity import EnterpriseIdentityStore, IdentityError
+from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 
 
 class ChatRequest(BaseModel):
@@ -201,8 +203,8 @@ load();
 def install_enterprise_routes(app, root: str | Path):
     components = build_components(root)
     control_plane = EnterpriseControlPlane(components.cfg.root)
-    security_cfg = components.cfg.section("security")
-    secret = ensure_secret(security_cfg["token_secret_file"])
+    enterprise_tenants = EnterpriseTenantRegistry(Path(components.cfg.root) / "workspace" / "Reportes" / ".tenants")
+    enterprise_identity = EnterpriseIdentityStore(Path(components.cfg.root) / "workspace" / "Reportes" / ".identity", enterprise_tenants)
     router = APIRouter()
 
     def principal_dependency(authorization: Optional[str] = Header(default=None)) -> Principal:
@@ -212,13 +214,18 @@ def install_enterprise_routes(app, root: str | Path):
         if not raw:
             raise HTTPException(status_code=401, detail="Token requerido")
         try:
-            return verify_token(secret, raw)
-        except ValueError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
+            user = enterprise_identity.authenticate(raw)
+            return Principal(user["tenant_id"], user["user_id"], "admin" if "SYSTEM_ADMIN" in user["roles"] else "user")
+        except (IdentityError, TenantRegistryError) as exc:
+            raise HTTPException(status_code=401, detail="Sesión empresarial inválida") from exc
 
     def admin_dependency(principal: Principal = Depends(principal_dependency)) -> Principal:
-        if principal.role != "admin":
-            raise HTTPException(status_code=403, detail="Se requiere rol admin")
+        try:
+            user = enterprise_identity.get(principal.user_id)
+        except IdentityError as exc:
+            raise HTTPException(status_code=401, detail="Sesión empresarial inválida") from exc
+        if user["tenant_id"] != principal.company_id or not enterprise_identity.has_permission(user, "admin:audit"):
+            raise HTTPException(status_code=403, detail="Permiso administrativo requerido")
         return principal
 
     def control_plane_response(call):

@@ -501,7 +501,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                 "answer": answer,
                 "sources": built.sources,
                 "memory_candidate": candidate,
-                "timings_ms": {**{k: round(v, 2) for k, v in built.timings.items()}, "llm_ms": round(llm_ms, 2), "queue_ms": round(queue_ms, 2), "total_ms": round(total_ms, 2)},
+                "timings_ms": {**{k: round(v, 2) if isinstance(v, (int, float)) and not isinstance(v, bool) else v for k, v in built.timings.items()}, "llm_ms": round(llm_ms, 2), "queue_ms": round(queue_ms, 2), "total_ms": round(total_ms, 2)},
                 "retrieval": {"memories": len(built.memories), "document_chunks": len(built.document_chunks), "structured": bool(built.structured), **({"response_profile": profile["name"], "generation_mode": "natural"} if "profile" in locals() else {})},
             }
         except Exception as exc:

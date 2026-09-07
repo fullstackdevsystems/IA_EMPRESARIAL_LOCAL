@@ -8,7 +8,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "IA_Local" / "scripts"))
 
-from enterprise_ai.security import Principal, create_token
+from enterprise_ai.security import Principal
 from enterprise_control_plane import ControlPlaneError, EnterpriseControlPlane
 from enterprise_platform_config import PlatformConfigError
 from enterprise_sql_gateway import EnterpriseSqlError, validate_query_plan
@@ -88,13 +88,13 @@ with tempfile.TemporaryDirectory() as tmp:
     import enterprise_ai.api as enterprise_api
     class Config:
         root = runtime
-        def section(self, name): return {"token_secret_file": str(runtime / "config" / "control.secret")} if name == "security" else {}
+        def section(self, name): return {}
     original = enterprise_api.build_components
     enterprise_api.build_components = lambda _root: SimpleNamespace(cfg=Config(), llm=SimpleNamespace(healthy=lambda: False), vectors=object())
     try:
         app = FastAPI(); enterprise_api.install_enterprise_routes(app, runtime); client = TestClient(app)
-        secret = (runtime / "config" / "control.secret").read_text(encoding="utf-8").encode()
-        admin_token = create_token(secret, admin_p); viewer_token = create_token(secret, viewer_p)
+        admin_token, _ = plane.identity.login("admin", "PasswordSeguro12")
+        viewer_token, _ = plane.identity.login("viewer", "PasswordSeguro12")
         for endpoint in ("overview", "tenants", "users", "sql-sources", "ai"):
             path = "/api/enterprise/control-plane/" + endpoint
             assert client.get(path).status_code == 401, endpoint
