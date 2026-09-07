@@ -13,10 +13,40 @@ if (-not (Test-Path $ManifestPath -PathType Leaf)) {
 
 $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
 
-$version = [string]$manifest.version
-if ([string]::IsNullOrWhiteSpace($version)) {
-    throw "MANIFEST_VERSION_INVALID"
+$ReleaseMetadataPath = Join-Path $Root "RELEASE_METADATA.json"
+
+if (-not (Test-Path $ReleaseMetadataPath -PathType Leaf)) {
+    throw "RELEASE_METADATA_MISSING"
 }
+
+$releaseMetadata = Get-Content $ReleaseMetadataPath -Raw | ConvertFrom-Json
+
+$product = [string]$releaseMetadata.product
+$productVersion = [string]$releaseMetadata.product_version
+$release = [string]$releaseMetadata.release
+$channel = [string]$releaseMetadata.channel
+
+if ([string]::IsNullOrWhiteSpace($product)) {
+    throw "RELEASE_PRODUCT_INVALID"
+}
+
+if ([string]::IsNullOrWhiteSpace($productVersion)) {
+    throw "RELEASE_PRODUCT_VERSION_INVALID"
+}
+
+if ([string]::IsNullOrWhiteSpace($release)) {
+    throw "RELEASE_ID_INVALID"
+}
+
+if ([string]::IsNullOrWhiteSpace($channel)) {
+    throw "RELEASE_CHANNEL_INVALID"
+}
+
+if ([string]$manifest.version -ne $release) {
+    throw "MANIFEST_RELEASE_METADATA_MISMATCH"
+}
+
+$version = $release
 
 $sha = (
     git -C $Root rev-parse --short=12 HEAD

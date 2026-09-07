@@ -27,6 +27,36 @@ import pandas as pd
 from fastapi import Header
 
 import analizador_app as base
+
+# R10.21F.1: runtime release identity has one canonical authority.
+_RELEASE_METADATA_PATH = base.ROOT.parent / "RELEASE_METADATA.json"
+
+if not _RELEASE_METADATA_PATH.is_file():
+    raise RuntimeError("RELEASE_METADATA_MISSING")
+
+try:
+    _RELEASE_METADATA = json.loads(
+        _RELEASE_METADATA_PATH.read_text(encoding="utf-8-sig")
+    )
+except Exception as exc:
+    raise RuntimeError("RELEASE_METADATA_INVALID") from exc
+
+if _RELEASE_METADATA.get("schema_version") != 1:
+    raise RuntimeError("RELEASE_METADATA_SCHEMA_UNSUPPORTED")
+
+if _RELEASE_METADATA.get("product") != "IA_EMPRESARIAL_LOCAL":
+    raise RuntimeError("RELEASE_METADATA_PRODUCT_INVALID")
+
+for _release_field in ("product_version", "release", "channel"):
+    _release_value = _RELEASE_METADATA.get(_release_field)
+    if not isinstance(_release_value, str) or not _release_value.strip():
+        raise RuntimeError(
+            f"RELEASE_METADATA_FIELD_INVALID:{_release_field}"
+        )
+
+PRODUCT_VERSION = _RELEASE_METADATA["product_version"].strip()
+RELEASE_ID = _RELEASE_METADATA["release"].strip()
+RELEASE_CHANNEL = _RELEASE_METADATA["channel"].strip()
 import reportes_profesionales as pro
 import bi_productivo as bi
 import dashboard_planner as dp
@@ -1213,12 +1243,12 @@ base.infer_roles = infer_roles
 base.build_profile = build_profile
 base.build_overview_sections = build_overview_sections
 base.analyze_file = analyze_file
-base.app.version = "8.5.5-r10.2"
+base.app.version = PRODUCT_VERSION
 
 # Actualiza textos de la interfaz sin duplicar todo el HTML de V3.
 base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analizador Empresarial de Excel / CSV",
-    "Analizador Universal Empresarial de Excel / CSV - V8.5.5 R10.2 · Dashboard Dinámico IA",
+    f"Analizador Universal Empresarial de Excel / CSV - V{PRODUCT_VERSION} {RELEASE_ID.upper()} · Dashboard Dinámico IA",
 ).replace(
     "Procesa archivos grandes con Python/Pandas y usa Qwen local solo para interpretar los resultados. Los datos no se envian a Internet.",
     "Detecta automaticamente hojas, encabezados, columnas, tipos de datos y metricas. Procesa los datos con Python y usa Qwen local solo para interpretar resultados; nada se envia a Internet.",
@@ -1230,10 +1260,10 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
     "Analiza completamente el archivo y genera un dashboard HTML interactivo, un reporte ejecutivo PDF y un Excel analitico. Incluye resumen, evolucion, lineas, productos, clientes, vendedores, facturas, clientes perdidos, clientes en caida, oportunidades y calidad de datos. Usa solo columnas reales y calculos deterministas; no inventes costos, margenes ni formulas.",
 ).replace(
     "<title>IA Empresarial Local - Analizador</title>",
-    "<title>IA Empresarial Local - V8.5.5 R10.2 · Dashboard Dinámico IA</title>",
+    f"<title>IA Empresarial Local - V{PRODUCT_VERSION} {RELEASE_ID.upper()} · Dashboard Dinámico IA</title>",
 ).replace(
     "<h1>Analizador Universal Empresarial de Excel / CSV</h1>",
-    "<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V8.5.5 R10.2</span></h1>",
+    f"<h1>Analizador Universal Empresarial de Excel / CSV <span style=\"font-size:14px;background:#dbeafe;color:#1d4ed8;padding:4px 8px;border-radius:999px;vertical-align:middle\">V{PRODUCT_VERSION} {RELEASE_ID.upper()}</span></h1>",
 )
 
 
@@ -1571,7 +1601,7 @@ def view_html_report(filename: str):
 
 @base.app.get("/version")
 def version_info() -> Dict[str, Any]:
-    return {"prompt_integrity": "r10.13c.2-request-authority", "version": "8.5.5-r10.2", "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
+    return {"prompt_integrity": "r10.13c.2-request-authority", "version": PRODUCT_VERSION, "release": RELEASE_ID, "channel": RELEASE_CHANNEL, "motor": "universal-profesional-memoria-rag", "script": "analizador_universal.py", "reportes": "dashboard HTML dinámico por prompt + PDF BI + Excel analitico", "enterprise_ai": "memoria persistente + RAG + datos estructurados + ContextEngine", "controles": "prompt authority + data contract + calculo deterministico + semantic mapper + aislamiento empresa/usuario"}
 
 # V8: integra memoria persistente, RAG, seguridad y ContextEngine sin reemplazar el analizador V7.
 try:

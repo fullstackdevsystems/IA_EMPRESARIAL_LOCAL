@@ -1,0 +1,27 @@
+# IA EMPRESARIAL LOCAL
+# Canonical repository text representation.
+#
+# Release integrity requires deterministic bytes across clones.
+# Git repository text files are canonical LF.
+
+*.py   text eol=lf
+*.ps1  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.bat  text eol=crlf
+
+# Binary artifacts must never be newline-normalized.
+*.zip    binary
+*.xlsx   binary
+*.xls    binary
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.db     binary
+*.sqlite binary
+*.sqlite3 binary
+*.joblib binary

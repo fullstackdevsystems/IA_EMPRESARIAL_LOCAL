@@ -1,10 +1,10 @@
 {
-  "version": "r10.20c.1",
+  "version": "r10.21f",
   "files": [
     {
       "path": "BuildReleaseR1021A.ps1",
-      "sha256": "917c3b23c3bc15ae2486733c47893410cfa4dad29c53b8f240e01757e32aa691",
-      "size": 3508
+      "sha256": "e8282ebee26f1f1664b159f483927c233ed15bb7ffff5471e50e44c59505b14e",
+      "size": 4285
     },
     {
       "path": "IA_Local/ABRIR_ADMIN_MEMORIA_RAG.bat",
@@ -43,8 +43,8 @@
     },
     {
       "path": "IA_Local/ARQUITECTURA_MEMORIA_RAG_V8.md",
-      "sha256": "24e95e6169609529ee76dea9dfd6d501ec66176b489e7d3c2b54efaa0bb72d3e",
-      "size": 6200
+      "sha256": "2a0654b95814c135a6c791f3124b9eaae52bd167e3fac01aaaba9fec83cd52c4",
+      "size": 6052
     },
     {
       "path": "IA_Local/DETENER_IA.bat",
@@ -63,13 +63,13 @@
     },
     {
       "path": "IA_Local/ESTRUCTURA.txt",
-      "sha256": "32e508551bb6b4c457cc593c9af39df3e892653bc56c3a45ca48e0bdb53bc5dc",
-      "size": 1708
+      "sha256": "41130e7a8fc396c05742b62654a0a186c6c38c40f453d272d1620fb1859367e2",
+      "size": 1668
     },
     {
       "path": "IA_Local/GUIA_PRUEBAS_MEMORIA_RAG_V8.md",
-      "sha256": "92f7c9f894a3a5cd55c86844f2b8ca3a8f1bbf67c13934afef1e0448c980dfcc",
-      "size": 5276
+      "sha256": "5085b9f2a0c7e1be26cf45ae8d827dcd24208e2b092cd0d4cf209ce0f43a7578",
+      "size": 5108
     },
     {
       "path": "IA_Local/INICIAR_IA.bat",
@@ -83,8 +83,8 @@
     },
     {
       "path": "IA_Local/LEEME_PRIMERO.txt",
-      "sha256": "b37c48cb1ba414ce6518d49fa64f31c0223d5c2dc53d7e459fb811fa33892b15",
-      "size": 242
+      "sha256": "db92b9a73eb4a91d44c9d3da70e27fcbb12ab226ea8e49ad4d0f969e552ef63a",
+      "size": 236
     },
     {
       "path": "IA_Local/MOSTRAR_TOKEN_LOCAL.bat",
@@ -98,18 +98,18 @@
     },
     {
       "path": "IA_Local/PROMPT_ANALISIS_MELAZA.txt",
-      "sha256": "d28656fb371431465a9f36aecec8983dbfab948d8a1d0a8f67b04f63fc7ec52e",
-      "size": 1651
+      "sha256": "cb8e02558d12c26ca4380dcd2043ccf2a017aa280748a9ea340004bc1f23ae64",
+      "size": 1604
     },
     {
       "path": "IA_Local/PROMPT_PRUEBA_EXCEL.txt",
-      "sha256": "eaec89be596da90dbbbfd5492382c588319708558ee0cf7b59fcbc352562f5a3",
-      "size": 880
+      "sha256": "23bf14ac866c4b96ae53ef6292171402b8bc943f15f5c3072b23d37de35b52b8",
+      "size": 866
     },
     {
       "path": "IA_Local/README_INSTALACION.txt",
-      "sha256": "3d46407ecc680303bd2b3664eeffdadd81ee05f484023bc468f747361d52e71a",
-      "size": 1160
+      "sha256": "80b30f641445923efd245618ffc03c5c383e27ca7044608d0241617742966c6b",
+      "size": 1125
     },
     {
       "path": "IA_Local/RESPALDAR_IA.bat",
@@ -118,8 +118,8 @@
     },
     {
       "path": "IA_Local/VERSION.txt",
-      "sha256": "fe14e0234ec06dfca592a8246f53d6df4b53a23f42c7944b9889a7b49b942e94",
-      "size": 320
+      "sha256": "18b5cea63805e5b723725f57019bc3eb5ff90edebe2bded6b3365b2d8471bd33",
+      "size": 319
     },
     {
       "path": "IA_Local/config/.keep",
@@ -143,18 +143,18 @@
     },
     {
       "path": "IA_Local/requirements-local.txt",
-      "sha256": "2ad171c687804bf54f7f99180d31792a9c012e31e4d0b34a36c043f9b9a882fb",
-      "size": 208
+      "sha256": "8e21972c11bb0baa0360cf680d0a6aeeacac7ce75a795c8ae6a4501c603be2a8",
+      "size": 192
     },
     {
       "path": "IA_Local/requirements-optional.txt",
-      "sha256": "f39b6f817b5564634d8908e010fa10551056cefc0dfd5ca5ae8589abd3c2e909",
-      "size": 155
+      "sha256": "ec8afdf6ec2d22bb8dbc2581455ad9cc29cea724092bf23d082b48815bc99bb3",
+      "size": 152
     },
     {
       "path": "IA_Local/scripts/Actualizar.ps1",
-      "sha256": "a8d56f20f9fa65fa35aaf80aba46abaff107e5f616fa6e20f70d66626bd3e44e",
-      "size": 1300
+      "sha256": "39c1082e8341743a3b57eb2b3c58d281e6f29c9798acca16031a6582f481e58e",
+      "size": 1266
     },
     {
       "path": "IA_Local/scripts/BackupIA.ps1",
@@ -163,113 +163,113 @@
     },
     {
       "path": "IA_Local/scripts/Comun.ps1",
-      "sha256": "0ab0142953da50f84e911483f21a982acc3956488a2dfc49131b9bed5e844fdc",
-      "size": 4084
+      "sha256": "720b1006754f78c77e66e5408c4ac5b310982286636412103eb46aa00bfa3525",
+      "size": 3955
     },
     {
       "path": "IA_Local/scripts/Detener.ps1",
-      "sha256": "3984331a3b537bf2c490832d395eaed8544c452f0c784e3e3cd4b59ee5b5ab95",
-      "size": 1145
+      "sha256": "4f57772a246af262eb8c9b3a189c0900256c8f1c7d34bd7751f293ea53d8cceb",
+      "size": 1115
     },
     {
       "path": "IA_Local/scripts/Diagnostico.ps1",
-      "sha256": "b3f0231ea64a21c08747ca9d2dd6b173121b917dadc5bf516f3e504186531438",
-      "size": 3094
+      "sha256": "7c10b119f6d54d02d940750a5e8043354339417c13d39b9fa93cb52de1de63bd",
+      "size": 3030
     },
     {
       "path": "IA_Local/scripts/DiagnosticoProductivo.ps1",
-      "sha256": "863e22a2c1f8abc084ba5fe2e0456bf18ddca604605758e1af0e7e2f78874605",
-      "size": 1493
+      "sha256": "6e8b36929c5b25ae8261622313c524b2dad6091a574bcdcafe9f1df7997449e9",
+      "size": 1477
     },
     {
       "path": "IA_Local/scripts/Iniciar.ps1",
-      "sha256": "7208c2e9e19ad6bc5a1423ea5cb6ae164cbdf87c646d1a1ca2f9f8e9bcffd0cc",
-      "size": 10848
+      "sha256": "6bbbf8cbd5e843e180353056799102c6ea369ab7c37251bc0974058f21847fa1",
+      "size": 10620
     },
     {
       "path": "IA_Local/scripts/Instalar.ps1",
-      "sha256": "6fa0d2a8f4720a047d6f80a5513ec42208e289428c01e769e406271c3dcc1068",
-      "size": 6311
+      "sha256": "b8a64efa617195ae0e9c52642015c0dc568f345512bae1cf4b33577807d7c341",
+      "size": 6162
     },
     {
       "path": "IA_Local/scripts/analizador_app.py",
-      "sha256": "859804c6b6ce1c96db703e9c731ebc6620bb1784083a0ca216e16e06b2378213",
-      "size": 56987
+      "sha256": "6d4c2a6dc071525fbe39ca80ee54cd97f42a2f7af2e3f4fe7d9572e90516dd6b",
+      "size": 55838
     },
     {
       "path": "IA_Local/scripts/analizador_universal.py",
-      "sha256": "e747d16c54c6b739e3b58cb09ff3b3d06c7aea21b6cd767a6091ca6c830110ff",
-      "size": 105104
+      "sha256": "557bf9247e887727debfb671e09a65039d00c2732860d30b192ce0b6a5ee01da",
+      "size": 104684
     },
     {
       "path": "IA_Local/scripts/analysis_executor.py",
-      "sha256": "b60aaab1c19922cf7dbb7f3ebaf299e77e253a84b04b0752ceaf07d93643c5e7",
-      "size": 6690
+      "sha256": "74aa5bba15a2e1951603eaf4f3e5bf3d80eb652b56557d00d2b3d4cde7ed1632",
+      "size": 6520
     },
     {
       "path": "IA_Local/scripts/analysis_planner.py",
-      "sha256": "ee60e42dc3d9828575cf3709fc31eef89dbecd20bc731061fff2c6cd336802b1",
-      "size": 7949
+      "sha256": "3153ad7f56f2f1032f124ce4ff1245785c719f8d3c513d0ed92c1c257d81058c",
+      "size": 7865
     },
     {
       "path": "IA_Local/scripts/bi_productivo.py",
-      "sha256": "e180fdbe6e46e6d6a023fce9b340a06f57e30dc68b884a4ff219028fcf15df50",
-      "size": 59265
+      "sha256": "5f7e75de9cd09d38e28fefb40fdeada901f85e874198c35b3826e09d47256f0f",
+      "size": 58463
     },
     {
       "path": "IA_Local/scripts/bootstrap_enterprise.py",
-      "sha256": "768fef3714e109983ebfe7ba714560f71a66d621eda7be2326ad9b8e6d823f88",
-      "size": 2349
+      "sha256": "d7e1f23e324cf92dd1e661ac5a35730cd51b64fd4dc611fe21843e94d9534cef",
+      "size": 2292
     },
     {
       "path": "IA_Local/scripts/business_rule_context.py",
-      "sha256": "63daed38b860367f964136ba488d8a6025f37b0b9441073e7f2af171b597fb43",
-      "size": 2675
+      "sha256": "65bb2199a7093c3e540e83a2b663b88d57e4f47c0c3761660d263633feedb9d1",
+      "size": 2587
     },
     {
       "path": "IA_Local/scripts/business_rule_engine.py",
-      "sha256": "e371e3f8b080bd952d086fe482d9951aeca9ab333dba6f09b054776c9307cd5c",
-      "size": 7360
+      "sha256": "031b3bac334648e4f085b4d991f96a217e34ee70ba850ec7075533f73a5bae0b",
+      "size": 7158
     },
     {
       "path": "IA_Local/scripts/business_rule_registry.py",
-      "sha256": "3197e21df1790a9c9345bab6c1f90b1d567c80106eb94f44a9154e20bc809288",
-      "size": 7327
+      "sha256": "027e0042b3f96cc39b49be6e3b2b40743ac99148c040b599cc0403c2bbf9c184",
+      "size": 7100
     },
     {
       "path": "IA_Local/scripts/capability_rules.py",
-      "sha256": "92801fd2b219f810b4312942ccc6a128b85d4cf33f97238e8937de9e377d3d94",
-      "size": 7947
+      "sha256": "a9f1954881f02b3d30374b9e122719a1350afda9e88b0657b394151fa4e737fa",
+      "size": 7738
     },
     {
       "path": "IA_Local/scripts/dashboard_dynamic.py",
-      "sha256": "f11bcd5fe4978a06dcd9f3507262bf05d852763a9408918c41852a6a5687d39c",
-      "size": 88758
+      "sha256": "3206af116fec92bb232a1b34e416fad108983425fd97fedc341f2acc2b0fe7a5",
+      "size": 88012
     },
     {
       "path": "IA_Local/scripts/dashboard_planner.py",
-      "sha256": "057da4ceb02d331f753e7daf3caae77b4bd0dceaf736987a4be238ae26792a1c",
-      "size": 15464
+      "sha256": "6d4ce1c7f06989fa9afb057383bb054ff0f7a150d759e4a89de417b7ce96fd54",
+      "size": 15224
     },
     {
       "path": "IA_Local/scripts/dashboard_prompt_guard.py",
-      "sha256": "b3731ae46f3b27b0c231f618d4e883d07b708052c9da74dafbff02ca29cfa913",
-      "size": 8456
+      "sha256": "cb0f37fb85fa152a6017b3cd54ed6f065c1ed4754bb7a1e2dca78ac1c6be6c9c",
+      "size": 8237
     },
     {
       "path": "IA_Local/scripts/dashboard_spec_builder.py",
-      "sha256": "bcbc6efe3f70e3ad0168c7eed3f765e6b2da0c510e73e9baf34a7711f8cc1acf",
-      "size": 62616
+      "sha256": "9fcbce9affc84c89f7da3d76bf3fb9546778b04d098475beb2caf063964abbfd",
+      "size": 60093
     },
     {
       "path": "IA_Local/scripts/data_contract.py",
-      "sha256": "6d9c9334a36cd552fa39b034ebb8cab96581c478cb58a444c50b2ebdd38d0b40",
-      "size": 5046
+      "sha256": "618a865d06f942b0f2295304ddb5836452ac1c1da6aea7902865070495662b7c",
+      "size": 4930
     },
     {
       "path": "IA_Local/scripts/dynamic_renderer.py",
-      "sha256": "bd1325c62b4698ca9db3944422923277f16324002733f4b642c94dd644168a39",
-      "size": 167765
+      "sha256": "58f1c38618913c681d8edfe5dc429354c3d59c8a8996cdb47ebebb783796818a",
+      "size": 161473
     },
     {
       "path": "IA_Local/scripts/enterprise_agent_orchestrator.py",
@@ -278,128 +278,128 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/__init__.py",
-      "sha256": "42d667981b4ac8066b4570faf5f740f73a854430dbe4473d162617c7eb7e9098",
-      "size": 103
+      "sha256": "60564caa2c20ccfbced3e8064c29d6af4f599075ec049ff584531f06c3e3dcf1",
+      "size": 101
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/admin_console.py",
-      "sha256": "6f8c96f0fdc7f934b9070dac90d843a3b946c4ddc95069de527c15126b2f6700",
-      "size": 18400
+      "sha256": "cb41a34ae270bbea49d8dfe39d49d93da5e8886ae3c58147d6ffdd3635960d0c",
+      "size": 18350
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/advanced_retrieval.py",
-      "sha256": "3563dbdd431055ce47925e3b209b06332e7baf4174f21a0b2d1f59cd1962082a",
-      "size": 11540
+      "sha256": "ef4de69b393c464a3309f4ccb0909a4c74082cd0d7720e482c9ec7f40bf81268",
+      "size": 11249
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/analytic_rules.py",
-      "sha256": "148130e881dfd04c4eabf85dfbcc3e5c1b255e4c4c8eab0e0ff40f64c5a69e11",
-      "size": 16841
+      "sha256": "c793e40a9ccaa58dfdedb7a479ef595ad18205d45a30c649bec14218ef1260d3",
+      "size": 16480
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/api.py",
-      "sha256": "ab4ebc887214aa9c8d4e6cd90cb29ba742cf4416cb7cea577aeeded9a9bff2a7",
-      "size": 58759
+      "sha256": "9da61e6bb9eb80cef492a840d59c665d4e2800e66050405d4f2b52f304acd019",
+      "size": 58101
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/config.py",
-      "sha256": "6a05046d6af66e24714f05af8d9a02af011cd55e16f4abf81557525c457b4635",
-      "size": 5496
+      "sha256": "2f9c86dfe1b35fed855c8fa9021d9d1f5f6e58df3f0363c02492d68868c1078d",
+      "size": 5347
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/context_engine.py",
-      "sha256": "02114308b911406923a87f0b6d77a3973e07cb22832b11a6f0856943290967d4",
-      "size": 8900
+      "sha256": "ee7f25e4389ff0beb26e6f98aadf4512d981234304c18e390dce7cef61a0c45f",
+      "size": 8743
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/database.py",
-      "sha256": "eb23164b8f17b55b451f5f19a91c0ef8745a8a6186b0b2d0fedf268ac277d576",
-      "size": 8095
+      "sha256": "87131d864b156810e5f88a5eecd18e2919946ff01c8fe34c8e987533b63b71d5",
+      "size": 7865
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/documents.py",
-      "sha256": "40ffd7c498519693e68c9ed9d4bf1a1f33a4dc05736c823f2d0a525fc2bfca5b",
-      "size": 17179
+      "sha256": "f05ce08fa878d8209c0cdd49e1daef1873c9e805cb011d48510a25b79fce3a2f",
+      "size": 16873
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/factory.py",
-      "sha256": "d467a080690edf4f57716a460069decd2ecb4cdd85d997ff18d602103eb64f4f",
-      "size": 3236
+      "sha256": "7a4d2eb739cbcfa7f9411962e7397865f2937605392ed8dfbf44fa418c8d530f",
+      "size": 3170
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/feedback.py",
-      "sha256": "f732137629339cf1b3cbb47f5c5aa32f889341c0a8667bc3902669a13e803052",
-      "size": 11939
+      "sha256": "5b1ae2e1dc6bc5d238adaa4a7745265d041b089d929bb015568f0713b9a73635",
+      "size": 11709
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/fine_tuning_dataset.py",
-      "sha256": "4a57cbe5cfa87232aac0555cfbf97ec83337d1125bc72dceb30fd7e464cef953",
-      "size": 11833
+      "sha256": "d361e1407cf7fd98e9844f37068e2ec5046a9d5e40c88f73faed7e8aac2a6276",
+      "size": 11729
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/knowledge_governance.py",
-      "sha256": "4dc0abf993847feab0f439f4132d87c053dec103d995a479dd6f195efe3a02a2",
-      "size": 19306
+      "sha256": "bcd3ea28557440f23b7c12be9e14f26396e5245c636dd60412709282060ec213",
+      "size": 18937
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/memory.py",
-      "sha256": "203e7e8a2955d8ae52cccde4ad405b44a791726a1849033c1fceb74791c0813a",
-      "size": 16761
+      "sha256": "018603c91831b0b134d76e507a4bf3ef7750dc26be89e55c9cd7ede9ef6c2198",
+      "size": 16438
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/observability.py",
-      "sha256": "f94e8ea32d8cb1c4d7553f609d735c6b2d08ff7a09a67b56a0d6d9581be6bcc0",
-      "size": 3421
+      "sha256": "6a9cc518546155dcfe2ee204759dffaf97ef46f8746fbc59741a073812b3f60e",
+      "size": 3331
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/performance.py",
-      "sha256": "7439470063055992d1d3761166d7cee7730173f613f89feb2ca03b87d302d045",
-      "size": 10035
+      "sha256": "d5f68619f4bd5009a9fb9f2d80d91e3ea3c1f6224d34bd0473c8dbd3d4acb3c9",
+      "size": 9788
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/precedence_engine.py",
-      "sha256": "49941fe347cc0b9684eed7ccfbf7f7c7da1fe9cf54b2813c4a8cdd35f6f54f71",
-      "size": 10100
+      "sha256": "c94661d801a43f2be1e6ae8db73586988726731e017f351d558536924df62117",
+      "size": 9874
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/providers.py",
-      "sha256": "f570b58159ccba352279887bbaf764c7ee9fee40efad58bbde4f251800ec4755",
-      "size": 15529
+      "sha256": "05cbb18275dcf0c06b0ca49e75431016c0de79100cb8c682142e32e92cfbeb93",
+      "size": 15169
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/security.py",
-      "sha256": "cda8c4c0a72825101916d8d2b52f5da3d814c6fdf4f2ddf9917606dc23c37820",
-      "size": 3683
+      "sha256": "0d365a3fcf130c530803fca2ff58364275a5a53c624255f4b57b022807b29ff5",
+      "size": 3575
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/semantic_registry.py",
-      "sha256": "3d4c1a97975ab85cf61a3d9cb4a100af92f3b8a8e475d41a9122937a86563e5a",
-      "size": 5254
+      "sha256": "1961d9a50bfe0f16328537f8d5e4b0e682dbca2f14be1fce195e0ccc266a96da",
+      "size": 5128
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/service.py",
-      "sha256": "4c9a8e8165b7fbae44496878f5ae5718268795d8c10b1101423a7a2bc4f93f02",
-      "size": 44814
+      "sha256": "1d688c269b495b1188a9fd72c45f54d25fbc26e11f7f1cfb870ba17080998a00",
+      "size": 44173
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/structured_data.py",
-      "sha256": "146d4b701c0dd3d5aee45acae1cc7de63fff050db047ecd90409b1d4eded17ae",
-      "size": 21402
+      "sha256": "67a230755c162b77766f267d95e1cfacb34208ced73b752e7414281c5fd067b1",
+      "size": 21007
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/traceability.py",
-      "sha256": "c6980c5059e3b3891bdbc686a10ec0ab6179dbebd4d3bc2d73cf8ec6ced30fba",
-      "size": 10107
+      "sha256": "a6a22ef83761c34aba281349d7f5c874c99c1ae6adc11b1155b0c87659388051",
+      "size": 9916
     },
     {
       "path": "IA_Local/scripts/enterprise_ai/vector_store.py",
-      "sha256": "39c672737eb11d15fdec9ccfb9c7723db407a4f68fa6f7d406237444f7746118",
-      "size": 8592
+      "sha256": "30fafde92e7891a29ba65135126452edbf9703c63dff6e3f1e76e84af9ebc14e",
+      "size": 8359
     },
     {
       "path": "IA_Local/scripts/enterprise_analytics.py",
-      "sha256": "9244b57b4fc202b71836e9a6e3d4a4e5a596645c3faec36063ab133eff20e14e",
-      "size": 9176
+      "sha256": "0bd8dfd7f8e3ad09060ea7fd944b2e1a10e9e845407b0638d019b6dfc53f67e9",
+      "size": 9028
     },
     {
       "path": "IA_Local/scripts/enterprise_backup_recovery.py",
@@ -408,18 +408,18 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_cli.py",
-      "sha256": "0bc173dc7e8ac983ab93d29c2ca50b92a1a36253d82ea0edd33da9ea79627a98",
-      "size": 3637
+      "sha256": "25b12d0c18882b960548c8eb86ef70eaf758adaee7d3d0b8543f1044527e624a",
+      "size": 3568
     },
     {
       "path": "IA_Local/scripts/enterprise_deliverable_manifest.py",
-      "sha256": "b95b7ae143ca5dbf0df1806a1497276c4564414346f4aed858bf6eca6ae4a8a7",
-      "size": 9215
+      "sha256": "d42a94dca2a364330dd18a1ab88932dd766bd2bae2b433bcddde902dfa227954",
+      "size": 9022
     },
     {
       "path": "IA_Local/scripts/enterprise_deliverable_registry.py",
-      "sha256": "71d492db996a4db1e179c5d68a9ccc1f556a4e2fe9f8b07c41d0dd5b59dbdb1b",
-      "size": 13978
+      "sha256": "3aa22411122d11a3d6aec7df0969f125e6cf3de93757d7d6142e46963ae7d93d",
+      "size": 13712
     },
     {
       "path": "IA_Local/scripts/enterprise_design_system.py",
@@ -428,8 +428,8 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_file_connector.py",
-      "sha256": "6dd43093b8adbc54175ecb9299bb4ee2b2706c5a6c1e3e61bf73b5670ddf21d5",
-      "size": 6643
+      "sha256": "2d74c0191ca15a020b4a56d2a384530f150ced621c26fee2827039b6172128fe",
+      "size": 6459
     },
     {
       "path": "IA_Local/scripts/enterprise_identity.py",
@@ -438,18 +438,18 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_approval.py",
-      "sha256": "9aabab3977becc1641fa0d8cf49f8c89e2d5c3ef67652995ce8634207c2f949b",
-      "size": 10878
+      "sha256": "df07db86c1b09e0ee50b6d7fc75da078f5137b35a409c7274a9fb08f7e1a0821",
+      "size": 10628
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_context_injection.py",
-      "sha256": "60ed1ffdac8168b95773d4dc7689cc5b960d79c257df434e0e50e0cb7bc66452",
-      "size": 5330
+      "sha256": "1a8f2a6ae420f1f70b1cb15e6872864f799196c753450169151d0e40353a27fb",
+      "size": 5165
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_ingestion.py",
-      "sha256": "94ccb8da50fc9f53dff6fd481744ec00c22c7dec1a5b37d0d71f8a2ea9e67736",
-      "size": 9040
+      "sha256": "9d06b723bb9a43adf8c80c21d84f19bfc35ff4d63225aeec9a51a2a683f6268a",
+      "size": 8835
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_qa.py",
@@ -458,13 +458,13 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_registry.py",
-      "sha256": "f2a062552a3177de9d332918cb4e2d8ac48d4dadc265f4c390780d6167f5ca61",
-      "size": 8358
+      "sha256": "bb4b7faf2c4d13df743421bee58fcf76ff621d7419ee87183b134f48a6ed1c7f",
+      "size": 8203
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_retrieval.py",
-      "sha256": "93be47d4826f0e1171b864cd0aa6b2064a637d86894103672e56fd0e94a681e9",
-      "size": 4453
+      "sha256": "5ac46801c8f4bef3395287d90ebb47a73a4cd4a753df03457b74077a69e78f0b",
+      "size": 4398
     },
     {
       "path": "IA_Local/scripts/enterprise_knowledge_store.py",
@@ -473,13 +473,13 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_memory_closure.py",
-      "sha256": "8f096bb2192dc388b06639b313193cc8e36326beae92158f0e26692f69781e1a",
-      "size": 3508
+      "sha256": "5eafcede536c351678932c83b90a8d00e63380c24b381db3aa2d8a83165d4f39",
+      "size": 3432
     },
     {
       "path": "IA_Local/scripts/enterprise_metric_rules.py",
-      "sha256": "8405cec02f9c8bf0466b10d1ec0e260572ec0d44b7413c1f2bc35fa692ff91bf",
-      "size": 6850
+      "sha256": "fc620b5e19c4140b79f2a5c942c6eaa96ad816ef75091a90895f9f6921a03ee4",
+      "size": 6729
     },
     {
       "path": "IA_Local/scripts/enterprise_onboarding.py",
@@ -493,33 +493,33 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_prompt_compiler.py",
-      "sha256": "67f0e91eaa85a48802b2ce18586eb48f2aac7ffbad0084c1ebd8f9ee04af69dd",
-      "size": 3307
+      "sha256": "08a2657c02e9cbe0b7ea9ea96a6b49702f9f4f070b3280acb28aae49673526ab",
+      "size": 3238
     },
     {
       "path": "IA_Local/scripts/enterprise_query_registry.py",
-      "sha256": "ebbdba9494369cd2bbecb30cd307718ecb1f5aa0ec4eebc365f4f904a0db13cd",
-      "size": 9822
+      "sha256": "1c668ea8181a5a12941725c74d072cf8c442eb617f591cdfdea4de46f7e2760b",
+      "size": 9580
     },
     {
       "path": "IA_Local/scripts/enterprise_question_answering.py",
-      "sha256": "80a9fafd5b5317e66222b9dbe5450e068afc531a6d65ab43ed645ac65029b25f",
-      "size": 21125
+      "sha256": "1d59bc093056046743f6ad473ace24f364734996aab07b0519f3fe4950c0ec6d",
+      "size": 20473
     },
     {
       "path": "IA_Local/scripts/enterprise_rule_governance.py",
-      "sha256": "cb12f7448d8aa7616496fd98f9b1b3e1c2b7bedd247d8537c388f46e47556044",
-      "size": 3716
+      "sha256": "615ad4faa32c6b99ca07a414983f4e19c0e6bae3a6fdd57477e4edca2421acc8",
+      "size": 3644
     },
     {
       "path": "IA_Local/scripts/enterprise_source_execution.py",
-      "sha256": "e399b75f5cf659b7329bedec0321afba3c195182d34649a1059990bc9ea0788a",
-      "size": 10844
+      "sha256": "109f67627770ae788c333ca4077449bfd05ce8621058bf49f4a3fd9f3acc1579",
+      "size": 10588
     },
     {
       "path": "IA_Local/scripts/enterprise_source_registry.py",
-      "sha256": "094b800203b76fabebfdd4e5950097992f1873d909fc51ab273109101c327d83",
-      "size": 11863
+      "sha256": "5505236111d891783bdf5ac73801b2e9f76a514d5175aa2c04e77724c56580ce",
+      "size": 11602
     },
     {
       "path": "IA_Local/scripts/enterprise_sql_gateway.py",
@@ -528,8 +528,8 @@
     },
     {
       "path": "IA_Local/scripts/enterprise_sql_server_connector.py",
-      "sha256": "607bc599bd9eb72e61603ebb9040e580b9c4018991ba6b180b59bc3dd8e41cb3",
-      "size": 9222
+      "sha256": "d442e196ec268fb5073ac35aa226f991e84b66833eaf09d09416da1f9e5fa1cc",
+      "size": 8987
     },
     {
       "path": "IA_Local/scripts/enterprise_tenant_registry.py",
@@ -538,53 +538,53 @@
     },
     {
       "path": "IA_Local/scripts/insight_engine.py",
-      "sha256": "3ed2a2472a95933214d98a28300a5b4a783b8c0d6129e9b134eebc47a4a3177a",
-      "size": 12718
+      "sha256": "da8e5cb85cfb03edc2d1c73394e55d63b46035c361c522489ce2bc61e151a5ea",
+      "size": 12383
     },
     {
       "path": "IA_Local/scripts/legacy_semantic_cleanup.py",
-      "sha256": "be7a04f2bdbf29312106bddf8a31edcd28491ce223b61f57a41cb137bc989f60",
-      "size": 1978
+      "sha256": "ba91edeca5f32f9283bc66809b65041b4d03d91045538ab077281abe1570771c",
+      "size": 1920
     },
     {
       "path": "IA_Local/scripts/output_intent_resolver.py",
-      "sha256": "b819b32f56441c11fe18b92a64ef5a5f8f8fdb3bcd9e48d5f0608262b8f6028e",
-      "size": 3578
+      "sha256": "3f937203ee8dc6b7990d45628e106ff7f779285b5de168503711f4533c922c0a",
+      "size": 3503
     },
     {
       "path": "IA_Local/scripts/prompt_execution_plan.py",
-      "sha256": "2929904c3e483b199748b58d3d6a72011cf930d957167f5559beb488365766f4",
-      "size": 4248
+      "sha256": "87bbbb832881b508dae328ec6341072fde7225deef66fa35e60dc9ec5bb5b65d",
+      "size": 4151
     },
     {
       "path": "IA_Local/scripts/prompt_intelligence.py",
-      "sha256": "4790e9a54778d6307b19aa1fcaf8fdc0ee710494594495b9d82f55ab18149323",
-      "size": 19386
+      "sha256": "d510faa3aa12f27b45b10c4c06060d055e355268c62785b5fd6a3cb5aa8b9a11",
+      "size": 18806
     },
     {
       "path": "IA_Local/scripts/prueba_regresion_v7.py",
-      "sha256": "9b801230121c6576d081609ca2b277eaf68f5e41c759f54b574a0e8bd07f76ad",
-      "size": 1820
+      "sha256": "55dbd1d38f3f410a9345fd746359d0d0978b14f010bcedf75d4ef4f1c161992b",
+      "size": 1775
     },
     {
       "path": "IA_Local/scripts/reportes_profesionales.py",
-      "sha256": "66f6d2ea0dd8efdbc065f23070fee6fcbeae3fbf7bba7c9d0bd0519d5b370a2a",
-      "size": 50136
+      "sha256": "554491ea355b575206eada68ae2e3664bb36bfaf7f27b889768ad35931ee43c2",
+      "size": 49703
     },
     {
       "path": "IA_Local/scripts/run_enterprise_tests.py",
-      "sha256": "4c27ca10c1b1940302df7511f6293bd9e99912e0bda09b92d6c52591434d5223",
-      "size": 394
+      "sha256": "f2f28214caf325eac0ec9a577d4bf9cc2def446b027a3d3306670e0565918f30",
+      "size": 384
     },
     {
       "path": "IA_Local/scripts/semantic_contract_enforcer.py",
-      "sha256": "d15222bc0db01119c9f188e4416fd62687d8ddd9eb9dee313d154f74bcef5df1",
-      "size": 7345
+      "sha256": "68f7e964808209a5a5c02f772d4f75c7c18e0ba792f0852f2ddd52968b51fd6c",
+      "size": 7192
     },
     {
       "path": "IA_Local/scripts/semantic_layer.py",
-      "sha256": "2f3de60eeee12ee5a1a55d9389251d0d619579894cfc1120246319c82042bdd5",
-      "size": 15363
+      "sha256": "e2d347183517d116bf9b1975a96a2e81db8ea11b76251e0743d2df7d5366ff3a",
+      "size": 15134
     },
     {
       "path": "IA_Local/scripts/templates/dashboard_bi.html",
@@ -593,18 +593,18 @@
     },
     {
       "path": "IA_Local/scripts/universal_prompt_engine.py",
-      "sha256": "d1b1f57e73b0201155e3d81cfc14dcd94237130d7e537f94de5cfe3fd0a3e97c",
-      "size": 18224
+      "sha256": "42b3001d536a4f721e5c7a6e72f0f0ef04028d24b4227eda39a71475f2379035",
+      "size": 17861
     },
     {
       "path": "IA_Local/tests/test_bi_productivo.py",
-      "sha256": "ea1d25149e41e57d5ded1ca0f2f278343f2ae54aa475c54fdd8558cd778e8f65",
-      "size": 34417
+      "sha256": "86c6ec6b4c166ae0bf0fce340b6c927c00085bfe726a0f9968777b331aef492a",
+      "size": 33727
     },
     {
       "path": "IA_Local/tests/test_enterprise_ai.py",
-      "sha256": "29d1549adf1a77e9544081f8e6ee0909485caf6b2a6529f40b912333ac2ba5f0",
-      "size": 21922
+      "sha256": "198d5f6ee1ec02ac326a0d3d88491063c1c0b22d5af045cb9cc9dfebfc3978c1",
+      "size": 21537
     },
     {
       "path": "IA_Local/workspace/Conocimiento/.keep",
@@ -628,33 +628,38 @@
     },
     {
       "path": "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
-      "sha256": "6b4b445b65af8a6df6d6ba1b84370ebd875849afa215cb9bff246ec1063819bf",
-      "size": 884
+      "sha256": "9c7b3f14357dc502f8174be3ebc3663a71e7dadc8a8debb8984b80cf8ba12d68",
+      "size": 885
     },
     {
       "path": "InstalarLimpio.ps1",
-      "sha256": "a1a76166ce9d086fc0ae959adc566717d28200b13d1cb5010f708fa579699657",
-      "size": 3658
+      "sha256": "2876513f19609b19d7dc9962a06218ac0e80e7ed1d8ef4adaf1d885a53edbbea",
+      "size": 3593
     },
     {
       "path": "InstallerR1020C1.ps1",
-      "sha256": "4963a92d37daa32f99da634a5b82f02b8c837e47de846862e0f40e7a2a835199",
-      "size": 8028
+      "sha256": "ee20b98c24e8c043baf50bdf048ea9510fb2e140ce3a131cc764c70e0313c8ff",
+      "size": 8491
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",
-      "sha256": "a60cfb5ecb56fbcb62dbc9098e9a409d0c9c8ef9bbe7587a204bce756f8873df",
-      "size": 3402
+      "sha256": "adff7afcb95c96009a9061b437437165b56b24f5705d2c13e36d19b31fdba409",
+      "size": 3341
     },
     {
       "path": "OperarIA.ps1",
-      "sha256": "13a42b68da7bcbd01d63c1d4b93e2026ca06e2f983e5049380ed2b9d45e4c2f2",
-      "size": 21499
+      "sha256": "a4e546b5b22d297d06b1d953a86bc7c47298d4c0fe03723cfb7a6ae4d806ed2a",
+      "size": 21485
+    },
+    {
+      "path": "RELEASE_METADATA.json",
+      "sha256": "ea43bb79dbc34288ac5bc7b9f4a90cddddaee7351baa05b3a0f270862e5c2c61",
+      "size": 155
     },
     {
       "path": "ValidarInstalador.ps1",
-      "sha256": "6cf3528bc34ab9f5cc7146e94476ef6efb3befa4533068280e48ffda2750e07b",
-      "size": 756
+      "sha256": "145e420de03bac9f48cc8ad4b684cf4a56358ab195b99b1c2b7b02316efc0b91",
+      "size": 733
     }
   ]
 }
