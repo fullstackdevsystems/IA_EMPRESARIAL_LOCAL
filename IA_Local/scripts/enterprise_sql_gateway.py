@@ -38,7 +38,7 @@ class EnterpriseSecretStore:
         self.provider.delete(reference)
 
 def public_sql_profile(record: Dict[str,Any]) -> Dict[str,Any]:
-    public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count","last_query_at","last_query_status","last_query_ms","last_query_row_count")}
+    public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","read_only","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count","last_query_at","last_query_status","last_query_ms","last_query_row_count")}
     public["secret_configured"] = bool(record.get("secret_reference"))
     return public
 

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from .factory import build_components
 from .security import Principal, ensure_secret, safe_component, verify_token
 from .admin_console import UNIFIED_ADMIN_HTML
+from enterprise_control_plane import ControlPlaneError, EnterpriseControlPlane
 
 
 class ChatRequest(BaseModel):
@@ -199,6 +200,7 @@ load();
 
 def install_enterprise_routes(app, root: str | Path):
     components = build_components(root)
+    control_plane = EnterpriseControlPlane(components.cfg.root)
     security_cfg = components.cfg.section("security")
     secret = ensure_secret(security_cfg["token_secret_file"])
     router = APIRouter()
@@ -218,6 +220,13 @@ def install_enterprise_routes(app, root: str | Path):
         if principal.role != "admin":
             raise HTTPException(status_code=403, detail="Se requiere rol admin")
         return principal
+
+    def control_plane_response(call):
+        try:
+            return call()
+        except ControlPlaneError as exc:
+            status = 401 if exc.code == "CONTROL_PLANE_AUTH_REQUIRED" else 403
+            raise HTTPException(status_code=status, detail=exc.code) from exc
 
     @router.get("/assistant", response_class=HTMLResponse)
     def assistant_page():
@@ -269,6 +278,28 @@ def install_enterprise_routes(app, root: str | Path):
             "embedding_model": getattr(components.embeddings, "model", "unknown"),
             "vector_store": type(components.vectors).__name__,
         }
+
+    @router.get("/api/enterprise/control-plane/overview")
+    def control_plane_overview(principal: Principal = Depends(principal_dependency)):
+        health = {"live": True, "readiness": "available" if components.llm.healthy() else "degraded",
+                  "llm_healthy": bool(components.llm.healthy()), "vector_store": type(components.vectors).__name__}
+        return control_plane_response(lambda: control_plane.overview(principal, health=health))
+
+    @router.get("/api/enterprise/control-plane/tenants")
+    def control_plane_tenants(principal: Principal = Depends(principal_dependency)):
+        return {"tenants": control_plane_response(lambda: control_plane.tenants_for(principal))}
+
+    @router.get("/api/enterprise/control-plane/users")
+    def control_plane_users(principal: Principal = Depends(principal_dependency)):
+        return {"users": control_plane_response(lambda: control_plane.users_for(principal))}
+
+    @router.get("/api/enterprise/control-plane/sql-sources")
+    def control_plane_sql_sources(principal: Principal = Depends(principal_dependency)):
+        return {"sources": control_plane_response(lambda: control_plane.sql_sources_for(principal))}
+
+    @router.get("/api/enterprise/control-plane/ai")
+    def control_plane_ai(principal: Principal = Depends(principal_dependency)):
+        return {"provider": control_plane_response(lambda: control_plane.ai_for(principal))}
 
     @router.post("/api/enterprise/chat")
     def enterprise_chat(body: ChatRequest, principal: Principal = Depends(principal_dependency)):
