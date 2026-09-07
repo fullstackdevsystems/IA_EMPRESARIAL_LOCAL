@@ -225,7 +225,7 @@ def install_enterprise_routes(app, root: str | Path):
         try:
             return call()
         except ControlPlaneError as exc:
-            status = 401 if exc.code == "CONTROL_PLANE_AUTH_REQUIRED" else 403
+            status = 401 if exc.code == "CONTROL_PLANE_AUTH_REQUIRED" else (503 if exc.code.startswith("CONTROL_PLANE_RELEASE_METADATA") else 403)
             raise HTTPException(status_code=status, detail=exc.code) from exc
 
     @router.get("/assistant", response_class=HTMLResponse)
