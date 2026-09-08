@@ -1,11 +1,18 @@
 param(
-    [string]$OutputDir = "$PSScriptRoot\release"
+    [string]$OutputDir = "$PSScriptRoot\release",
+    [string]$ManifestPath,
+    [string]$ReleaseMetadataPath
 )
 
 $ErrorActionPreference = "Stop"
 
 $Root = $PSScriptRoot
-$ManifestPath = Join-Path $Root "MANIFEST_SHA256.json"
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    $ManifestPath = [System.IO.Path]::Combine(
+        $Root,
+        "MANIFEST_SHA256.json"
+    )
+}
 
 if (-not (Test-Path $ManifestPath -PathType Leaf)) {
     throw "MANIFEST_NOT_FOUND"
@@ -13,7 +20,12 @@ if (-not (Test-Path $ManifestPath -PathType Leaf)) {
 
 $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
 
-$ReleaseMetadataPath = Join-Path $Root "RELEASE_METADATA.json"
+if ([string]::IsNullOrWhiteSpace($ReleaseMetadataPath)) {
+    $ReleaseMetadataPath = [System.IO.Path]::Combine(
+        $Root,
+        "RELEASE_METADATA.json"
+    )
+}
 
 if (-not (Test-Path $ReleaseMetadataPath -PathType Leaf)) {
     throw "RELEASE_METADATA_MISSING"
@@ -78,7 +90,12 @@ New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
 foreach ($item in $manifest.files) {
     $relative = [string]$item.path
-    $source = Join-Path $Root $relative
+    if ($relative -eq "RELEASE_METADATA.json") {
+        $source = $ReleaseMetadataPath
+    }
+    else {
+        $source = Join-Path $Root $relative
+    }
     $destination = Join-Path $stageRoot $relative
 
     if (-not (Test-Path $source -PathType Leaf)) {
@@ -96,7 +113,7 @@ foreach ($item in $manifest.files) {
 
 # El manifest mismo forma parte del paquete aunque no se liste a sí mismo.
 Copy-Item `
-    (Join-Path $Root "MANIFEST_SHA256.json") `
+    $ManifestPath `
     (Join-Path $stageRoot "MANIFEST_SHA256.json") `
     -Force
 
@@ -170,4 +187,4 @@ $result = [ordered]@{
 $result | ConvertTo-Json
 
 Write-Host ""
-Write-Host "R10.21A RELEASE PACKAGE BUILD: PASS" -ForegroundColor Green
+Write-Host "$($release.ToUpper()) RELEASE PACKAGE BUILD: PASS" -ForegroundColor Green

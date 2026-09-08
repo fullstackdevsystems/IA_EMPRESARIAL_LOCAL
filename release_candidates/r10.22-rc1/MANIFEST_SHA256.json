@@ -1,0 +1,675 @@
+{
+  "version": "r10.22-rc1",
+  "files": [
+    {
+      "path": "BuildReleaseR1021A.ps1",
+      "sha256": "ebda9e1a32cfbbf1d4c4ae95b238e39923ba5341e2cf5d0e34053cdaeb02c7be",
+      "size": 4649
+    },
+    {
+      "path": "IA_Local/ABRIR_ADMIN_MEMORIA_RAG.bat",
+      "sha256": "ccd293763b4afe7a94726606c9f2a875198bf684fddc712209bc38233dacddb4",
+      "size": 318
+    },
+    {
+      "path": "IA_Local/ABRIR_ANALIZADOR_EXCEL.bat",
+      "sha256": "27efe4ea7619d6d471788db9cbc6404725417252ce7067abef406fd9d8d3e1eb",
+      "size": 45
+    },
+    {
+      "path": "IA_Local/ABRIR_ASISTENTE.bat",
+      "sha256": "36e0e967d68d9acf68d882ba427f3e259e07b5a6332b331c9142aa09c488160e",
+      "size": 322
+    },
+    {
+      "path": "IA_Local/ABRIR_CARPETA_ENTRADA.bat",
+      "sha256": "2c9e9d9a98bdfeb62d330ea9e3a157f426a4de460a5832c95e3de0d77c9a1114",
+      "size": 141
+    },
+    {
+      "path": "IA_Local/ABRIR_INTERFAZ.bat",
+      "sha256": "121937e3c42018c3a9bff442df1490f461bc75fb3598d80deb86ae30aaeceadb",
+      "size": 45
+    },
+    {
+      "path": "IA_Local/ABRIR_REPORTES.bat",
+      "sha256": "616dc8b2bbad1f63f902fb512d13b0e02e041f5baee44970931fb3664dceaae1",
+      "size": 144
+    },
+    {
+      "path": "IA_Local/ACTUALIZAR_IA.bat",
+      "sha256": "7c18b91e0d43558dbb80aaebab3fc21509785facd06352dfe62902ab6c9820ab",
+      "size": 161
+    },
+    {
+      "path": "IA_Local/ARQUITECTURA_MEMORIA_RAG_V8.md",
+      "sha256": "2a0654b95814c135a6c791f3124b9eaae52bd167e3fac01aaaba9fec83cd52c4",
+      "size": 6052
+    },
+    {
+      "path": "IA_Local/DETENER_IA.bat",
+      "sha256": "3e771c26dc8bdadbad4f7663287e011484ac7c04cf578732ce30b61e9d249a95",
+      "size": 155
+    },
+    {
+      "path": "IA_Local/DIAGNOSTICO.bat",
+      "sha256": "83698f8e816d29174631160137cdc0d12f15a242249176a911e68086ba779833",
+      "size": 163
+    },
+    {
+      "path": "IA_Local/DIAGNOSTICO_PRODUCTIVO.bat",
+      "sha256": "54e06fe6d61efd81d100ceb0c9b7ad52f5a7f02cf0237b433ea1be8fac133299",
+      "size": 116
+    },
+    {
+      "path": "IA_Local/ESTRUCTURA.txt",
+      "sha256": "41130e7a8fc396c05742b62654a0a186c6c38c40f453d272d1620fb1859367e2",
+      "size": 1668
+    },
+    {
+      "path": "IA_Local/GUIA_PRUEBAS_MEMORIA_RAG_V8.md",
+      "sha256": "5085b9f2a0c7e1be26cf45ae8d827dcd24208e2b092cd0d4cf209ce0f43a7578",
+      "size": 5108
+    },
+    {
+      "path": "IA_Local/INICIAR_IA.bat",
+      "sha256": "921e2045b0af6f78e44b7fb002a258e67f12a6e0be59379152b5b348e556af22",
+      "size": 253
+    },
+    {
+      "path": "IA_Local/INSTALAR_Y_ABRIR.bat",
+      "sha256": "0b35747a1a42db853bf07148859bf928ac8c8ec9e273310e0dfe6cc2b22525c9",
+      "size": 212
+    },
+    {
+      "path": "IA_Local/LEEME_PRIMERO.txt",
+      "sha256": "db92b9a73eb4a91d44c9d3da70e27fcbb12ab226ea8e49ad4d0f969e552ef63a",
+      "size": 236
+    },
+    {
+      "path": "IA_Local/MOSTRAR_TOKEN_LOCAL.bat",
+      "sha256": "c950aee1814902ede1cd48839492df643e34451113431a4aa712ebf092cd642c",
+      "size": 193
+    },
+    {
+      "path": "IA_Local/PROBAR_MEMORIA_RAG.bat",
+      "sha256": "fa4c6e84a5a7e94dd1760700e71aac17163766086ea6d8f449ecaac0ea9622c6",
+      "size": 293
+    },
+    {
+      "path": "IA_Local/PROMPT_ANALISIS_MELAZA.txt",
+      "sha256": "cb8e02558d12c26ca4380dcd2043ccf2a017aa280748a9ea340004bc1f23ae64",
+      "size": 1604
+    },
+    {
+      "path": "IA_Local/PROMPT_PRUEBA_EXCEL.txt",
+      "sha256": "23bf14ac866c4b96ae53ef6292171402b8bc943f15f5c3072b23d37de35b52b8",
+      "size": 866
+    },
+    {
+      "path": "IA_Local/README_INSTALACION.txt",
+      "sha256": "80b30f641445923efd245618ffc03c5c383e27ca7044608d0241617742966c6b",
+      "size": 1125
+    },
+    {
+      "path": "IA_Local/RESPALDAR_IA.bat",
+      "sha256": "cc9b4bb2ba8f6be463aaf278d03ab3b05406ee60cf12e12539a1a8a16ccaded7",
+      "size": 179
+    },
+    {
+      "path": "IA_Local/VERSION.txt",
+      "sha256": "18b5cea63805e5b723725f57019bc3eb5ff90edebe2bded6b3365b2d8471bd33",
+      "size": 319
+    },
+    {
+      "path": "IA_Local/config/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/data/enterprise/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/data/open-webui/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/logs/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/requirements-local.txt",
+      "sha256": "8e21972c11bb0baa0360cf680d0a6aeeacac7ce75a795c8ae6a4501c603be2a8",
+      "size": 192
+    },
+    {
+      "path": "IA_Local/requirements-optional.txt",
+      "sha256": "ec8afdf6ec2d22bb8dbc2581455ad9cc29cea724092bf23d082b48815bc99bb3",
+      "size": 152
+    },
+    {
+      "path": "IA_Local/scripts/Actualizar.ps1",
+      "sha256": "39c1082e8341743a3b57eb2b3c58d281e6f29c9798acca16031a6582f481e58e",
+      "size": 1266
+    },
+    {
+      "path": "IA_Local/scripts/BackupIA.ps1",
+      "sha256": "35b703617374f1146248cb544751adc3771c0ff4dbd241b887b64337067e0046",
+      "size": 288
+    },
+    {
+      "path": "IA_Local/scripts/Comun.ps1",
+      "sha256": "720b1006754f78c77e66e5408c4ac5b310982286636412103eb46aa00bfa3525",
+      "size": 3955
+    },
+    {
+      "path": "IA_Local/scripts/Detener.ps1",
+      "sha256": "4f57772a246af262eb8c9b3a189c0900256c8f1c7d34bd7751f293ea53d8cceb",
+      "size": 1115
+    },
+    {
+      "path": "IA_Local/scripts/Diagnostico.ps1",
+      "sha256": "7c10b119f6d54d02d940750a5e8043354339417c13d39b9fa93cb52de1de63bd",
+      "size": 3030
+    },
+    {
+      "path": "IA_Local/scripts/DiagnosticoProductivo.ps1",
+      "sha256": "6e8b36929c5b25ae8261622313c524b2dad6091a574bcdcafe9f1df7997449e9",
+      "size": 1477
+    },
+    {
+      "path": "IA_Local/scripts/Iniciar.ps1",
+      "sha256": "6bbbf8cbd5e843e180353056799102c6ea369ab7c37251bc0974058f21847fa1",
+      "size": 10620
+    },
+    {
+      "path": "IA_Local/scripts/Instalar.ps1",
+      "sha256": "b8a64efa617195ae0e9c52642015c0dc568f345512bae1cf4b33577807d7c341",
+      "size": 6162
+    },
+    {
+      "path": "IA_Local/scripts/analizador_app.py",
+      "sha256": "6d4c2a6dc071525fbe39ca80ee54cd97f42a2f7af2e3f4fe7d9572e90516dd6b",
+      "size": 55838
+    },
+    {
+      "path": "IA_Local/scripts/analizador_universal.py",
+      "sha256": "f72bbe6ff1c7dbc4136b75450c04669202c72c56d1e50c0c65510b494034afad",
+      "size": 119366
+    },
+    {
+      "path": "IA_Local/scripts/analysis_executor.py",
+      "sha256": "74aa5bba15a2e1951603eaf4f3e5bf3d80eb652b56557d00d2b3d4cde7ed1632",
+      "size": 6520
+    },
+    {
+      "path": "IA_Local/scripts/analysis_planner.py",
+      "sha256": "3153ad7f56f2f1032f124ce4ff1245785c719f8d3c513d0ed92c1c257d81058c",
+      "size": 7865
+    },
+    {
+      "path": "IA_Local/scripts/bi_productivo.py",
+      "sha256": "5f7e75de9cd09d38e28fefb40fdeada901f85e874198c35b3826e09d47256f0f",
+      "size": 58463
+    },
+    {
+      "path": "IA_Local/scripts/bootstrap_enterprise.py",
+      "sha256": "d7e1f23e324cf92dd1e661ac5a35730cd51b64fd4dc611fe21843e94d9534cef",
+      "size": 2292
+    },
+    {
+      "path": "IA_Local/scripts/business_rule_context.py",
+      "sha256": "65bb2199a7093c3e540e83a2b663b88d57e4f47c0c3761660d263633feedb9d1",
+      "size": 2587
+    },
+    {
+      "path": "IA_Local/scripts/business_rule_engine.py",
+      "sha256": "031b3bac334648e4f085b4d991f96a217e34ee70ba850ec7075533f73a5bae0b",
+      "size": 7158
+    },
+    {
+      "path": "IA_Local/scripts/business_rule_registry.py",
+      "sha256": "027e0042b3f96cc39b49be6e3b2b40743ac99148c040b599cc0403c2bbf9c184",
+      "size": 7100
+    },
+    {
+      "path": "IA_Local/scripts/capability_rules.py",
+      "sha256": "a9f1954881f02b3d30374b9e122719a1350afda9e88b0657b394151fa4e737fa",
+      "size": 7738
+    },
+    {
+      "path": "IA_Local/scripts/dashboard_dynamic.py",
+      "sha256": "2bb62f7d7520c8195543e2dfef60b9e353545368a65c0a51ccedccb5cdaa45e4",
+      "size": 88336
+    },
+    {
+      "path": "IA_Local/scripts/dashboard_planner.py",
+      "sha256": "6d4ce1c7f06989fa9afb057383bb054ff0f7a150d759e4a89de417b7ce96fd54",
+      "size": 15224
+    },
+    {
+      "path": "IA_Local/scripts/dashboard_prompt_guard.py",
+      "sha256": "7e5e52e74898beb1d47237d4a8aae348f716b86f534a63e2fb2a70bc652d5815",
+      "size": 8470
+    },
+    {
+      "path": "IA_Local/scripts/dashboard_spec_builder.py",
+      "sha256": "9fcbce9affc84c89f7da3d76bf3fb9546778b04d098475beb2caf063964abbfd",
+      "size": 60093
+    },
+    {
+      "path": "IA_Local/scripts/data_contract.py",
+      "sha256": "618a865d06f942b0f2295304ddb5836452ac1c1da6aea7902865070495662b7c",
+      "size": 4930
+    },
+    {
+      "path": "IA_Local/scripts/dynamic_renderer.py",
+      "sha256": "58f1c38618913c681d8edfe5dc429354c3d59c8a8996cdb47ebebb783796818a",
+      "size": 161473
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_agent_orchestrator.py",
+      "sha256": "df3ad443813bcf06acd303e69d32ee5be96306cf88f43fe780ae7f0f42b24b9b",
+      "size": 2433
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/__init__.py",
+      "sha256": "60564caa2c20ccfbced3e8064c29d6af4f599075ec049ff584531f06c3e3dcf1",
+      "size": 101
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/admin_console.py",
+      "sha256": "d49af3bfe739feb62ddc9d09888d83c33d7b6ab4d17bea945af3b6fb2acb250b",
+      "size": 62267
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/advanced_retrieval.py",
+      "sha256": "ef4de69b393c464a3309f4ccb0909a4c74082cd0d7720e482c9ec7f40bf81268",
+      "size": 11249
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/analytic_rules.py",
+      "sha256": "c793e40a9ccaa58dfdedb7a479ef595ad18205d45a30c649bec14218ef1260d3",
+      "size": 16480
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/api.py",
+      "sha256": "a5500523388f157e5c5c296b485b798815f3ec8e56fbdfca73ab7d8f9f058e75",
+      "size": 62161
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/config.py",
+      "sha256": "2f9c86dfe1b35fed855c8fa9021d9d1f5f6e58df3f0363c02492d68868c1078d",
+      "size": 5347
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/context_engine.py",
+      "sha256": "ee7f25e4389ff0beb26e6f98aadf4512d981234304c18e390dce7cef61a0c45f",
+      "size": 8743
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/database.py",
+      "sha256": "87131d864b156810e5f88a5eecd18e2919946ff01c8fe34c8e987533b63b71d5",
+      "size": 7865
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/documents.py",
+      "sha256": "f05ce08fa878d8209c0cdd49e1daef1873c9e805cb011d48510a25b79fce3a2f",
+      "size": 16873
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/factory.py",
+      "sha256": "7a4d2eb739cbcfa7f9411962e7397865f2937605392ed8dfbf44fa418c8d530f",
+      "size": 3170
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/feedback.py",
+      "sha256": "5b1ae2e1dc6bc5d238adaa4a7745265d041b089d929bb015568f0713b9a73635",
+      "size": 11709
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/fine_tuning_dataset.py",
+      "sha256": "d361e1407cf7fd98e9844f37068e2ec5046a9d5e40c88f73faed7e8aac2a6276",
+      "size": 11729
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/knowledge_governance.py",
+      "sha256": "bcd3ea28557440f23b7c12be9e14f26396e5245c636dd60412709282060ec213",
+      "size": 18937
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/memory.py",
+      "sha256": "018603c91831b0b134d76e507a4bf3ef7750dc26be89e55c9cd7ede9ef6c2198",
+      "size": 16438
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/observability.py",
+      "sha256": "6a9cc518546155dcfe2ee204759dffaf97ef46f8746fbc59741a073812b3f60e",
+      "size": 3331
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/performance.py",
+      "sha256": "d5f68619f4bd5009a9fb9f2d80d91e3ea3c1f6224d34bd0473c8dbd3d4acb3c9",
+      "size": 9788
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/precedence_engine.py",
+      "sha256": "c94661d801a43f2be1e6ae8db73586988726731e017f351d558536924df62117",
+      "size": 9874
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/providers.py",
+      "sha256": "05cbb18275dcf0c06b0ca49e75431016c0de79100cb8c682142e32e92cfbeb93",
+      "size": 15169
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/security.py",
+      "sha256": "0d365a3fcf130c530803fca2ff58364275a5a53c624255f4b57b022807b29ff5",
+      "size": 3575
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/semantic_registry.py",
+      "sha256": "1961d9a50bfe0f16328537f8d5e4b0e682dbca2f14be1fce195e0ccc266a96da",
+      "size": 5128
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/service.py",
+      "sha256": "c05a3e438a2596a1325bad5be9014caa0b665d3b57c7f02024a2b328f692ee9f",
+      "size": 44239
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/structured_data.py",
+      "sha256": "67a230755c162b77766f267d95e1cfacb34208ced73b752e7414281c5fd067b1",
+      "size": 21007
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/traceability.py",
+      "sha256": "a6a22ef83761c34aba281349d7f5c874c99c1ae6adc11b1155b0c87659388051",
+      "size": 9916
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_ai/vector_store.py",
+      "sha256": "30fafde92e7891a29ba65135126452edbf9703c63dff6e3f1e76e84af9ebc14e",
+      "size": 8359
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_analytics.py",
+      "sha256": "0bd8dfd7f8e3ad09060ea7fd944b2e1a10e9e845407b0638d019b6dfc53f67e9",
+      "size": 9028
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_backup_recovery.py",
+      "sha256": "333fda362cbb06a236e0ff55c5cddf7e08fb89e9aaf37410383dd719ff1e704a",
+      "size": 14980
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_cli.py",
+      "sha256": "25b12d0c18882b960548c8eb86ef70eaf758adaee7d3d0b8543f1044527e624a",
+      "size": 3568
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_control_plane.py",
+      "sha256": "79ae9e86383fbdb6e0c4e27552c801ccb38942321d1ccda4f22a364704660c6a",
+      "size": 6177
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_deliverable_manifest.py",
+      "sha256": "d42a94dca2a364330dd18a1ab88932dd766bd2bae2b433bcddde902dfa227954",
+      "size": 9022
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_deliverable_registry.py",
+      "sha256": "3aa22411122d11a3d6aec7df0969f125e6cf3de93757d7d6142e46963ae7d93d",
+      "size": 13712
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_design_system.py",
+      "sha256": "046c621f5555deebf28ae2ca041560811b6797426e7a82d2f28541446c6f6ebf",
+      "size": 4877
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_file_connector.py",
+      "sha256": "2d74c0191ca15a020b4a56d2a384530f150ced621c26fee2827039b6172128fe",
+      "size": 6459
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_identity.py",
+      "sha256": "98ba9a5b50a60b1f3d84ba04276f0e03f4a4343c135bb93663314e8b3b70c417",
+      "size": 10006
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_approval.py",
+      "sha256": "df07db86c1b09e0ee50b6d7fc75da078f5137b35a409c7274a9fb08f7e1a0821",
+      "size": 10628
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_context_injection.py",
+      "sha256": "1a8f2a6ae420f1f70b1cb15e6872864f799196c753450169151d0e40353a27fb",
+      "size": 5165
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_ingestion.py",
+      "sha256": "9d06b723bb9a43adf8c80c21d84f19bfc35ff4d63225aeec9a51a2a683f6268a",
+      "size": 8835
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_qa.py",
+      "sha256": "0b1b755f5c950e731ce08996dac156faab89d44470fbb3715ceacb927136dccb",
+      "size": 2710
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_registry.py",
+      "sha256": "bb4b7faf2c4d13df743421bee58fcf76ff621d7419ee87183b134f48a6ed1c7f",
+      "size": 8203
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_retrieval.py",
+      "sha256": "5ac46801c8f4bef3395287d90ebb47a73a4cd4a753df03457b74077a69e78f0b",
+      "size": 4398
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_knowledge_store.py",
+      "sha256": "a7c2627ae6617fa25b2e8a810981f4c5897a6d22b4552d4af7128e9f123a650b",
+      "size": 8681
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_memory_closure.py",
+      "sha256": "5eafcede536c351678932c83b90a8d00e63380c24b381db3aa2d8a83165d4f39",
+      "size": 3432
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_metric_rules.py",
+      "sha256": "fc620b5e19c4140b79f2a5c942c6eaa96ad816ef75091a90895f9f6921a03ee4",
+      "size": 6729
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_onboarding.py",
+      "sha256": "3be1e662f6014cac3017f576a91bca5d4a7e31f3c4b5dd7de563bedacf1cdeed",
+      "size": 22531
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_platform_config.py",
+      "sha256": "0f524dde3e745176f9957d403701eca75a9bc4616414101476768b0e1af0c148",
+      "size": 9601
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_prompt_compiler.py",
+      "sha256": "08a2657c02e9cbe0b7ea9ea96a6b49702f9f4f070b3280acb28aae49673526ab",
+      "size": 3238
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_query_registry.py",
+      "sha256": "1c668ea8181a5a12941725c74d072cf8c442eb617f591cdfdea4de46f7e2760b",
+      "size": 9580
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_question_answering.py",
+      "sha256": "1d59bc093056046743f6ad473ace24f364734996aab07b0519f3fe4950c0ec6d",
+      "size": 20473
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_rule_governance.py",
+      "sha256": "615ad4faa32c6b99ca07a414983f4e19c0e6bae3a6fdd57477e4edca2421acc8",
+      "size": 3644
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_source_execution.py",
+      "sha256": "109f67627770ae788c333ca4077449bfd05ce8621058bf49f4a3fd9f3acc1579",
+      "size": 10588
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_source_registry.py",
+      "sha256": "5505236111d891783bdf5ac73801b2e9f76a514d5175aa2c04e77724c56580ce",
+      "size": 11602
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_sql_gateway.py",
+      "sha256": "ecdc39a30744ae9689d607f91f6476074e945633c066dfe46eb3590c8a90f0ab",
+      "size": 30576
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_sql_server_connector.py",
+      "sha256": "d442e196ec268fb5073ac35aa226f991e84b66833eaf09d09416da1f9e5fa1cc",
+      "size": 8987
+    },
+    {
+      "path": "IA_Local/scripts/enterprise_tenant_registry.py",
+      "sha256": "8b964c86a5a3a393734f5f7ea5115d1a3320f77798fc2f743fa5640d8ea5b917",
+      "size": 9851
+    },
+    {
+      "path": "IA_Local/scripts/insight_engine.py",
+      "sha256": "da8e5cb85cfb03edc2d1c73394e55d63b46035c361c522489ce2bc61e151a5ea",
+      "size": 12383
+    },
+    {
+      "path": "IA_Local/scripts/legacy_semantic_cleanup.py",
+      "sha256": "ba91edeca5f32f9283bc66809b65041b4d03d91045538ab077281abe1570771c",
+      "size": 1920
+    },
+    {
+      "path": "IA_Local/scripts/output_intent_resolver.py",
+      "sha256": "3f937203ee8dc6b7990d45628e106ff7f779285b5de168503711f4533c922c0a",
+      "size": 3503
+    },
+    {
+      "path": "IA_Local/scripts/prompt_execution_plan.py",
+      "sha256": "87bbbb832881b508dae328ec6341072fde7225deef66fa35e60dc9ec5bb5b65d",
+      "size": 4151
+    },
+    {
+      "path": "IA_Local/scripts/prompt_intelligence.py",
+      "sha256": "582bd22c947899741a353cb4bac9894f8724ece8e08559550486d7df88705ccb",
+      "size": 21272
+    },
+    {
+      "path": "IA_Local/scripts/prompt_polarity.py",
+      "sha256": "e394a38b3b7cf084e6b39448085e8baccc8d2b4dc3b418d30ec2d69f0ce51503",
+      "size": 1286
+    },
+    {
+      "path": "IA_Local/scripts/prueba_regresion_v7.py",
+      "sha256": "55dbd1d38f3f410a9345fd746359d0d0978b14f010bcedf75d4ef4f1c161992b",
+      "size": 1775
+    },
+    {
+      "path": "IA_Local/scripts/reportes_profesionales.py",
+      "sha256": "554491ea355b575206eada68ae2e3664bb36bfaf7f27b889768ad35931ee43c2",
+      "size": 49703
+    },
+    {
+      "path": "IA_Local/scripts/run_enterprise_tests.py",
+      "sha256": "f2f28214caf325eac0ec9a577d4bf9cc2def446b027a3d3306670e0565918f30",
+      "size": 384
+    },
+    {
+      "path": "IA_Local/scripts/semantic_contract_enforcer.py",
+      "sha256": "38e928b1cca9efca08331a568fb6599674dfa886bcb6246a3948eb9a5c96a275",
+      "size": 7685
+    },
+    {
+      "path": "IA_Local/scripts/semantic_layer.py",
+      "sha256": "0ceaeac9676e1552392acb6caa855f113eda0933aa38925632ae2e75549e880e",
+      "size": 15558
+    },
+    {
+      "path": "IA_Local/scripts/templates/dashboard_bi.html",
+      "sha256": "e0371c23b3b712f3cca6d9b1f8dcdc08ab2019293db986df5c9f49566a8389af",
+      "size": 45383
+    },
+    {
+      "path": "IA_Local/scripts/universal_prompt_engine.py",
+      "sha256": "37aa72aa36868159eae565def926bf827c5be92b4f88db48ee85d32d2cb9810f",
+      "size": 18613
+    },
+    {
+      "path": "IA_Local/tests/test_bi_productivo.py",
+      "sha256": "86c6ec6b4c166ae0bf0fce340b6c927c00085bfe726a0f9968777b331aef492a",
+      "size": 33727
+    },
+    {
+      "path": "IA_Local/tests/test_enterprise_ai.py",
+      "sha256": "198d5f6ee1ec02ac326a0d3d88491063c1c0b22d5af045cb9cc9dfebfc3978c1",
+      "size": 21537
+    },
+    {
+      "path": "IA_Local/workspace/Conocimiento/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/workspace/Entrada/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/workspace/Historico/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "IA_Local/workspace/Reportes/.keep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
+      "sha256": "9c7b3f14357dc502f8174be3ebc3663a71e7dadc8a8debb8984b80cf8ba12d68",
+      "size": 885
+    },
+    {
+      "path": "InstalarLimpio.ps1",
+      "sha256": "2876513f19609b19d7dc9962a06218ac0e80e7ed1d8ef4adaf1d885a53edbbea",
+      "size": 3593
+    },
+    {
+      "path": "InstallerR1020C1.ps1",
+      "sha256": "4b43fcc5ad9f2cb7ae49ea29469f04fc938b263d1e530c742d5684cd752ea719",
+      "size": 11565
+    },
+    {
+      "path": "LEEME_INSTALACION_LIMPIA.txt",
+      "sha256": "adff7afcb95c96009a9061b437437165b56b24f5705d2c13e36d19b31fdba409",
+      "size": 3341
+    },
+    {
+      "path": "OperarIA.ps1",
+      "sha256": "7bad4c27ec929e406a1bcc186a97f68fe649c0c61828271128ee12f93a8ce1c4",
+      "size": 22329
+    },
+    {
+      "path": "RELEASE_METADATA.json",
+      "sha256": "8067b2230cf18e201450015aa0f1fd658818d80b76dd8de25fadad1015e6050b",
+      "size": 138
+    },
+    {
+      "path": "ValidarInstalador.ps1",
+      "sha256": "145e420de03bac9f48cc8ad4b684cf4a56358ab195b99b1c2b7b02316efc0b91",
+      "size": 733
+    }
+  ]
+}

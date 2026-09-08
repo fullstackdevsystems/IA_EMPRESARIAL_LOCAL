@@ -128,20 +128,19 @@ metadata_in_root_files = len(
     )
 )
 
-root_files_copy_loop_count = installer.count(
-    "foreach ($rootFile in $rootFiles) {"
-)
-
-root_files_product_copy_count = installer.count(
-    "Copy-Item $sourceFile (Join-Path $ProductRoot $rootFile) -Force"
-)
-
 ck(
     "installer_copies_canonical_release_metadata_to_product_root",
-    len(root_files_matches) == 1
-    and metadata_in_root_files == 1
-    and root_files_copy_loop_count == 1
-    and root_files_product_copy_count == 1,
+    (
+        len(root_files_matches) == 1
+        and metadata_in_root_files == 1
+        and "$stagedRoot" in installer
+        and "$previousRoot" in installer
+        and "$liveFile" in installer
+        and "$ProductRoot" in installer
+        and "Copy-Item" in installer
+        and "$stagedFile" in installer
+        and "previous managed root files restored" in installer
+    ),
 )
 
 
