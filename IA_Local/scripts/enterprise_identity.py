@@ -86,6 +86,13 @@ class EnterpriseIdentityStore:
  def _revoke(self,d,uid):
   for s in d["sessions"]:
    if s["user_id"]==uid:s["revoked"]=True
+ def revoke_tenant_sessions(self,tenant_id):
+  tenant=self.tenants.get(tenant_id);canonical_tenant_id=tenant["tenant_id"];d=self._load();user_ids={u["user_id"] for u in d["users"] if u["tenant_id"]==canonical_tenant_id};count=0
+  for s in d["sessions"]:
+   if s["user_id"] in user_ids and not s.get("revoked"):
+    s["revoked"]=True;count+=1
+  if count:self._save(d)
+  return count
  def login(self,username,password):
   d=self._load();u=next((x for x in d["users"] if x["username"]==str(username or "").strip().lower()),None);now=_now()
   if not u or u["status"]!="ACTIVE": self._event(d,"LOGIN_FAILED",None);self._save(d);raise IdentityError("AUTH_INVALID_CREDENTIALS","Credenciales inválidas")

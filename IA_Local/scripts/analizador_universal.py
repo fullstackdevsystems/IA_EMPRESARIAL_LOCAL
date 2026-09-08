@@ -1641,12 +1641,16 @@ def _bearer(authorization: str):
     if not str(authorization or "").startswith("Bearer "): raise base.HTTPException(status_code=401,detail={"code":"AUTH_REQUIRED","message":"Autenticación requerida"})
     try:return _identity_store().authenticate(str(authorization)[7:])
     except IdentityError as exc:_auth_error(exc)
+    except TenantRegistryError as exc:
+        raise base.HTTPException(status_code=401,detail={"code":"AUTH_SESSION_INVALID","message":"Sesi?n inv?lida"}) from exc
 
 @app.post("/api/auth/login")
 def auth_login(payload: Dict[str,Any]):
     try:
         token,user=_identity_store().login(payload.get("username"),payload.get("password"));return {"token":token,"user":user}
     except IdentityError as exc:_auth_error(exc)
+    except TenantRegistryError as exc:
+        raise base.HTTPException(status_code=401,detail={"code":"AUTH_INVALID_CREDENTIALS","message":"Credenciales inv?lidas"}) from exc
 
 @app.post("/api/auth/logout")
 def auth_logout(authorization: str = Header("")):
@@ -1710,10 +1714,10 @@ def user_action(user_id:str,action:str,payload:Dict[str,Any]={},authorization:st
     except IdentityError as exc:_auth_error(exc)
 
 
-def _require_tenant_admin(authorization: str = "", tenant_id: Optional[str] = None) -> Dict[str, Any]:
+def _require_tenant_admin(authorization: str = "", tenant_id: Optional[str] = None, permission: str = "tenant:list") -> Dict[str, Any]:
     if authorization:
         user = _bearer(authorization); store = _identity_store()
-        if not store.has_permission(user, "tenant:list"):
+        if not store.has_permission(user, permission):
             raise base.HTTPException(status_code=403, detail={"code": "PERMISSION_DENIED", "message": "Permiso denegado"})
         if "SYSTEM_ADMIN" not in user["roles"] and tenant_id and tenant_id != user["tenant_id"]:
             raise base.HTTPException(status_code=403, detail={"code": "TENANT_SCOPE_DENIED", "message": "Tenant no permitido"})
@@ -1785,7 +1789,7 @@ def list_admin_tenants(authorization: str = Header("")) -> Dict[str, Any]:
 
 @app.post("/api/admin/tenants")
 def create_admin_tenant(payload: Dict[str, Any], authorization: str = Header("")) -> Dict[str, Any]:
-    user=_require_tenant_admin(authorization)
+    user=_require_tenant_admin(authorization,permission="tenant:update")
     if "SYSTEM_ADMIN" not in user["roles"]: raise base.HTTPException(status_code=403,detail={"code":"PERMISSION_DENIED","message":"Permiso denegado"})
     try:
         return _tenant_registry().create(tenant_id=payload.get("tenant_id"), name=payload.get("name"), settings=payload.get("settings"), default_business_unit=payload.get("default_business_unit"), default_branch=payload.get("default_branch"))
@@ -1804,7 +1808,7 @@ def get_admin_tenant(tenant_id: str, authorization: str = Header("")) -> Dict[st
 
 @app.patch("/api/admin/tenants/{tenant_id}")
 def update_admin_tenant(tenant_id: str, payload: Dict[str, Any], authorization: str = Header("")) -> Dict[str, Any]:
-    _require_tenant_admin(authorization,tenant_id)
+    _require_tenant_admin(authorization,tenant_id,permission="tenant:update")
     try:
         allowed = {"name", "settings", "default_business_unit", "default_branch"}
         if set(payload) - allowed:
@@ -1816,16 +1820,21 @@ def update_admin_tenant(tenant_id: str, payload: Dict[str, Any], authorization: 
 
 @app.post("/api/admin/tenants/{tenant_id}/disable")
 def disable_admin_tenant(tenant_id: str, authorization: str = Header("")) -> Dict[str, Any]:
-    _require_tenant_admin(authorization,tenant_id)
+    user = _require_tenant_admin(authorization,tenant_id,permission="tenant:update")
+    if "SYSTEM_ADMIN" in user["roles"] and str(tenant_id).strip().lower() == str(user["tenant_id"]).strip().lower():
+        raise base.HTTPException(status_code=403,detail={"code":"TENANT_SELF_DISABLE_DENIED","message":"No se puede deshabilitar la empresa de la sesion SYSTEM_ADMIN"})
     try:
+        _identity_store().revoke_tenant_sessions(tenant_id)
         return _tenant_registry().disable(tenant_id)
+    except IdentityError as exc:
+        _auth_error(exc)
     except TenantRegistryError as exc:
         _tenant_http_error(exc)
 
 
 @app.post("/api/admin/tenants/{tenant_id}/enable")
 def enable_admin_tenant(tenant_id: str, authorization: str = Header("")) -> Dict[str, Any]:
-    _require_tenant_admin(authorization,tenant_id)
+    _require_tenant_admin(authorization,tenant_id,permission="tenant:update")
     try:
         return _tenant_registry().enable(tenant_id)
     except TenantRegistryError as exc:

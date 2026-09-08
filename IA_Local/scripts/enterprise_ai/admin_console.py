@@ -11,7 +11,7 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 <button data-p="resumen" class="active">Resumen</button><button data-p="controlplane">Plataforma</button><button data-p="memoria">Memoria</button><button data-p="documentos">Documentos / RAG</button><button data-p="semantica">Diccionario</button><button data-p="reglas">Reglas empresariales</button><button data-p="analiticas">Reglas analíticas</button><button data-p="feedback">Feedback</button><button data-p="trazas">Trazabilidad</button><button data-p="historial">Historial</button><button data-p="auditoria">Auditoría</button></div></aside>
 <main class="main"><div class="top"><div><h2 style="margin:0">Administración empresarial</h2><div class="mutedtxt">Conocimiento, gobernanza, aprendizaje y trazabilidad en una sola consola.</div></div><div class="links"><a id="assistant" href="/assistant">Asistente</a><a href="/">Analizador</a><button class="btn muted" onclick="enterpriseLogout()">Cerrar sesión</button></div></div><div id="auth" class="notice error" style="display:none"></div><div id="msg"></div>
 <section id="resumen" class="panel active"><div class="grid" id="metrics"></div><div class="card"><h3>Estado de conocimiento</h3><div id="statusSummary"></div></div></section>
-<section id="controlplane" class="panel"><div class="card"><h3>Enterprise Control Plane</h3><div class="mutedtxt">Administracion gobernada de empresa, usuarios, SQL Server e IA.</div><div id="controlSummary"></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contrasena<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div><div class="card table"><h3>Fuentes SQL Server</h3><div id="controlSql"></div><div id="cpSqlCreate" data-cp-permission="sql:configure" class="settings" style="margin-top:12px"><label>ID conexion<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticacion<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Windows Integrated</option><option value="SQL_AUTH">SQL Auth</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Secret SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Schemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Max filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" onclick="controlCreateSql()">Crear conexion SQL</button></div><div class="card"><h3>Proveedor IA</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">OpenAI compatible local</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Timeout<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Context window<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Si</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
+<section id="controlplane" class="panel"><div class="card"><h3>Enterprise Control Plane</h3><div class="mutedtxt">Administracion gobernada de empresa, usuarios, SQL Server e IA.</div><div id="controlSummary"></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div><div id="cpTenantCreate" data-cp-permission="tenant:update" data-cp-system-admin="true" class="settings" style="margin-top:12px"><label>ID empresa<input id="cpTenantId" autocomplete="off" placeholder="empresa-norte"></label><label>Nombre<input id="cpTenantName" autocomplete="off"></label><label>Unidad de negocio predeterminada<input id="cpTenantBusinessUnit" autocomplete="off"></label><label>Sucursal predeterminada<input id="cpTenantBranch" autocomplete="off"></label><label>Locale<input id="cpTenantLocale" autocomplete="off" value="es-MX"></label><label>Zona horaria<input id="cpTenantTimezone" autocomplete="off" placeholder="America/Mazatlan"></label></div><button id="cpCreateTenantBtn" class="btn" data-cp-permission="tenant:update" data-cp-system-admin="true" onclick="controlCreateTenant()">Crear empresa</button></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contrasena<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div><div class="card table"><h3>Fuentes SQL Server</h3><div id="controlSql"></div><div id="cpSqlCreate" data-cp-permission="sql:configure" class="settings" style="margin-top:12px"><label>ID conexion<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticacion<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Windows Integrated</option><option value="SQL_AUTH">SQL Auth</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Secret SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Schemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Max filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" onclick="controlCreateSql()">Crear conexion SQL</button></div><div class="card"><h3>Proveedor IA</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">OpenAI compatible local</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Timeout<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Context window<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Si</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
 <section id="memoria" class="panel"><div class="card"><h3>Memoria permanente</h3><div class="formgrid"><input id="memText" placeholder="Conocimiento o preferencia"><select id="memCategory"><option>conocimiento_empresa</option><option>regla_negocio</option><option>definicion</option><option>preferencia</option><option>procedimiento</option></select></div><div style="margin-top:8px"><button class="btn" onclick="createMemory()">Guardar memoria</button></div></div><div class="card table" id="memoryTable"></div></section>
 <section id="documentos" class="panel"><div class="card"><h3>Documentos / RAG</h3><input type="file" id="docFile"><div style="margin-top:8px"><button class="btn" onclick="uploadDoc()">Indexar documento</button></div></div><div class="card table" id="docsTable"></div></section>
 <section id="semantica" class="panel"><div class="card"><h3>Diccionario empresarial</h3><div class="formgrid"><input id="semPhysical" placeholder="Nombre físico: Cve_Clie"><input id="semName" placeholder="Concepto: customer_id"><input id="semArea" placeholder="Área (opcional)"><input id="semDesc" placeholder="Descripción"></div><div style="margin-top:8px"><button class="btn" onclick="proposeSemantic()">Crear propuesta</button></div></div><div class="card table" id="semanticTable"></div></section>
@@ -36,6 +36,7 @@ async function enterpriseLogout(){try{if(token)await fetch('/api/auth/logout',{m
 async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{}if(r.status===401){showLogin('La sesión expiró o fue revocada.');throw new Error('Sesión requerida')}if(!r.ok)throw new Error(d.detail||d.error||('HTTP '+r.status));return d}
 function pill(s){return '<span class="pill '+esc(s)+'">'+esc(s||'N/D')+'</span>'}function table(rows,cols,actions){if(!rows||!rows.length)return '<div class="empty">Sin registros.</div>';return '<table><thead><tr>'+cols.map(c=>'<th>'+esc(c[0])+'</th>').join('')+(actions?'<th>Acciones</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+(c[2]?c[2](r[c[1]],r):esc(r[c[1]]??''))+'</td>').join('')+(actions?'<td class="actions">'+actions(r)+'</td>':'')+'</tr>').join('')+'</tbody></table>'}
 async function refreshAll(){if(!token)return;try{const [m,d,s,r,a,f]=await Promise.all([api('/api/enterprise/memories?include_inactive=true',{headers:H()}),api('/api/enterprise/documents',{headers:H()}),api('/api/enterprise/semantic-definitions?include_inactive=true',{headers:H()}),api('/api/enterprise/business-rules?include_inactive=true',{headers:H()}),api('/api/enterprise/analytic-rules',{headers:H()}),api('/api/enterprise/feedback',{headers:H()})]);renderMem(m.memories);renderDocs(d.documents);renderSem(s.items);renderRules(r.items);renderAnalytic(a.items);renderFeedback(f.feedback||f.items);applyCapabilities();if(can('admin:audit')){const [ov,t]=await Promise.all([api('/api/enterprise/admin/overview',{headers:H()}),api('/api/enterprise/traces?limit=100',{headers:H()})]);renderOverview(ov);renderTraces(t.traces);loadAudit()}else{document.getElementById('metrics').innerHTML='';document.getElementById('statusSummary').innerHTML='<div class="empty">Resumen administrativo no autorizado.</div>'}}catch(e){toast(e.message,true)}}
+let CONTROL_TENANTS=[];
 let CONTROL_USERS=[];
 let CONTROL_SQL=[];
 
@@ -75,6 +76,9 @@ function controlCsv(value){
 function controlApplyCapabilities(){
     document.querySelectorAll('[data-cp-permission]').forEach(el=>{
         el.style.display=can(el.dataset.cpPermission)?'':'none'
+    });
+    document.querySelectorAll('[data-cp-system-admin]').forEach(el=>{
+        el.style.display=(controlSystemAdmin()&&can(el.dataset.cpPermission))?'':'none'
     })
 }
 
@@ -106,6 +110,42 @@ async function controlLoadOverview(){
     }
 }
 
+function controlTenantActions(tenant){
+    const actions=[];
+
+    if(!can('tenant:update'))return '';
+
+    actions.push(
+        '<button class="btn" onclick="controlEditTenant(\''+
+        esc(tenant.tenant_id)+
+        '\')">Editar</button>'
+    );
+
+    const ownTenant=String(
+        (currentUser&&currentUser.tenant_id)||''
+    ).toLowerCase()===String(
+        tenant.tenant_id||''
+    ).toLowerCase();
+
+    if(tenant.status==='ACTIVE'){
+        if(!(controlSystemAdmin()&&ownTenant)){
+            actions.push(
+                '<button class="btn danger" onclick="controlTenantState(\''+
+                esc(tenant.tenant_id)+
+                '\',\'disable\')">Deshabilitar</button>'
+            )
+        }
+    }else{
+        actions.push(
+            '<button class="btn ok" onclick="controlTenantState(\''+
+            esc(tenant.tenant_id)+
+            '\',\'enable\')">Habilitar</button>'
+        )
+    }
+
+    return actions.join(' ')
+}
+
 async function controlLoadTenants(){
     if(!can('tenant:list')){
         controlUnavailable(
@@ -114,12 +154,15 @@ async function controlLoadTenants(){
         );
         return
     }
+
     try{
         const data=await api(
-            '/api/enterprise/control-plane/tenants',
+            '/api/admin/tenants',
             {headers:H()}
         );
-        const tenants=data.tenants||[];
+
+        CONTROL_TENANTS=data.tenants||[];
+
         const selected=controlTenantId();
 
         let selector='';
@@ -128,9 +171,10 @@ async function controlLoadTenants(){
             selector=
                 '<label class="small">Empresa activa para administrar '+
                 '<select id="cpTenantSelect" onchange="controlTenantChanged()">'+
-                tenants.map(t=>
+                CONTROL_TENANTS.map(t=>
                     '<option value="'+esc(t.tenant_id)+'">'+
                     esc(t.name||t.tenant_id)+
+                    (t.status==='ACTIVE'?'':' [DESHABILITADA]')+
                     '</option>'
                 ).join('')+
                 '</select></label>'
@@ -144,22 +188,335 @@ async function controlLoadTenants(){
         controlElement('controlTenants').innerHTML=
             selector+
             table(
-                tenants,
+                CONTROL_TENANTS,
                 [
                     ['Tenant','tenant_id'],
                     ['Nombre','name'],
+                    ['Unidad','default_business_unit'],
+                    ['Sucursal','default_branch'],
                     ['Estado','status',(v)=>pill(v)]
-                ]
+                ],
+                can('tenant:update')
+                    ?controlTenantActions
+                    :null
             );
 
         const select=controlElement('cpTenantSelect');
+
         if(select){
             const exists=[...select.options]
                 .some(x=>x.value===selected);
-            if(exists)select.value=selected
+
+            if(exists){
+                select.value=selected
+            }else if(select.options.length){
+                select.value=select.options[0].value
+            }
         }
+
+        controlApplyCapabilities()
     }catch(e){
-        controlUnavailable('controlTenants',e.message)
+        controlUnavailable(
+            'controlTenants',
+            e.message
+        )
+    }
+}
+
+async function controlCreateTenant(){
+    if(
+        !controlSystemAdmin() ||
+        !can('tenant:update')
+    )return;
+
+    const tenantId=controlElement(
+        'cpTenantId'
+    ).value.trim().toLowerCase();
+
+    const name=controlElement(
+        'cpTenantName'
+    ).value.trim();
+
+    const businessUnit=controlElement(
+        'cpTenantBusinessUnit'
+    ).value.trim();
+
+    const branch=controlElement(
+        'cpTenantBranch'
+    ).value.trim();
+
+    const locale=controlElement(
+        'cpTenantLocale'
+    ).value.trim();
+
+    const timezone=controlElement(
+        'cpTenantTimezone'
+    ).value.trim();
+
+    try{
+        if(!tenantId||!name){
+            throw new Error(
+                'ID y nombre de empresa son obligatorios.'
+            )
+        }
+
+        if(
+            !/^[a-z0-9][a-z0-9_.-]{0,79}$/.test(
+                tenantId
+            )
+        ){
+            throw new Error(
+                'ID de empresa no valido.'
+            )
+        }
+
+        const settings={};
+
+        if(locale){
+            settings.locale=locale
+        }
+
+        if(timezone){
+            settings.timezone=timezone
+        }
+
+        const body={
+            tenant_id:tenantId,
+            name,
+            default_business_unit:
+                businessUnit||null,
+            default_branch:
+                branch||null
+        };
+
+        if(Object.keys(settings).length){
+            body.settings=settings
+        }
+
+        await api(
+            '/api/admin/tenants',
+            {
+                method:'POST',
+                headers:{
+                    ...H(),
+                    'Content-Type':'application/json'
+                },
+                body:JSON.stringify(body)
+            }
+        );
+
+        controlElement('cpTenantId').value='';
+        controlElement('cpTenantName').value='';
+        controlElement('cpTenantBusinessUnit').value='';
+        controlElement('cpTenantBranch').value='';
+        controlElement('cpTenantLocale').value='es-MX';
+        controlElement('cpTenantTimezone').value='';
+
+        await controlLoadTenants();
+
+        const selector=controlElement(
+            'cpTenantSelect'
+        );
+
+        if(selector){
+            selector.value=tenantId;
+            await controlTenantChanged()
+        }
+
+        toast('Empresa creada.')
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlEditTenant(tenantId){
+    if(!can('tenant:update'))return;
+
+    const tenant=CONTROL_TENANTS.find(
+        x=>x.tenant_id===tenantId
+    );
+
+    if(!tenant)return;
+
+    const name=prompt(
+        'Nombre de empresa:',
+        tenant.name||''
+    );
+
+    if(name===null)return;
+
+    const businessUnit=prompt(
+        'Unidad de negocio predeterminada:',
+        tenant.default_business_unit||''
+    );
+
+    if(businessUnit===null)return;
+
+    const branch=prompt(
+        'Sucursal predeterminada:',
+        tenant.default_branch||''
+    );
+
+    if(branch===null)return;
+
+    const currentSettings={
+        ...(tenant.settings||{})
+    };
+
+    const locale=prompt(
+        'Locale:',
+        currentSettings.locale||''
+    );
+
+    if(locale===null)return;
+
+    const timezone=prompt(
+        'Zona horaria:',
+        currentSettings.timezone||''
+    );
+
+    if(timezone===null)return;
+
+    try{
+        if(!String(name).trim()){
+            throw new Error(
+                'Nombre de empresa obligatorio.'
+            )
+        }
+
+        const settings={
+            ...currentSettings
+        };
+
+        if(String(locale).trim()){
+            settings.locale=String(locale).trim()
+        }else{
+            delete settings.locale
+        }
+
+        if(String(timezone).trim()){
+            settings.timezone=String(timezone).trim()
+        }else{
+            delete settings.timezone
+        }
+
+        await api(
+            '/api/admin/tenants/'+
+            encodeURIComponent(tenantId),
+            {
+                method:'PATCH',
+                headers:{
+                    ...H(),
+                    'Content-Type':'application/json'
+                },
+                body:JSON.stringify({
+                    name:String(name).trim(),
+                    default_business_unit:
+                        String(businessUnit).trim(),
+                    default_branch:
+                        String(branch).trim(),
+                    settings
+                })
+            }
+        );
+
+        toast('Empresa actualizada.');
+
+        await Promise.allSettled([
+            controlLoadTenants(),
+            controlLoadOverview()
+        ])
+    }catch(e){
+        toast(e.message,true)
+    }
+}
+
+async function controlTenantState(tenantId,action){
+    if(!can('tenant:update'))return;
+
+    if(!['enable','disable'].includes(action)){
+        return
+    }
+
+    const tenant=CONTROL_TENANTS.find(
+        x=>x.tenant_id===tenantId
+    );
+
+    if(!tenant)return;
+
+    const ownTenant=String(
+        (currentUser&&currentUser.tenant_id)||''
+    ).toLowerCase()===String(
+        tenantId||''
+    ).toLowerCase();
+
+    if(
+        action==='disable' &&
+        controlSystemAdmin() &&
+        ownTenant
+    ){
+        toast(
+            'No se permite deshabilitar desde la consola la empresa de la sesion SYSTEM_ADMIN.',
+            true
+        );
+        return
+    }
+
+    if(action==='disable'){
+        const approved=confirm(
+            'Deshabilitar empresa "'+
+            (tenant.name||tenantId)+
+            '"? Los usuarios de esa empresa perderan acceso.'
+        );
+
+        if(!approved)return
+    }
+
+    try{
+        const result=await api(
+            '/api/admin/tenants/'+
+            encodeURIComponent(tenantId)+
+            '/'+action,
+            {
+                method:'POST',
+                headers:H()
+            }
+        );
+
+        if(
+            action==='disable' &&
+            ownTenant &&
+            !controlSystemAdmin()
+        ){
+            showLogin(
+                'La empresa fue deshabilitada. Se cerro la sesion local.'
+            );
+            return
+        }
+
+        toast(
+            action==='enable'
+                ?'Empresa habilitada.'
+                :'Empresa deshabilitada.'
+        );
+
+        await controlLoadTenants();
+
+        if(
+            controlSystemAdmin() &&
+            controlTenantId()===tenantId
+        ){
+            await Promise.allSettled([
+                controlLoadUsers(),
+                controlLoadSql(),
+                controlLoadAi(),
+                controlLoadOverview()
+            ])
+        }
+
+        return result
+    }catch(e){
+        toast(e.message,true)
     }
 }
 
