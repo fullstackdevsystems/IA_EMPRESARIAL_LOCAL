@@ -62,6 +62,428 @@ class EnterpriseOnboarding:
         except (TenantRegistryError, IdentityError, PlatformConfigError) as exc:
             return {"status": "INVALID_CONFIGURATION", "code": exc.code, "sql": "NOT_CONFIGURED", "ai_provider": "NOT_CONFIGURED"}
 
+    def _readiness_admins(self, tenant_id):
+        tenant = self.tenants.get(tenant_id)
+        canonical = tenant["tenant_id"]
+        return [
+            user
+            for user in self.identity.list(canonical)
+            if user["status"] == "ACTIVE"
+            and set(user.get("roles") or [])
+            & {"SYSTEM_ADMIN", "TENANT_ADMIN"}
+        ]
+
+    def readiness(self, tenant_id, *, ai_test=None):
+        try:
+            tenant = self.tenants.get(tenant_id)
+            canonical = tenant["tenant_id"]
+
+            if tenant["status"] != "ACTIVE":
+                return {
+                    "status": "BLOCKED",
+                    "verification_status": "BLOCKED",
+                    "tenant_id": canonical,
+                    "steps": {
+                        "company": {
+                            "status": "BLOCKED",
+                            "required": True,
+                        },
+                        "admin": {
+                            "status": "BLOCKED",
+                            "required": True,
+                        },
+                        "sql": {
+                            "status": "BLOCKED",
+                            "required": True,
+                        },
+                        "ai": {
+                            "status": "CONFIGURED",
+                            "required": False,
+                        },
+                        "branding": {
+                            "status": "CONFIGURED",
+                            "required": True,
+                        },
+                    },
+                    "next_actions": [
+                        "enable_company",
+                    ],
+                }
+
+            admins = self._readiness_admins(
+                canonical
+            )
+
+            effective = (
+                self.platform
+                .resolve_effective_config(
+                    canonical
+                )
+            )
+
+            features = dict(
+                effective.get(
+                    "enabled_features"
+                )
+                or {}
+            )
+
+            company = {
+                "status": "CONFIGURED",
+                "required": True,
+            }
+
+            admin = {
+                "status":
+                    "CONFIGURED"
+                    if admins
+                    else "BLOCKED",
+                "required": True,
+                "active_admin_count":
+                    len(admins),
+            }
+
+            branding_data = dict(
+                effective.get("branding")
+                or {}
+            )
+
+            branding = {
+                "status":
+                    "CONFIGURED"
+                    if str(
+                        branding_data.get(
+                            "display_name"
+                        )
+                        or ""
+                    ).strip()
+                    else "BLOCKED",
+                "required": True,
+            }
+
+            # SQL readiness is derived from the
+            # existing persisted connection evidence.
+            sql_required = bool(
+                features.get(
+                    "sql_enabled",
+                    True,
+                )
+            )
+
+            profiles = []
+
+            if admins:
+                profiles = self.sql.list(
+                    self.identity.scope(
+                        admins[0]
+                    )
+                )
+
+            active_sql = [
+                profile
+                for profile in profiles
+                if profile.get("enabled")
+                and profile.get("read_only")
+            ]
+
+            sql_failed = any(
+                profile.get(
+                    "last_test_status"
+                ) == "FAIL"
+                or profile.get(
+                    "last_discovery_status"
+                ) == "FAIL"
+                for profile in active_sql
+            )
+
+            sql_tested = (
+                bool(active_sql)
+                and all(
+                    profile.get(
+                        "last_test_status"
+                    ) == "PASS"
+                    and profile.get(
+                        "last_discovery_status"
+                    ) == "PASS"
+                    for profile
+                    in active_sql
+                )
+            )
+
+            if not sql_required:
+                sql_status = "CONFIGURED"
+            elif not active_sql:
+                sql_status = "BLOCKED"
+            elif sql_failed:
+                sql_status = "DEGRADED"
+            elif sql_tested:
+                sql_status = "TESTED"
+            else:
+                sql_status = "CONFIGURED"
+
+            sql = {
+                "status": sql_status,
+                "required": sql_required,
+                "configured_count":
+                    len(active_sql),
+                "tested_count":
+                    sum(
+                        profile.get(
+                            "last_test_status"
+                        ) == "PASS"
+                        and profile.get(
+                            "last_discovery_status"
+                        ) == "PASS"
+                        for profile
+                        in active_sql
+                    ),
+            }
+
+            # AI PASS is accepted only as explicit
+            # evidence from an actual provider test.
+            # readiness() itself never performs or
+            # persists a fake provider test.
+            provider = dict(
+                effective.get(
+                    "ai_provider"
+                )
+                or {}
+            )
+
+            provider_type = str(
+                provider.get(
+                    "provider_type"
+                )
+                or "DISABLED"
+            ).upper()
+
+            ai_required = bool(
+                features.get(
+                    "ai_enabled",
+                    False,
+                )
+            )
+
+            provider_enabled = bool(
+                provider.get(
+                    "enabled",
+                    provider_type
+                    != "DISABLED",
+                )
+            )
+
+            ai_evidence = ""
+
+            if isinstance(
+                ai_test,
+                dict,
+            ):
+                ai_evidence = str(
+                    ai_test.get(
+                        "status"
+                    )
+                    or ""
+                ).upper()
+
+            if not ai_required:
+                ai_status = "CONFIGURED"
+            elif (
+                provider_type
+                == "DISABLED"
+                or not provider_enabled
+            ):
+                ai_status = "BLOCKED"
+            elif ai_evidence == "PASS":
+                ai_status = "TESTED"
+            elif ai_evidence:
+                ai_status = "DEGRADED"
+            else:
+                ai_status = "CONFIGURED"
+
+            ai = {
+                "status": ai_status,
+                "required": ai_required,
+                "provider_type":
+                    provider_type,
+            }
+
+            steps = {
+                "company": company,
+                "admin": admin,
+                "sql": sql,
+                "ai": ai,
+                "branding": branding,
+            }
+
+            required = [
+                value
+                for value
+                in steps.values()
+                if value.get("required")
+            ]
+
+            external = [
+                value
+                for key, value
+                in steps.items()
+                if key in {"sql", "ai"}
+                and value.get("required")
+            ]
+
+            if any(
+                value["status"]
+                == "BLOCKED"
+                for value
+                in required
+            ):
+                overall = "BLOCKED"
+
+            elif any(
+                value["status"]
+                == "DEGRADED"
+                for value
+                in required
+            ):
+                overall = "DEGRADED"
+
+            elif (
+                not external
+                or all(
+                    value["status"]
+                    == "TESTED"
+                    for value
+                    in external
+                )
+            ):
+                overall = "READY"
+
+            else:
+                overall = "CONFIGURED"
+
+            if not external:
+                verification = (
+                    "NOT_REQUIRED"
+                )
+
+            elif any(
+                value["status"]
+                == "BLOCKED"
+                for value
+                in external
+            ):
+                verification = "BLOCKED"
+
+            elif any(
+                value["status"]
+                == "DEGRADED"
+                for value
+                in external
+            ):
+                verification = "DEGRADED"
+
+            elif all(
+                value["status"]
+                == "TESTED"
+                for value
+                in external
+            ):
+                verification = "TESTED"
+
+            else:
+                verification = (
+                    "CONFIGURED"
+                )
+
+            actions = []
+
+            if admin["status"] == "BLOCKED":
+                actions.append(
+                    "create_tenant_admin"
+                )
+
+            if (
+                branding["status"]
+                == "BLOCKED"
+            ):
+                actions.append(
+                    "configure_branding"
+                )
+
+            if sql_required:
+                if sql_status == "BLOCKED":
+                    actions.append(
+                        "configure_sql"
+                    )
+
+                elif (
+                    sql_status
+                    == "CONFIGURED"
+                ):
+                    actions.append(
+                        "test_sql_and_discover"
+                    )
+
+                elif (
+                    sql_status
+                    == "DEGRADED"
+                ):
+                    actions.append(
+                        "fix_sql_and_retest"
+                    )
+
+            if ai_required:
+                if ai_status == "BLOCKED":
+                    actions.append(
+                        "configure_ai"
+                    )
+
+                elif (
+                    ai_status
+                    == "CONFIGURED"
+                ):
+                    actions.append(
+                        "test_ai_provider"
+                    )
+
+                elif (
+                    ai_status
+                    == "DEGRADED"
+                ):
+                    actions.append(
+                        "fix_ai_and_retest"
+                    )
+
+            return {
+                "status": overall,
+                "verification_status":
+                    verification,
+                "tenant_id": canonical,
+                "steps": steps,
+                "next_actions": actions,
+            }
+
+        except (
+            TenantRegistryError,
+            IdentityError,
+            PlatformConfigError,
+            EnterpriseSqlError,
+        ) as exc:
+            return {
+                "status": "BLOCKED",
+                "verification_status":
+                    "BLOCKED",
+                "tenant_id":
+                    str(
+                        tenant_id
+                        or ""
+                    ).strip().lower(),
+                "code": exc.code,
+                "steps": {},
+                "next_actions": [
+                    "repair_configuration",
+                ],
+            }
+
     def validate(self) -> Dict[str, Any]:
         result = self.status()
         if result["status"] != "CONFIGURED":
@@ -106,7 +528,7 @@ class EnterpriseOnboarding:
 
 
 def _reports_from_runtime(runtime_root: str) -> Path:
-    return Path(runtime_root).resolve() / "IA_Local" / "Reportes"
+    return Path(runtime_root).resolve() / "workspace" / "Reportes"
 
 
 def main(argv=None) -> int:

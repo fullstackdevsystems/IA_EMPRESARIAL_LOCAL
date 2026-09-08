@@ -82,6 +82,8 @@ from enterprise_sql_gateway import (
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
 from enterprise_platform_config import EnterprisePlatformConfigStore, PlatformConfigError
+from enterprise_onboarding import EnterpriseOnboarding
+from enterprise_ai.providers import OllamaProvider, LMStudioProvider
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
     public_source_execution_metadata,
@@ -1739,6 +1741,111 @@ def _config_actor(authorization: str, permission: str):
     if not _identity_store().has_permission(actor,permission):raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso de configuración denegado"})
     return actor
 
+class _EnterpriseAiHealthAdapter:
+    """Bridge platform-config health contract to existing productive providers."""
+
+    def health(self, config: Dict[str, Any]) -> bool:
+        provider_type = str(
+            config.get("provider_type")
+            or ""
+        ).upper()
+
+        base_url = str(
+            config.get("base_url")
+            or ""
+        ).strip()
+
+        model = str(
+            config.get("model")
+            or ""
+        ).strip()
+
+        timeout = int(
+            config.get("timeout")
+            or 30
+        )
+
+        if not model:
+            raise PlatformConfigError(
+                "AI_MODEL_INVALID",
+                "Modelo IA requerido para validar preparaci?n",
+            )
+
+        if provider_type == "OLLAMA":
+            provider = OllamaProvider(
+                base_url,
+                model,
+                timeout=timeout,
+            )
+
+        elif provider_type == "OPENAI_COMPATIBLE_LOCAL":
+            provider = LMStudioProvider(
+                base_url,
+                model,
+                timeout=timeout,
+            )
+
+        else:
+            raise PlatformConfigError(
+                "AI_PROVIDER_INVALID",
+                "Provider IA inv?lido",
+            )
+
+        if not provider.healthy():
+            raise PlatformConfigError(
+                "AI_PROVIDER_UNAVAILABLE",
+                "Provider IA no disponible",
+            )
+
+        return True
+
+
+def _enterprise_onboarding() -> EnterpriseOnboarding:
+    return EnterpriseOnboarding(
+        base.REPORTES
+    )
+
+
+def _config_target(
+    actor: Dict[str, Any],
+    tenant_id: Optional[str],
+) -> str:
+    target = str(
+        tenant_id
+        or actor["tenant_id"]
+        or ""
+    ).strip().lower()
+
+    if not target:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": "TENANT_REQUIRED",
+                "message": "Empresa requerida",
+            },
+        )
+
+    if (
+        "SYSTEM_ADMIN"
+        not in actor["roles"]
+        and target
+        != str(
+            actor["tenant_id"]
+        ).strip().lower()
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "CONFIG_TENANT_SCOPE_DENIED",
+                "message":
+                    "Tenant no permitido",
+            },
+        )
+
+    return target
+
+
 @app.get("/api/admin/config")
 def get_platform_config(authorization: str=Header("")):
     actor=_config_actor(authorization,"config:read")
@@ -1772,10 +1879,155 @@ def get_ai_provider(tenant_id:Optional[str]=None,authorization: str=Header("")):
     return {"provider":_platform_config().resolve_effective_config(target).get("ai_provider")}
 
 @app.post("/api/admin/ai/provider/test")
-def test_ai_provider(payload:Dict[str,Any],authorization: str=Header("")):
-    _config_actor(authorization,"config:read")
-    try:return _platform_config().test_provider(payload.get("provider") or {})
-    except PlatformConfigError as exc:_config_http_error(exc)
+def test_ai_provider(
+    payload: Dict[str, Any],
+    authorization: str = Header(""),
+):
+    actor = _config_actor(
+        authorization,
+        "config:read",
+    )
+
+    target = _config_target(
+        actor,
+        payload.get("tenant_id"),
+    )
+
+    try:
+        provider = (
+            payload.get("provider")
+            or _platform_config()
+            .resolve_effective_config(
+                target
+            )
+            .get("ai_provider")
+            or {}
+        )
+
+        result = (
+            _platform_config()
+            .test_provider(
+                provider,
+                adapter=
+                    _EnterpriseAiHealthAdapter(),
+            )
+        )
+
+        return {
+            **result,
+            "tenant_id": target,
+        }
+
+    except PlatformConfigError as exc:
+        _config_http_error(exc)
+
+
+@app.get("/api/admin/tenants/{tenant_id}/readiness")
+def get_tenant_readiness(
+    tenant_id: str,
+    authorization: str = Header(""),
+):
+    actor = _config_actor(
+        authorization,
+        "config:read",
+    )
+
+    target = _config_target(
+        actor,
+        tenant_id,
+    )
+
+    return _enterprise_onboarding().readiness(
+        target
+    )
+
+
+@app.post("/api/admin/tenants/{tenant_id}/readiness/validate")
+def validate_tenant_readiness(
+    tenant_id: str,
+    authorization: str = Header(""),
+):
+    actor = _config_actor(
+        authorization,
+        "config:read",
+    )
+
+    target = _config_target(
+        actor,
+        tenant_id,
+    )
+
+    onboarding = _enterprise_onboarding()
+
+    initial = onboarding.readiness(
+        target
+    )
+
+    ai_step = (
+        initial.get("steps", {})
+        .get("ai", {})
+    )
+
+    if not ai_step.get("required"):
+        return {
+            "tenant_id": target,
+            "ai_test": {
+                "status":
+                    "NOT_REQUIRED",
+            },
+            "readiness": initial,
+        }
+
+    effective = (
+        _platform_config()
+        .resolve_effective_config(
+            target
+        )
+    )
+
+    provider = (
+        effective.get("ai_provider")
+        or {}
+    )
+
+    try:
+        ai_test = (
+            _platform_config()
+            .test_provider(
+                provider,
+                adapter=
+                    _EnterpriseAiHealthAdapter(),
+            )
+        )
+
+    except PlatformConfigError as exc:
+        if exc.code == "AI_PROVIDER_UNAVAILABLE":
+            ai_test = {
+                "status": "FAIL",
+                "code": exc.code,
+            }
+
+            return {
+                "tenant_id": target,
+                "ai_test": ai_test,
+                "readiness":
+                    onboarding.readiness(
+                        target,
+                        ai_test=ai_test,
+                    ),
+            }
+
+        _config_http_error(exc)
+
+    return {
+        "tenant_id": target,
+        "ai_test": ai_test,
+        "readiness":
+            onboarding.readiness(
+                target,
+                ai_test=ai_test,
+            ),
+    }
 
 
 @app.get("/api/admin/tenants")

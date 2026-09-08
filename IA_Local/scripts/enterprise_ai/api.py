@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .factory import build_components
+from .observability import shutdown_logging
 from .security import Principal, safe_component
 from .admin_console import UNIFIED_ADMIN_HTML
 from enterprise_control_plane import ControlPlaneError, EnterpriseControlPlane
@@ -202,6 +203,24 @@ load();
 
 def install_enterprise_routes(app, root: str | Path):
     components = build_components(root)
+
+    def _close_enterprise_components() -> None:
+        closer = getattr(
+            components.vectors,
+            "close",
+            None,
+        )
+
+        if callable(closer):
+            closer()
+
+        shutdown_logging()
+
+    app.router.add_event_handler(
+        "shutdown",
+        _close_enterprise_components,
+    )
+
     control_plane = EnterpriseControlPlane(components.cfg.root)
     enterprise_tenants = EnterpriseTenantRegistry(Path(components.cfg.root) / "workspace" / "Reportes" / ".tenants")
     enterprise_identity = EnterpriseIdentityStore(Path(components.cfg.root) / "workspace" / "Reportes" / ".identity", enterprise_tenants)
