@@ -6,6 +6,19 @@ function Stop-Install($x){Note "FAIL: $x";throw $x}
 
 $backupRoot = $null
 $previousScripts = $null
+$freshMetadataBootstrap = $null
+
+function Cleanup-FreshMetadataBootstrap {
+    if (
+        $freshMetadataBootstrap -and
+        (Test-Path $freshMetadataBootstrap -PathType Leaf)
+    ) {
+        Remove-Item `
+            -LiteralPath $freshMetadataBootstrap `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+}
 
 function Restore-PreviousManagedScripts {
     if (
@@ -133,6 +146,22 @@ if (-not $existingInstall) {
     Note 'INSTALL MODE: FRESH'
     New-Item -ItemType Directory -Force $RuntimeRoot | Out-Null
     Copy-Item (Join-Path $source '*') $RuntimeRoot -Recurse -Force
+
+    # FRESH_METADATA_BOOTSTRAP
+    # analizador_universal requires canonical release identity
+    # at ProductRoot during import health validation. This copy
+    # is temporary and is removed before the managed root-file
+    # transaction begins.
+    $freshMetadataBootstrap = Join-Path `
+        $ProductRoot `
+        'RELEASE_METADATA.json'
+
+    Copy-Item `
+        -LiteralPath $releaseMetadataPath `
+        -Destination $freshMetadataBootstrap `
+        -Force
+
+    Note 'FRESH_METADATA_BOOTSTRAP: canonical release metadata prepared for health validation'
 }
 else {
     Note 'INSTALL MODE: UPGRADE'
@@ -195,6 +224,7 @@ if(-not(Test-Path $vp)){
     & $py.Command @($py.Args) -m venv (Join-Path $ProductRoot '.venv')
 
     if($LASTEXITCODE){
+        Cleanup-FreshMetadataBootstrap
         Restore-PreviousManagedScripts
         Cleanup-ManagedScriptBackup
         Stop-Install 'venv creation failed'
@@ -205,6 +235,7 @@ if(-not(Test-Path $vp)){
     -r (Join-Path $RuntimeRoot 'requirements-local.txt')
 
 if($LASTEXITCODE){
+    Cleanup-FreshMetadataBootstrap
     Restore-PreviousManagedScripts
     Cleanup-ManagedScriptBackup
     Stop-Install 'dependency install failed'
@@ -244,10 +275,18 @@ finally {
 }
 
 if($healthExit){
+    Cleanup-FreshMetadataBootstrap
     Restore-PreviousManagedScripts
     Cleanup-ManagedScriptBackup
     Stop-Install 'health imports failed'
 }
+
+# The fresh-only metadata copy existed solely so runtime
+# imports could resolve canonical release identity. Remove
+# it now so the complete managed root transaction remains
+# authoritative and can still treat metadata as a new file
+# during a clean install.
+Cleanup-FreshMetadataBootstrap
 
 # Managed root files are deployed only after runtime health
 # validation succeeds. They are staged and rolled back as
