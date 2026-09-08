@@ -103,5 +103,6 @@ class EnterprisePlatformConfigStore:
   try:
    if not adapter:raise PlatformConfigError("AI_PROVIDER_UNAVAILABLE","Provider IA no disponible")
    adapter.health(p);return {"status":"PASS","latency_ms":round((time.monotonic()-start)*1000,3),"provider_type":p["provider_type"]}
+  except TimeoutError as e:raise PlatformConfigError("AI_PROVIDER_TIMEOUT","Tiempo de espera IA agotado") from e
   except PlatformConfigError:raise
   except Exception as e:raise PlatformConfigError("AI_PROVIDER_UNAVAILABLE","Provider IA no disponible") from e

@@ -73,6 +73,16 @@ class EnterpriseOnboarding:
             & {"SYSTEM_ADMIN", "TENANT_ADMIN"}
         ]
 
+    def sql_readiness_scope(self, tenant_id):
+        """Return the existing administrative scope used by SQL readiness."""
+        admins = self._readiness_admins(tenant_id)
+        if not admins:
+            raise OnboardingError(
+                "CONFIGURATION_REQUIRED",
+                "Administrador requerido",
+            )
+        return self.identity.scope(admins[0])
+
     def readiness(self, tenant_id, *, ai_test=None):
         try:
             tenant = self.tenants.get(tenant_id)
@@ -174,9 +184,7 @@ class EnterpriseOnboarding:
 
             if admins:
                 profiles = self.sql.list(
-                    self.identity.scope(
-                        admins[0]
-                    )
+                    self.sql_readiness_scope(canonical)
                 )
 
             active_sql = [
@@ -210,6 +218,28 @@ class EnterpriseOnboarding:
                 )
             )
 
+            sql_last_checked = max(
+                [
+                    str(
+                        profile.get("last_discovery_at")
+                        or profile.get("last_test_at")
+                        or ""
+                    )
+                    for profile in active_sql
+                ],
+                default="",
+            )
+
+            sql_error_code = next(
+                (
+                    str(profile.get("last_error_code") or "")
+                    for profile in active_sql
+                    if profile.get("last_test_status") == "FAIL"
+                    and profile.get("last_error_code")
+                ),
+                "",
+            )
+
             if not sql_required:
                 sql_status = "CONFIGURED"
             elif not active_sql:
@@ -238,6 +268,15 @@ class EnterpriseOnboarding:
                         in active_sql
                     ),
             }
+
+            if sql_last_checked:
+                sql["last_checked_at"] = sql_last_checked
+
+            if sql_failed:
+                sql["code"] = (
+                    sql_error_code
+                    or "SQL_CONNECTION_TEST_FAILED"
+                )
 
             # AI PASS is accepted only as explicit
             # evidence from an actual provider test.
@@ -272,6 +311,14 @@ class EnterpriseOnboarding:
                 )
             )
 
+            ai_code = ""
+
+            if ai_required and provider_type != "DISABLED":
+                if not str(provider.get("model") or "").strip():
+                    ai_code = "AI_MODEL_INVALID"
+                elif not str(provider.get("base_url") or "").strip():
+                    ai_code = "AI_PROVIDER_INVALID"
+
             ai_evidence = ""
 
             if isinstance(
@@ -293,6 +340,8 @@ class EnterpriseOnboarding:
                 or not provider_enabled
             ):
                 ai_status = "BLOCKED"
+            elif ai_code:
+                ai_status = "BLOCKED"
             elif ai_evidence == "PASS":
                 ai_status = "TESTED"
             elif ai_evidence:
@@ -306,6 +355,15 @@ class EnterpriseOnboarding:
                 "provider_type":
                     provider_type,
             }
+
+            if ai_code:
+                ai.update(
+                    {
+                        "code": ai_code,
+                        "safe_message": "Configuración IA incompleta",
+                        "recoverable": True,
+                    }
+                )
 
             steps = {
                 "company": company,

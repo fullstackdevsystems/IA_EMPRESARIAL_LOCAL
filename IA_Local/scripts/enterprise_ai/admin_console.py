@@ -1076,6 +1076,11 @@ function controlReadinessStep(name,step){
             esc(item.discovered_object_count)
     }
 
+    const code=String(item.code||'').trim();
+    const safeMessage=String(item.safe_message||'').trim();
+    const action=String(item.suggested_action||'').trim();
+    const checked=String(item.last_checked_at||'').trim();
+
     return (
         '<div style="padding:7px 0;border-bottom:1px solid #e5e7eb">'+
         '<b>'+esc(name)+'</b> '+
@@ -1093,6 +1098,34 @@ function controlReadinessStep(name,step){
             detail
                 ?'<div class="mutedtxt">'+
                  detail+
+                 '</div>'
+                :''
+        )+
+        (
+            code
+                ?'<div class="mutedtxt">Código: '+
+                 esc(code)+
+                 '</div>'
+                :''
+        )+
+        (
+            safeMessage
+                ?'<div class="mutedtxt">'+
+                 esc(safeMessage)+
+                 '</div>'
+                :''
+        )+
+        (
+            action
+                ?'<div class="mutedtxt">Acción: '+
+                 esc(action)+
+                 '</div>'
+                :''
+        )+
+        (
+            checked
+                ?'<div class="mutedtxt">Última evidencia: '+
+                 esc(checked)+
                  '</div>'
                 :''
         )+

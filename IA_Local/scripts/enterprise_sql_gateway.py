@@ -247,6 +247,7 @@ def assert_sql_profile_active(profile:Dict[str,Any])->Dict[str,Any]:
 
 _PUBLIC_CONNECTION_ERRORS = {
     "SQL_SECRET_UNAVAILABLE", "SQL_DRIVER_NOT_AVAILABLE", "SQL_AUTH_FAILED",
+    "SQL_TIMEOUT",
     "SQL_DATABASE_UNAVAILABLE", "SQL_CONNECTION_TEST_FAILED",
     "SQL_SCHEMA_DISCOVERY_FAILED", "SQL_CONNECTION_DISABLED", "SQL_SCOPE_DENIED",
     "SQL_EXECUTION_FAILED", "SQL_ALLOWLIST_DENIED", "SQL_QUERY_INVALID", "SQL_QUERY_POLICY_BLOCKED",
@@ -255,6 +256,7 @@ _PUBLIC_CONNECTION_MESSAGES = {
     "SQL_SECRET_UNAVAILABLE": "Secret SQL no disponible",
     "SQL_DRIVER_NOT_AVAILABLE": "Driver SQL Server no disponible",
     "SQL_AUTH_FAILED": "Autenticación SQL rechazada",
+    "SQL_TIMEOUT": "Tiempo de espera SQL agotado",
     "SQL_DATABASE_UNAVAILABLE": "Base de datos SQL no disponible",
     "SQL_CONNECTION_TEST_FAILED": "Prueba de conexión SQL falló",
     "SQL_SCHEMA_DISCOVERY_FAILED": "Discovery SQL no disponible",

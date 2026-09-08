@@ -1733,13 +1733,215 @@ def _tenant_http_error(exc: TenantRegistryError):
     raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
 
 def _config_http_error(exc: PlatformConfigError):
-    status=503 if exc.code=="AI_PROVIDER_UNAVAILABLE" else (403 if exc.code in {"CONFIG_PERMISSION_DENIED","CONFIG_TENANT_SCOPE_DENIED"} else 400)
+    status=503 if exc.code in {"AI_PROVIDER_UNAVAILABLE","AI_PROVIDER_TIMEOUT"} else (403 if exc.code in {"CONFIG_PERMISSION_DENIED","CONFIG_TENANT_SCOPE_DENIED"} else 400)
     raise base.HTTPException(status_code=status,detail={"code":exc.code,"message":str(exc)}) from exc
 
 def _config_actor(authorization: str, permission: str):
     actor=_bearer(authorization)
     if not _identity_store().has_permission(actor,permission):raise base.HTTPException(status_code=403,detail={"code":"CONFIG_PERMISSION_DENIED","message":"Permiso de configuración denegado"})
     return actor
+
+
+_SQL_READINESS_MESSAGES = {
+    "SQL_AUTH_FAILED": "Autenticación SQL rechazada",
+    "SQL_TIMEOUT": "Tiempo de espera SQL agotado",
+    "SQL_CONNECTION_DISABLED": "Conexión SQL deshabilitada",
+    "SQL_CONNECTION_NOT_FOUND": "Conexión SQL requerida no configurada",
+    "SQL_CONNECTION_TEST_FAILED": "Conexión SQL no disponible",
+    "SQL_DATABASE_UNAVAILABLE": "Base de datos SQL no disponible",
+    "SQL_DRIVER_NOT_AVAILABLE": "Driver SQL Server no disponible",
+    "SQL_SCHEMA_DISCOVERY_FAILED": "Discovery SQL no disponible",
+}
+
+
+_AI_READINESS_MESSAGES = {
+    "AI_PROVIDER_UNAVAILABLE": "Provider IA no disponible",
+    "AI_PROVIDER_TIMEOUT": "Tiempo de espera IA agotado",
+    "AI_MODEL_INVALID": "Modelo IA inválido o ausente",
+    "AI_PROVIDER_INVALID": "Configuración de provider IA inválida",
+}
+
+
+_READINESS_MESSAGES = {
+    "TENANT_DISABLED": "Empresa deshabilitada",
+    "TENANT_INTEGRITY_MISMATCH": "Registro de empresa no confiable",
+    "IDENTITY_INTEGRITY_MISMATCH": "Registro de identidad no confiable",
+    "CONFIG_INTEGRITY_MISMATCH": "Configuración empresarial no confiable",
+    "CONFIGURATION_REQUIRED": "Configuración empresarial requerida",
+    **_SQL_READINESS_MESSAGES,
+    **_AI_READINESS_MESSAGES,
+}
+
+_READINESS_ACTIONS = {
+    "SQL_CONNECTION_TEST_FAILED": "Verifica que SQL Server esté disponible y vuelve a validar.",
+    "SQL_DATABASE_UNAVAILABLE": "Verifica que SQL Server esté disponible y vuelve a validar.",
+    "SQL_TIMEOUT": "Verifica conectividad o carga del servidor y vuelve a validar.",
+    "SQL_AUTH_FAILED": "Revisa la referencia de credenciales configurada.",
+    "SQL_CONNECTION_DISABLED": "Habilita una conexión SQL gobernada y vuelve a validar.",
+    "SQL_CONNECTION_NOT_FOUND": "Configura una conexión SQL gobernada y vuelve a validar.",
+    "AI_PROVIDER_UNAVAILABLE": "Verifica que el proveedor de IA esté disponible.",
+    "AI_PROVIDER_TIMEOUT": "Verifica el proveedor de IA y vuelve a validar.",
+    "AI_MODEL_INVALID": "Selecciona un modelo disponible.",
+    "AI_PROVIDER_INVALID": "Completa la configuración del proveedor de IA.",
+    "TENANT_DISABLED": "Habilita la empresa antes de continuar.",
+    "TENANT_INTEGRITY_MISMATCH": "Restaura una configuración válida antes de continuar.",
+    "IDENTITY_INTEGRITY_MISMATCH": "Restaura una configuración válida antes de continuar.",
+    "CONFIG_INTEGRITY_MISMATCH": "Restaura una configuración válida antes de continuar.",
+    "CONFIGURATION_REQUIRED": "Completa la configuración requerida y vuelve a validar.",
+}
+
+
+def _readiness_component_for_code(code: str) -> str:
+    code = str(code or "")
+    if code.startswith("TENANT_"):
+        return "tenant"
+    if code.startswith("IDENTITY_"):
+        return "identity"
+    if code.startswith("SQL_"):
+        return "sql"
+    if code.startswith(("AI_", "CONFIG_")):
+        return "configuration"
+    return "configuration"
+
+
+def _readiness_observability(readiness: Dict[str, Any], *, sql_test=None, ai_test=None) -> Dict[str, Any]:
+    """Project canonical readiness into safe, display-ready component evidence."""
+    result = dict(readiness or {})
+    steps = {
+        key: dict(value or {})
+        for key, value in dict(result.get("steps") or {}).items()
+    }
+    components = {
+        "company": "tenant",
+        "admin": "identity",
+        "sql": "sql",
+        "ai": "ai",
+        "branding": "configuration",
+    }
+
+    transient = {"sql": sql_test, "ai": ai_test}
+    for key, step in steps.items():
+        step["component"] = components.get(key, "configuration")
+        evidence = transient.get(key)
+        if isinstance(evidence, dict) and evidence.get("code"):
+            step["code"] = str(evidence["code"])
+            step["safe_message"] = str(evidence.get("safe_message") or _READINESS_MESSAGES.get(step["code"], "Validación no disponible"))
+            step["recoverable"] = bool(evidence.get("recoverable", True))
+        code = str(step.get("code") or "")
+        if code:
+            step.setdefault("safe_message", _READINESS_MESSAGES.get(code, "Validación no disponible"))
+            step.setdefault("recoverable", True)
+            action = _READINESS_ACTIONS.get(code)
+            if action:
+                step["suggested_action"] = action
+
+    top_code = str(result.get("code") or "")
+    if top_code:
+        component = _readiness_component_for_code(top_code)
+        steps.setdefault(component, {
+            "component": component,
+            "status": "BLOCKED",
+            "required": True,
+        })
+        steps[component].update({
+            "code": top_code,
+            "safe_message": _READINESS_MESSAGES.get(top_code, "Configuración empresarial no confiable"),
+            "recoverable": True,
+            "suggested_action": _READINESS_ACTIONS.get(top_code, "Restaura una configuración válida antes de continuar."),
+        })
+
+    result["steps"] = steps
+    return result
+
+
+def _ai_readiness_failure(exc: PlatformConfigError) -> Dict[str, Any]:
+    code = str(exc.code or "AI_PROVIDER_UNAVAILABLE")
+    return {
+        "component": "ai",
+        "status": "FAIL",
+        "code": code,
+        "safe_message": _AI_READINESS_MESSAGES.get(
+            code,
+            "Validación IA no disponible",
+        ),
+        "recoverable": True,
+    }
+
+
+def _sql_readiness_failure(exc: EnterpriseSqlError) -> Dict[str, Any]:
+    code = str(exc.code or "SQL_CONNECTION_TEST_FAILED")
+    return {
+        "component": "sql",
+        "status": "FAIL",
+        "code": code,
+        "safe_message": _SQL_READINESS_MESSAGES.get(
+            code,
+            "Validación SQL no disponible",
+        ),
+        "recoverable": True,
+    }
+
+
+def _validate_sql_readiness(onboarding: EnterpriseOnboarding, tenant_id: str, initial: Dict[str, Any]) -> Dict[str, Any]:
+    """Run only governed connection/discovery checks for existing SQL profiles."""
+    sql_step = dict(initial.get("steps", {}).get("sql", {}))
+    if not sql_step.get("required"):
+        return {"component": "sql", "status": "NOT_REQUIRED"}
+
+    try:
+        scope = onboarding.sql_readiness_scope(tenant_id)
+        profiles = onboarding.sql.list(scope)
+    except (EnterpriseSqlError, OnboardingError) as exc:
+        if isinstance(exc, EnterpriseSqlError):
+            return _sql_readiness_failure(exc)
+        return {
+            "component": "sql",
+            "status": "BLOCKED",
+            "code": "CONFIGURATION_REQUIRED",
+            "safe_message": "Configuración SQL requerida",
+            "recoverable": True,
+        }
+
+    active = [
+        profile for profile in profiles
+        if profile.get("enabled") and profile.get("read_only")
+    ]
+    if not active:
+        code = (
+            "SQL_CONNECTION_DISABLED"
+            if profiles else "SQL_CONNECTION_NOT_FOUND"
+        )
+        return {
+            "component": "sql",
+            "status": "BLOCKED",
+            "code": code,
+            "safe_message": _SQL_READINESS_MESSAGES[code],
+            "recoverable": True,
+        }
+
+    _, provider, _ = _sql_admin_services()
+    for profile in active:
+        try:
+            test_connection(
+                onboarding.sql,
+                provider,
+                scope,
+                profile["connection_id"],
+            )
+            discover_schema(
+                onboarding.sql,
+                provider,
+                scope,
+                profile["connection_id"],
+            )
+        except EnterpriseSqlError as exc:
+            return _sql_readiness_failure(exc)
+
+    return {
+        "component": "sql",
+        "status": "PASS",
+        "tested_count": len(active),
+    }
 
 class _EnterpriseAiHealthAdapter:
     """Bridge platform-config health contract to existing productive providers."""
@@ -1937,8 +2139,8 @@ def get_tenant_readiness(
         tenant_id,
     )
 
-    return _enterprise_onboarding().readiness(
-        target
+    return _readiness_observability(
+        _enterprise_onboarding().readiness(target)
     )
 
 
@@ -1957,10 +2159,25 @@ def validate_tenant_readiness(
         tenant_id,
     )
 
+    if not _identity_store().has_permission(actor, "sql:read"):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code": "SQL_PERMISSION_DENIED",
+                "message": "Permiso SQL denegado",
+            },
+        )
+
     onboarding = _enterprise_onboarding()
 
     initial = onboarding.readiness(
         target
+    )
+
+    sql_test = _validate_sql_readiness(
+        onboarding,
+        target,
+        initial,
     )
 
     ai_step = (
@@ -1971,11 +2188,15 @@ def validate_tenant_readiness(
     if not ai_step.get("required"):
         return {
             "tenant_id": target,
+            "sql_test": sql_test,
             "ai_test": {
                 "status":
                     "NOT_REQUIRED",
             },
-            "readiness": initial,
+            "readiness": _readiness_observability(
+                onboarding.readiness(target),
+                sql_test=sql_test,
+            ),
         }
 
     effective = (
@@ -2001,32 +2222,31 @@ def validate_tenant_readiness(
         )
 
     except PlatformConfigError as exc:
-        if exc.code == "AI_PROVIDER_UNAVAILABLE":
-            ai_test = {
-                "status": "FAIL",
-                "code": exc.code,
-            }
+        if exc.code in _AI_READINESS_MESSAGES:
+            ai_test = _ai_readiness_failure(exc)
 
             return {
                 "tenant_id": target,
+                "sql_test": sql_test,
                 "ai_test": ai_test,
-                "readiness":
-                    onboarding.readiness(
-                        target,
-                        ai_test=ai_test,
-                    ),
+                "readiness": _readiness_observability(
+                    onboarding.readiness(target, ai_test=ai_test),
+                    sql_test=sql_test,
+                    ai_test=ai_test,
+                ),
             }
 
         _config_http_error(exc)
 
     return {
         "tenant_id": target,
+        "sql_test": sql_test,
         "ai_test": ai_test,
-        "readiness":
-            onboarding.readiness(
-                target,
-                ai_test=ai_test,
-            ),
+        "readiness": _readiness_observability(
+            onboarding.readiness(target, ai_test=ai_test),
+            sql_test=sql_test,
+            ai_test=ai_test,
+        ),
     }
 
 
