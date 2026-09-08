@@ -774,10 +774,10 @@ function New-DiagnosticBundle {
 }
 
 switch ($Action) {
-    "backup" { if([string]::IsNullOrWhiteSpace($BackupPath)){exit 1}; & $Python $BackupEngine backup --runtime-root $ProductRoot --backup-path $BackupPath;exit $LASTEXITCODE }
-    "restore" { if([string]::IsNullOrWhiteSpace($RestorePath)){exit 1}; & $Python $BackupEngine restore --runtime-root $ProductRoot --restore-path $RestorePath;exit $LASTEXITCODE }
+    "backup" { if([string]::IsNullOrWhiteSpace($BackupPath)){exit 1}; & $Python $BackupEngine backup --runtime-root $RuntimeRoot --backup-path $BackupPath;exit $LASTEXITCODE }
+    "restore" { if([string]::IsNullOrWhiteSpace($RestorePath)){exit 1}; & $Python $BackupEngine restore --runtime-root $RuntimeRoot --restore-path $RestorePath;exit $LASTEXITCODE }
     "configuration" {
-        & $Python $Onboarding status --runtime-root $ProductRoot
+        & $Python $Onboarding status --runtime-root $RuntimeRoot
         exit $LASTEXITCODE
     }
 
@@ -786,14 +786,14 @@ switch ($Action) {
             Write-Host "CONFIGURATION: REQUIRED (set IA_ONBOARDING_ADMIN_PASSWORD for this process)" -ForegroundColor Yellow
             exit 1
         }
-        & $Python $Onboarding configure --runtime-root $ProductRoot --tenant-id $TenantId --tenant-name $TenantName --admin-user-id $AdminUserId --admin-username $AdminUsername --admin-display-name $AdminDisplayName
+        & $Python $Onboarding configure --runtime-root $RuntimeRoot --tenant-id $TenantId --tenant-name $TenantName --admin-user-id $AdminUserId --admin-username $AdminUsername --admin-display-name $AdminDisplayName
         exit $LASTEXITCODE
     }
 
     "configure-sql" {
         if (-not $AllowedSchemas -or -not $AllowedTables) { Write-Host "SQL allowlist schema/table requerida" -ForegroundColor Yellow; exit 1 }
         if ($AuthMode -eq 'SQL_AUTH' -and ([string]::IsNullOrWhiteSpace($SecretReference) -or [string]::IsNullOrWhiteSpace($SqlUsername))) { Write-Host "SQL_AUTH requiere username y secret reference" -ForegroundColor Yellow; exit 1 }
-        $argsList = @($Onboarding, 'configure-sql', '--runtime-root', $ProductRoot, '--tenant-id', $TenantId, '--connection-id', $ConnectionId, '--server', $Server, '--database', $Database, '--auth-mode', $AuthMode)
+        $argsList = @($Onboarding, 'configure-sql', '--runtime-root', $RuntimeRoot, '--tenant-id', $TenantId, '--connection-id', $ConnectionId, '--server', $Server, '--database', $Database, '--auth-mode', $AuthMode)
         if ($AllowedSchemas -and $AllowedSchemas.Count -gt 0) { $argsList += @('--allowed-schemas', ($AllowedSchemas -join ',')) }
         if ($AllowedTables -and $AllowedTables.Count -gt 0) { $argsList += @('--allowed-tables', ($AllowedTables -join ',')) }
         if (-not [string]::IsNullOrWhiteSpace($SecretReference)) { $argsList += @('--secret-reference', $SecretReference) }
@@ -803,7 +803,7 @@ switch ($Action) {
     }
 
     "configure-ai" {
-        $argsList = @($Onboarding, 'configure-ai', '--runtime-root', $ProductRoot, '--tenant-id', $TenantId, '--provider', $Provider, '--timeout', $Timeout)
+        $argsList = @($Onboarding, 'configure-ai', '--runtime-root', $RuntimeRoot, '--tenant-id', $TenantId, '--provider', $Provider, '--timeout', $Timeout)
         if (-not [string]::IsNullOrWhiteSpace($BaseUrl)) { $argsList += @('--base-url', $BaseUrl) }
         if (-not [string]::IsNullOrWhiteSpace($Model)) { $argsList += @('--model', $Model) }
         & $Python @argsList
@@ -855,16 +855,3 @@ switch ($Action) {
         New-DiagnosticBundle | Out-Null
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
