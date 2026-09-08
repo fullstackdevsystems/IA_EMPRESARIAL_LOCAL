@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from output_intent_resolver import output_list
+from prompt_polarity import positive_request_text
 
 import re
 import unicodedata
@@ -13,7 +14,10 @@ VERSION = "r10.2"
 
 
 def norm(v: Any) -> str:
-    s = str(v or "").strip().lower()
+    s = str(v or "").strip()
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)
+    s = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", s)
+    s = s.lower()
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
     s = re.sub(r"[^a-z0-9_%]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
@@ -65,6 +69,7 @@ ROLE_SYNONYMS: Dict[str, Sequence[str]] = {
     "product": ("articulo", "producto", "description", "descripcion", "product name"),
     "line": ("linea", "linea negocio", "business line"),
     "zone": ("zona", "region", "territorio"),
+    "branch": ("sucursal", "branch", "store", "sales branch", "office"),
     "seller": ("vendedor", "ejecutivo", "asesor", "salesperson", "seller"),
     "supplier": ("proveedor", "supplier", "vendor"),
     "warehouse": ("almacen", "warehouse", "bodega"),
@@ -72,7 +77,7 @@ ROLE_SYNONYMS: Dict[str, Sequence[str]] = {
     "destination": ("destino", "ciudad destino", "destination", "destination city"),
     "category": ("categoria", "category", "segmento", "segment"),
     "quantity": ("cantidad", "quantity", "unidades", "units", "toneladas", "tons", "volumen", "volume"),
-    "revenue": ("venta", "ventas", "importe venta", "sales", "revenue", "ingreso", "ingresos", "amount", "importe"),
+    "revenue": ("venta total", "total venta", "importe venta", "ventas", "venta", "sales", "revenue", "ingreso", "ingresos", "amount", "importe"),
     "cost": ("costo", "cost", "costo total", "total cost"),
     "profit": ("utilidad", "ganancia", "profit", "gross profit", "beneficio"),
     "freight": ("flete", "freight", "shipping", "costo flete"),
@@ -90,7 +95,7 @@ ROLE_SYNONYMS: Dict[str, Sequence[str]] = {
 # Priority prevents generic roles from stealing specialized columns.
 ROLE_PRIORITY = [
     "due_date", "days_overdue", "customer_id", "product_id", "transaction_id",
-    "date", "customer", "product", "line", "zone", "seller", "supplier", "warehouse",
+    "date", "customer", "product", "line", "zone", "branch", "seller", "supplier", "warehouse",
     "origin", "destination", "category", "employee", "department", "budget", "previous",
     "balance", "stock", "freight", "profit", "cost", "revenue", "quantity", "status",
 ]
@@ -115,6 +120,15 @@ def _header_score(column: str, role: str) -> float:
     # Guard against IDs becoming entities.
     if role in {"customer", "product", "seller", "supplier"} and any(x in nc for x in (" cod ", "codigo", " id")):
         best *= 0.45
+
+    if role in {
+        "quantity", "revenue", "cost", "profit", "freight",
+        "budget", "previous", "balance", "stock", "days_overdue",
+    }:
+        column_tokens = _tokens(column)
+        if {"id", "codigo", "cod"} & column_tokens:
+            best *= 0.25
+
     return best
 
 
@@ -230,9 +244,11 @@ DIMENSION_TERMS: Dict[str, Sequence[str]] = {
     "line": ("linea", "línea", "lineas", "líneas"),
     "seller": ("vendedor", "vendedores", "ejecutivo", "asesor"),
     "zone": ("zona", "zonas", "region", "región"),
+    "branch": ("sucursal", "sucursales", "branch", "branches"),
     "supplier": ("proveedor", "proveedores", "supplier"),
     "warehouse": ("almacen", "almacén", "bodega"),
     "category": ("categoria", "categoría", "segmento"),
+    "status": ("estatus", "status", "estado", "estado venta"),
     "employee": ("empleado", "empleados", "colaborador"),
     "department": ("departamento", "departamentos", "area", "área"),
     "date": ("fecha", "mes", "mensual", "año", "anual", "evolucion", "evolución", "tendencia"),
@@ -250,7 +266,8 @@ ANALYSIS_TERMS: Dict[str, Sequence[str]] = {
 
 
 def parse_prompt_intent(prompt: str) -> PromptIntent:
-    n = norm(prompt)
+    positive_prompt = positive_request_text(prompt)
+    n = norm(positive_prompt)
     outputs: List[str] = output_list(prompt, default_all=True)
 
     metrics = [k for k, terms in METRIC_TERMS.items() if any(norm(t) in n for t in terms)]
@@ -323,7 +340,7 @@ def compile_universal_plan(df: pd.DataFrame, prompt: str, filename: str = "", sh
 
     requested_dims = intent.requested_dimensions[:]
     if not requested_dims:
-        requested_dims = [r for r in ("customer", "product", "seller", "zone", "supplier", "warehouse", "category", "employee", "department", "date") if roles.get(r)]
+        requested_dims = [r for r in ("customer", "product", "seller", "zone", "branch", "supplier", "warehouse", "category", "status", "employee", "department", "date") if roles.get(r)]
     dimensions = [{"role": d, "column": roles.get(d), "ready": bool(roles.get(d))} for d in requested_dims]
 
     filters = [{"column": d["column"], "label": d["role"].replace("_", " ").title(), "role": d["role"]} for d in dimensions if d["ready"]]
@@ -333,7 +350,7 @@ def compile_universal_plan(df: pd.DataFrame, prompt: str, filename: str = "", sh
         for d in dimensions:
             if d["ready"] and d["role"] != "date":
                 charts.append({"type": "bar", "title": f"{primary_measure['label']} por {d['role'].replace('_',' ').title()}", "dimension": d["column"], "measure": primary_measure["column"], "op": "sum", "top_n": intent.top_n})
-                if len(charts) >= 4: break
+                if len(charts) >= 7: break
         if roles.get("date"):
             charts.insert(0, {"type": "line", "title": f"Evolución de {primary_measure['label']}", "dimension": roles["date"], "measure": primary_measure["column"], "op": "sum", "top_n": 60})
 

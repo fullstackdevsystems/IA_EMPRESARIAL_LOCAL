@@ -12,7 +12,10 @@ CONFIDENCE_ORDER = {"MISSING": 0, "AMBIGUOUS": 1, "INFERRED": 2, "STRONG": 3, "E
 
 
 def _norm(v: Any) -> str:
-    s = str(v or "").strip().lower()
+    s = str(v or "").strip()
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)
+    s = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", s)
+    s = s.lower()
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
     s = re.sub(r"[^a-z0-9%]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
@@ -60,12 +63,14 @@ SPECS: Tuple[ConceptSpec, ...] = (
     ConceptSpec("product", "Producto", ("articulo", "artículo", "producto", "product", "product name", "descripcion producto", "descripción producto", "item", "item description", "sku description"), ("text",), ("producto", "product", "articulo", "item", "sku"), ("codigo", "cod", "id", "grupo")),
     ConceptSpec("product_id", "Código producto", ("cod articulo", "cod_articulo", "codigo articulo", "código artículo", "product id", "product_id", "productid", "item id", "item_id", "sku", "sku id", "sku_id"), ("text", "number"), ("producto", "product", "articulo", "item", "sku", "id", "codigo", "cod")),
     ConceptSpec("product_group", "Grupo de producto", ("ctrl alm", "ctrl_alm", "grupo producto", "product group", "familia producto", "agrupador producto"), ("text",), ("grupo", "group", "familia", "agrupador", "ctrl")),
-    ConceptSpec("category", "Categoría", ("categoria", "categoría", "category", "familia", "segmento producto", "product category"), ("text",), ("categoria", "category", "familia", "segmento")),
+    ConceptSpec("category", "Categoría", ("categoria", "categoría", "category", "familia", "segmento", "segmento producto", "product category"), ("text",), ("categoria", "category", "familia", "segmento")),
     ConceptSpec("seller", "Vendedor", ("vendedor", "ejecutivo", "asesor", "sales rep", "salesrep", "seller", "account executive", "representante"), ("text",), ("vendedor", "ejecutivo", "asesor", "sales", "seller", "representante"), ("codigo", "cod", "id")),
     ConceptSpec("seller_id", "Código vendedor", ("cod vendedor", "cod_vendedor", "codigo vendedor", "código vendedor", "seller id", "seller_id", "sales rep id", "salesrep id", "salesperson id", "employee seller id"), ("text", "number"), ("vendedor", "seller", "sales", "id", "codigo", "cod")),
     ConceptSpec("zone", "Zona", ("zona", "region", "región", "territorio", "territory", "sales region"), ("text",), ("zona", "region", "territorio", "territory"), ("codigo", "cod", "id")),
+    ConceptSpec("branch", "Sucursal", ("sucursal", "branch", "store", "sales branch", "office"), ("text",), ("sucursal", "branch", "store", "office")),
     ConceptSpec("line", "Línea", ("linea", "línea", "cod linea", "cod_linea", "business line", "line"), ("text", "number"), ("linea", "line")),
     ConceptSpec("reference", "Referencia", ("refer", "referencia", "reference", "folio", "factura", "invoice", "transaction id", "operation id"), ("text", "number"), ("refer", "referencia", "folio", "invoice", "factura", "operation")),
+    ConceptSpec("status", "Estatus", ("estatus", "status", "estado", "venta estatus", "sales status"), ("text",), ("estatus", "status", "estado")),
     ConceptSpec("revenue", "Venta", ("importe venta", "importe_venta", "venta total", "ventas", "venta", "sales", "sales amount", "revenue", "net sales", "ventas netas", "monto venta", "monto facturado", "total facturado", "importe"), ("number",), ("venta", "sales", "revenue", "importe", "facturado", "monto"), ("costo", "cost", "utilidad", "profit", "flete", "tax", "iva")),
     ConceptSpec("quantity", "Cantidad", ("toneladas vendidas", "toneladas_vendidas", "cantidad", "unidades", "quantity", "qty", "volume", "volumen", "tons sold", "tonnage"), ("number",), ("cantidad", "unidades", "quantity", "qty", "toneladas", "volume", "volumen"), ("merma", "costo", "cost", "precio", "price")),
     ConceptSpec("actual", "Actual", ("actual", "real", "venta actual", "ventas actual", "actual sales", "toneladas vendidas actual", "toneladas_vendidas_actual"), ("number",), ("actual", "real"), ("budget", "presupuesto", "previous", "anterior")),

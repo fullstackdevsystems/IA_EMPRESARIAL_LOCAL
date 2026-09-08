@@ -2,6 +2,8 @@ from __future__ import annotations
 import re, unicodedata
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from prompt_polarity import positive_request_text
+
 SCHEMA_VERSION = "r10.13a.3"
 
 def norm(value: Any) -> str:
@@ -279,6 +281,9 @@ def _detected_keys(
     ]
 
 NEGATION_CUES = (
+    "no inventes",
+    "no invente",
+    "no inventar",
     "no generes",
     "no generar",
     "no genere",
@@ -359,9 +364,81 @@ def _positive_keys(
         excluded,
     )
 
+
+def _governed_freight_constraint(raw: str) -> bool:
+    """
+    Distinguish exclusion from governed capability demand.
+
+    "Do not invent freight" alone means exclusion.
+
+    But when the same prompt explicitly requires a validated
+    rule/provenance and N/D or conditional fallback, freight
+    remains a requested governed capability. If unsupported,
+    the capability layer must expose it as BLOCKED.
+    """
+
+    text = norm(raw)
+
+    if not _contains(
+        text,
+        METRIC_LEXICON["freight"],
+    ):
+        return False
+
+    safety_cues = (
+        "no inventes",
+        "no invente",
+        "no inventar",
+        "no utilices",
+        "no utilizar",
+        "no uses",
+        "no usar",
+        "do not invent",
+        "do not use",
+    )
+
+    governance_cues = (
+        "regla validada",
+        "regla empresarial validada",
+        "provenance",
+        "validated rule",
+        "validated business rule",
+    )
+
+    fallback_cues = (
+        "si no existe",
+        "salvo que exista",
+        "n d",
+        "blocked",
+        "bloqueado",
+        "missing",
+    )
+
+    return (
+        any(
+            cue in text
+            for cue in safety_cues
+        )
+        and any(
+            cue in text
+            for cue in governance_cues
+        )
+        and any(
+            cue in text
+            for cue in fallback_cues
+        )
+    )
+
+
 def parse_prompt_intelligence(prompt: str) -> Dict[str, Any]:
     raw = str(prompt or "")
-    text = norm(raw)
+
+    # Shared polarity authority:
+    # explicit negative instructions constrain the plan;
+    # they must not create domain, metric, page, or analysis intent.
+    text = norm(
+        positive_request_text(raw)
+    )
 
     domain_info = _detect_domain(text)
 
@@ -370,6 +447,22 @@ def parse_prompt_intelligence(prompt: str) -> Dict[str, Any]:
         text,
         METRIC_LEXICON,
     )
+
+    governed_freight = _governed_freight_constraint(
+        raw
+    )
+
+    if governed_freight:
+        if "freight" not in metrics:
+            metrics.append(
+                "freight"
+            )
+
+        excluded_metrics = [
+            item
+            for item in excluded_metrics
+            if item != "freight"
+        ]
 
     # "costo total de flete" se refiere al costo de flete,
     # no al KPI genérico de costo.
@@ -403,6 +496,21 @@ def parse_prompt_intelligence(prompt: str) -> Dict[str, Any]:
         text,
         ANALYSIS_LEXICON,
     )
+
+    # A governed freight request must preserve both
+    # the metric and its analysis capability.
+    # The capability layer will decide SUPPORTED/BLOCKED.
+    if governed_freight:
+        if "freight_analysis" not in analyses:
+            analyses.append(
+                "freight_analysis"
+            )
+
+        excluded_analyses = [
+            item
+            for item in excluded_analyses
+            if item != "freight_analysis"
+        ]
 
     if (
         domain_info["domain"] == "logistics"

@@ -4,15 +4,20 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Optional
 
+from prompt_polarity import positive_request_text
+
 def _norm(v: Any) -> str:
-    s = str(v or "").strip().lower()
+    s = str(v or "").strip()
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)
+    s = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", s)
+    s = s.lower()
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
     s = re.sub(r"[^a-z0-9%]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 ALIASES = {
     "customer": ["cliente", "customer"],
-    "customer_id": ["cod cliente", "cod_cliente", "customer id", "customerid"],
+    "customer_id": ["cod cliente", "cod_cliente", "codigo cliente", "cliente id", "customer id", "customerid"],
     "product": ["articulo", "producto", "product"],
     "seller": ["vendedor", "ejecutivo", "asesor", "seller"],
     "zone": ["zona", "region", "territorio"],
@@ -29,7 +34,7 @@ ALIASES = {
         "anterior",
         "previous"
     ],
-    "revenue": ["importe venta", "importe_venta", "venta", "ventas", "revenue"],
+    "revenue": ["venta total", "importe venta", "importe_venta", "venta", "ventas", "revenue"],
     "quantity": ["toneladas vendidas", "toneladas_vendidas", "cantidad", "unidades", "quantity"],
     "profit": ["utilidad", "ganancia", "profit"],
     "cost": ["costo", "coste", "cost"],
@@ -100,7 +105,7 @@ def _previous_comparison_requested(p: str) -> bool:
     return False
 
 def requested_intents(prompt: str) -> List[str]:
-    p = _norm(prompt)
+    p = _norm(positive_request_text(prompt))
     intents = []
     if _contains_any(p, ["clientes perdidos", "cliente perdido", "perdida de clientes"]):
         intents.append("lost_customers")

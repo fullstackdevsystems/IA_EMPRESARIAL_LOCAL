@@ -37,10 +37,12 @@ def enforce_semantic_contract(plan: Dict[str, Any], df, prompt: str) -> Dict[str
         "product": "product",
         "line": "line",
         "zone": "zone",
+        "branch": "branch",
         "seller": "seller",
         "supplier": "supplier",
         "warehouse": "warehouse",
         "category": "category",
+        "status": "status",
         "quantity": "quantity",
         "revenue": "revenue",
         "cost": "cost",
@@ -71,8 +73,12 @@ def enforce_semantic_contract(plan: Dict[str, Any], df, prompt: str) -> Dict[str
 
         q, rev, cost, profit = s.get("quantity"), s.get("revenue"), s.get("cost"), s.get("profit")
         freight = s.get("freight")
+        reference_key = s.get("reference") or roles.get("transaction_id")
+        customer_key = s.get("customer_id") or roles.get("customer_id")
         if q: add({"key":"quantity","label":"TONELADAS VENDIDAS","op":"sum","column":q,"ready":True,"format":"number"})
         if rev: add({"key":"revenue","label":"VENTA TOTAL","op":"sum","column":rev,"ready":True,"format":"currency"})
+        if rev and reference_key:
+            add({"key":"ticket_avg","label":"TICKET PROMEDIO","op":"sum_div_nunique","numerator":rev,"denominator":reference_key,"ready":True,"format":"currency"})
         if cost: add({"key":"cost","label":"COSTO TOTAL","op":"sum","column":cost,"ready":True,"format":"currency"})
         if profit: add({"key":"profit","label":"UTILIDAD TOTAL","op":"sum","column":profit,"ready":True,"format":"currency"})
         if profit and rev:
@@ -91,17 +97,19 @@ def enforce_semantic_contract(plan: Dict[str, Any], df, prompt: str) -> Dict[str
             add({"key":"other_cost","label":"OTROS COSTOS","op":"sum","column":s["other_cost"],"ready":True,"format":"currency"})
         if s.get("shrinkage"):
             add({"key":"shrinkage","label":"TONELADAS MERMADAS","op":"sum","column":s["shrinkage"],"ready":True,"format":"number"})
-        if s.get("customer_id"):
-            add({"key":"unique_customers","label":"CLIENTES ÚNICOS","op":"nunique","column":s["customer_id"],"ready":True,"format":"integer"})
-        if s.get("reference"):
-            add({"key":"operations","label":"OPERACIONES / REFERENCIAS","op":"nunique","column":s["reference"],"ready":True,"format":"integer"})
+        if customer_key:
+            add({"key":"unique_customers","label":"CLIENTES ÚNICOS","op":"nunique","column":customer_key,"ready":True,"format":"integer"})
+        if reference_key:
+            add({"key":"operations","label":"OPERACIONES / REFERENCIAS","op":"nunique","column":reference_key,"ready":True,"format":"integer"})
         out["kpis"] = kpis
 
     wanted_filters = [
         _filter(s.get("date"), "Fecha", "date"),
         _filter(s.get("week"), "Semana", "week"),
         _filter(s.get("zone"), "Zona", "zone"),
+        _filter(s.get("branch"), "Sucursal", "branch"),
         _filter(s.get("category"), "Categoria", "category"),
+        _filter(s.get("status"), "Estatus", "status"),
         _filter(s.get("seller"), "Vendedor", "seller"),
         _filter(s.get("customer"), "Cliente", "customer"),
         _filter(s.get("product"), "Articulo", "product"),
