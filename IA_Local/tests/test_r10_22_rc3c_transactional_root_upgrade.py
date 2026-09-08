@@ -31,6 +31,7 @@ required_root_files = (
     "InstallerR1020C1.ps1",
     "InstalarLimpio.ps1",
     "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
+    "ValidarInstalador.ps1",
 )
 
 for name in required_root_files:

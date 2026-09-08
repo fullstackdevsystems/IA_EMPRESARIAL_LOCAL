@@ -638,8 +638,8 @@
     },
     {
       "path": "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
-      "sha256": "9c7b3f14357dc502f8174be3ebc3663a71e7dadc8a8debb8984b80cf8ba12d68",
-      "size": 885
+      "sha256": "9041b18a228adb1369271e937739613f339206f25e7dc8670709a42b65ae819e",
+      "size": 804
     },
     {
       "path": "InstalarLimpio.ps1",
@@ -648,8 +648,8 @@
     },
     {
       "path": "InstallerR1020C1.ps1",
-      "sha256": "4b43fcc5ad9f2cb7ae49ea29469f04fc938b263d1e530c742d5684cd752ea719",
-      "size": 11565
+      "sha256": "538d3a357761642a5ba0a45851ec336306206add8aaa36094337f82da7ce13ec",
+      "size": 11586
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",

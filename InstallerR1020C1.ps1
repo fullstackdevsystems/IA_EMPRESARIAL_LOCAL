@@ -3,7 +3,7 @@ param([string]$InstallPath=(Join-Path $env:LOCALAPPDATA 'IA_Empresarial_Local'),
 $ErrorActionPreference='Stop';$root=Split-Path -Parent $MyInvocation.MyCommand.Path;$releaseMetadataPath=Join-Path $root 'RELEASE_METADATA.json';if(-not(Test-Path $releaseMetadataPath -PathType Leaf)){throw 'RELEASE_METADATA_MISSING'};$releaseMetadata=Get-Content $releaseMetadataPath -Raw|ConvertFrom-Json;$productVersion=[string]$releaseMetadata.product_version;$release=[string]$releaseMetadata.release;$channel=[string]$releaseMetadata.channel;$source=Join-Path $root 'IA_Local';$log=Join-Path $root ("logs\installer-{0}.log" -f $release)
 function Note($x){if($ValidateOnly){Write-Host $x;return};New-Item -ItemType Directory -Force (Split-Path $log)|Out-Null;Add-Content $log "$(Get-Date -Format o) $x";Write-Host $x}
 function Stop-Install($x){Note "FAIL: $x";throw $x}
-Note "R10.21F installer starting - product $productVersion / release $release / channel $channel"
+Note "Installer starting - product $productVersion / release $release / channel $channel"
 if($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem){Stop-Install 'Windows x64 required'}
 if(-not(Test-Path $source)){Stop-Install 'Critical IA_Local source missing'}
 function Resolve-CompatiblePython {
@@ -146,7 +146,8 @@ $rootFiles = @(
     'RELEASE_METADATA.json',
     'InstallerR1020C1.ps1',
     'InstalarLimpio.ps1',
-    'INSTALAR_IA_EMPRESARIAL_LOCAL.bat'
+    'INSTALAR_IA_EMPRESARIAL_LOCAL.bat',
+    'ValidarInstalador.ps1'
 )
 
 $vp = Join-Path $ProductRoot '.venv\Scripts\python.exe'
