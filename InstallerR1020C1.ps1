@@ -130,7 +130,7 @@ else {
             Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force -ErrorAction SilentlyContinue
             Move-Item $previousScripts (Join-Path $RuntimeRoot 'scripts') -Force
         }
-        Stop-Install "UPGRADE runtime deployment failed: $($_.Exception.Message); previous scripts restored"
+        Stop-Install "UPGRADE runtime deployment failed: $($_.Exception.Message); previous managed runtime scripts restored"
     }
     finally { Remove-Item $backupRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
@@ -148,14 +148,6 @@ $rootFiles = @(
     'InstalarLimpio.ps1',
     'INSTALAR_IA_EMPRESARIAL_LOCAL.bat'
 )
-
-foreach ($rootFile in $rootFiles) {
-    $sourceFile = Join-Path $root $rootFile
-
-    if (Test-Path $sourceFile -PathType Leaf) {
-        Copy-Item $sourceFile (Join-Path $ProductRoot $rootFile) -Force
-    }
-}
 
 $vp = Join-Path $ProductRoot '.venv\Scripts\python.exe'
 
@@ -203,6 +195,154 @@ finally {
 
 if($healthExit){
     Stop-Install 'health imports failed'
+}
+
+# Managed root files are deployed only after runtime health
+# validation succeeds. They are staged and rolled back as
+# one controlled root-file transaction.
+$rootUpdateBackup = Join-Path `
+    ([System.IO.Path]::GetTempPath()) `
+    ("ia-root-update-" + [guid]::NewGuid().ToString())
+
+$stagedRoot = Join-Path `
+    $rootUpdateBackup `
+    'new_root'
+
+$previousRoot = Join-Path `
+    $rootUpdateBackup `
+    'previous_root_files'
+
+$newRootFiles = @()
+
+try {
+    New-Item `
+        -ItemType Directory `
+        -Force `
+        $stagedRoot |
+        Out-Null
+
+    New-Item `
+        -ItemType Directory `
+        -Force `
+        $previousRoot |
+        Out-Null
+
+    # Stage every managed root file from the verified
+    # release package before changing ProductRoot.
+    foreach ($rootFile in $rootFiles) {
+
+        $sourceFile = Join-Path `
+            $root `
+            $rootFile
+
+        if (-not (
+            Test-Path `
+                $sourceFile `
+                -PathType Leaf
+        )) {
+            throw "ROOT_FILE_SOURCE_MISSING: $rootFile"
+        }
+
+        $stagedFile = Join-Path `
+            $stagedRoot `
+            $rootFile
+
+        Copy-Item `
+            $sourceFile `
+            $stagedFile `
+            -Force
+    }
+
+    # Preserve the complete previous managed root-file
+    # set before installing any new root file.
+    foreach ($rootFile in $rootFiles) {
+
+        $liveFile = Join-Path `
+            $ProductRoot `
+            $rootFile
+
+        $previousFile = Join-Path `
+            $previousRoot `
+            $rootFile
+
+        if (
+            Test-Path `
+                $liveFile `
+                -PathType Leaf
+        ) {
+            Copy-Item `
+                $liveFile `
+                $previousFile `
+                -Force
+        }
+        else {
+            $newRootFiles += $rootFile
+        }
+    }
+
+    # Deploy only from the fully prepared staging area.
+    foreach ($rootFile in $rootFiles) {
+
+        $stagedFile = Join-Path `
+            $stagedRoot `
+            $rootFile
+
+        $liveFile = Join-Path `
+            $ProductRoot `
+            $rootFile
+
+        Copy-Item `
+            $stagedFile `
+            $liveFile `
+            -Force
+    }
+}
+catch {
+    $rootDeploymentError = $_
+
+    # Restore every root file that existed before.
+    foreach ($rootFile in $rootFiles) {
+
+        $previousFile = Join-Path `
+            $previousRoot `
+            $rootFile
+
+        $liveFile = Join-Path `
+            $ProductRoot `
+            $rootFile
+
+        if (
+            Test-Path `
+                $previousFile `
+                -PathType Leaf
+        ) {
+            Copy-Item `
+                $previousFile `
+                $liveFile `
+                -Force
+        }
+        elseif (
+            $newRootFiles -contains $rootFile
+        ) {
+            Remove-Item `
+                $liveFile `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+    }
+
+    Stop-Install (
+        "UPGRADE root deployment failed: " +
+        $rootDeploymentError.Exception.Message +
+        "; previous managed root files restored"
+    )
+}
+finally {
+    Remove-Item `
+        $rootUpdateBackup `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue
 }
 if(-not $SkipSqlCheck){Note 'SQL driver checked through pyodbc; ODBC Driver 18 may be configured later.'};if(-not $SkipAiCheck){Note 'AI_PROVIDER: NOT CONFIGURED is valid; no model download occurs.'}
 if($TenantId -and $TenantName -and $AdminUsername){Note "Bootstrap requested for tenant $TenantId/admin $AdminUsername; password is never accepted or logged on command line."}else{Note 'No hardcoded tenant/admin/password. Bootstrap explicitly after install.'}
