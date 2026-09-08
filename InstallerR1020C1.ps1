@@ -3,6 +3,41 @@ param([string]$InstallPath=(Join-Path $env:LOCALAPPDATA 'IA_Empresarial_Local'),
 $ErrorActionPreference='Stop';$root=Split-Path -Parent $MyInvocation.MyCommand.Path;$releaseMetadataPath=Join-Path $root 'RELEASE_METADATA.json';if(-not(Test-Path $releaseMetadataPath -PathType Leaf)){throw 'RELEASE_METADATA_MISSING'};$releaseMetadata=Get-Content $releaseMetadataPath -Raw|ConvertFrom-Json;$productVersion=[string]$releaseMetadata.product_version;$release=[string]$releaseMetadata.release;$channel=[string]$releaseMetadata.channel;$source=Join-Path $root 'IA_Local';$log=Join-Path $root ("logs\installer-{0}.log" -f $release)
 function Note($x){if($ValidateOnly){Write-Host $x;return};New-Item -ItemType Directory -Force (Split-Path $log)|Out-Null;Add-Content $log "$(Get-Date -Format o) $x";Write-Host $x}
 function Stop-Install($x){Note "FAIL: $x";throw $x}
+
+$backupRoot = $null
+$previousScripts = $null
+
+function Restore-PreviousManagedScripts {
+    if (
+        $previousScripts -and
+        (Test-Path $previousScripts)
+    ) {
+        Remove-Item `
+            (Join-Path $RuntimeRoot 'scripts') `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        Move-Item `
+            $previousScripts `
+            (Join-Path $RuntimeRoot 'scripts') `
+            -Force
+    }
+}
+
+function Cleanup-ManagedScriptBackup {
+    if (
+        $backupRoot -and
+        (Test-Path $backupRoot)
+    ) {
+        Remove-Item `
+            -LiteralPath $backupRoot `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+}
+
 Note "Installer starting - product $productVersion / release $release / channel $channel"
 if($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem){Stop-Install 'Windows x64 required'}
 if(-not(Test-Path $source)){Stop-Install 'Critical IA_Local source missing'}
@@ -126,13 +161,17 @@ else {
         Copy-Item (Join-Path $stagedScripts '*') (Join-Path $RuntimeRoot 'scripts') -Recurse -Force
     }
     catch {
-        if (Test-Path $previousScripts) {
-            Remove-Item (Join-Path $RuntimeRoot 'scripts') -Recurse -Force -ErrorAction SilentlyContinue
-            Move-Item $previousScripts (Join-Path $RuntimeRoot 'scripts') -Force
-        }
-        Stop-Install "UPGRADE runtime deployment failed: $($_.Exception.Message); previous managed runtime scripts restored"
+        $runtimeDeploymentError = $_
+
+        Restore-PreviousManagedScripts
+        Cleanup-ManagedScriptBackup
+
+        Stop-Install (
+            "UPGRADE runtime deployment failed: " +
+            $runtimeDeploymentError.Exception.Message +
+            "; previous managed runtime scripts restored"
+        )
     }
-    finally { Remove-Item $backupRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 foreach ($d in 'config','data','logs','workspace','Reportes') {
@@ -156,10 +195,20 @@ if(-not(Test-Path $vp)){
     & $py.Command @($py.Args) -m venv (Join-Path $ProductRoot '.venv')
 
     if($LASTEXITCODE){
+        Restore-PreviousManagedScripts
+        Cleanup-ManagedScriptBackup
         Stop-Install 'venv creation failed'
     }
 }
-& $vp -m pip install --disable-pip-version-check -r (Join-Path $RuntimeRoot 'requirements-local.txt');if($LASTEXITCODE){Stop-Install 'dependency install failed'}
+& $vp -m pip install `
+    --disable-pip-version-check `
+    -r (Join-Path $RuntimeRoot 'requirements-local.txt')
+
+if($LASTEXITCODE){
+    Restore-PreviousManagedScripts
+    Cleanup-ManagedScriptBackup
+    Stop-Install 'dependency install failed'
+}
 $RuntimeScripts = Join-Path $RuntimeRoot 'scripts'
 $HealthScript = Join-Path $ProductRoot '.installer_health_check.py'
 
@@ -195,6 +244,8 @@ finally {
 }
 
 if($healthExit){
+    Restore-PreviousManagedScripts
+    Cleanup-ManagedScriptBackup
     Stop-Install 'health imports failed'
 }
 
@@ -332,10 +383,13 @@ catch {
         }
     }
 
+    Restore-PreviousManagedScripts
+    Cleanup-ManagedScriptBackup
+
     Stop-Install (
         "UPGRADE root deployment failed: " +
         $rootDeploymentError.Exception.Message +
-        "; previous managed root files restored"
+        "; previous managed root files and scripts restored"
     )
 }
 finally {
@@ -345,6 +399,12 @@ finally {
         -Force `
         -ErrorAction SilentlyContinue
 }
+
+# Managed scripts and managed root files have now
+# completed successfully. The previous scripts can
+# finally be discarded.
+Cleanup-ManagedScriptBackup
+
 if(-not $SkipSqlCheck){Note 'SQL driver checked through pyodbc; ODBC Driver 18 may be configured later.'};if(-not $SkipAiCheck){Note 'AI_PROVIDER: NOT CONFIGURED is valid; no model download occurs.'}
 if($TenantId -and $TenantName -and $AdminUsername){Note "Bootstrap requested for tenant $TenantId/admin $AdminUsername; password is never accepted or logged on command line."}else{Note 'No hardcoded tenant/admin/password. Bootstrap explicitly after install.'}
 Note 'INSTALL: PASS'

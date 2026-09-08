@@ -15,8 +15,17 @@ ck(
     (
         'previousScripts' in ps
         and 'catch' in ps
-        and 'Move-Item $previousScripts' in ps
         and 'Stop-Install' in ps
+        and (
+            'Move-Item $previousScripts' in ps
+            or (
+                'function Restore-PreviousManagedScripts'
+                in ps
+                and ps.count(
+                    'Restore-PreviousManagedScripts'
+                ) >= 2
+            )
+        )
     )
 )
 upgrade=ps[ps.find("INSTALL MODE: UPGRADE"):ps.find("foreach ($d in 'config'")]

@@ -55,7 +55,15 @@ check(
     (
         "previousScripts" in text
         and "catch" in text
-        and "Move-Item $previousScripts" in text
+        and (
+            "Move-Item $previousScripts" in text
+            or (
+                "function Restore-PreviousManagedScripts" in text
+                and text.count(
+                    "Restore-PreviousManagedScripts"
+                ) >= 2
+            )
+        )
     ),
 )
 

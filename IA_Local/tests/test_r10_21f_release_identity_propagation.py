@@ -139,7 +139,13 @@ ck(
         and "$ProductRoot" in installer
         and "Copy-Item" in installer
         and "$stagedFile" in installer
-        and "previous managed root files restored" in installer
+        and (
+            "previous managed root files restored" in installer
+            or (
+                "previous managed root files and scripts restored"
+                in installer
+            )
+        )
     ),
 )
 
