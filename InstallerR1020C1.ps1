@@ -305,7 +305,8 @@ $rootFiles = @(
     'InstallerR1020C1.ps1',
     'InstalarLimpio.ps1',
     'INSTALAR_IA_EMPRESARIAL_LOCAL.bat',
-    'ValidarInstalador.ps1'
+    'ValidarInstalador.ps1',
+    'IA_Local\VERSION.txt'
 )
 
 $vp = Join-Path $ProductRoot '.venv\Scripts\python.exe'
@@ -428,6 +429,16 @@ try {
             $stagedRoot `
             $rootFile
 
+        $stagedParent = Split-Path `
+            $stagedFile `
+            -Parent
+
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            $stagedParent |
+            Out-Null
+
         Copy-Item `
             $sourceFile `
             $stagedFile `
@@ -451,6 +462,16 @@ try {
                 $liveFile `
                 -PathType Leaf
         ) {
+            $previousParent = Split-Path `
+                $previousFile `
+                -Parent
+
+            New-Item `
+                -ItemType Directory `
+                -Force `
+                $previousParent |
+                Out-Null
+
             Copy-Item `
                 $liveFile `
                 $previousFile `
@@ -471,6 +492,16 @@ try {
         $liveFile = Join-Path `
             $ProductRoot `
             $rootFile
+
+        $liveParent = Split-Path `
+            $liveFile `
+            -Parent
+
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            $liveParent |
+            Out-Null
 
         Copy-Item `
             $stagedFile `
