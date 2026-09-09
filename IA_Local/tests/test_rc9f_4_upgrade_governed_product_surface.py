@@ -129,6 +129,29 @@ ck(
     not in text,
 )
 
+
+onboarding_text = (
+    ROOT
+    / "IA_Local"
+    / "scripts"
+    / "enterprise_onboarding.py"
+).read_text(
+    encoding="utf-8",
+)
+
+ck(
+    "onboarding_sql_scope_matches_admin_api",
+    '"user_id": "sql-admin"'
+    in onboarding_text,
+)
+
+ck(
+    "onboarding_sql_scope_not_bound_to_bootstrap_admin",
+    '"user_id": admin["user_id"]'
+    not in onboarding_text,
+)
+
+
 if not all(checks):
     raise SystemExit(1)
 

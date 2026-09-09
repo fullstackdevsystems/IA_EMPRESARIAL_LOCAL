@@ -35,7 +35,7 @@ class EnterpriseOnboarding:
     def _scope(self, tenant_id):
         admin = next((u for u in self._admins() if u["tenant_id"] == self.tenants.get(tenant_id)["tenant_id"]), None)
         if not admin: raise OnboardingError("CONFIGURATION_REQUIRED", "Administrador requerido")
-        return {"company_id": admin["tenant_id"], "user_id": admin["user_id"], "business_unit": None, "branch": None}
+        return {"company_id": admin["tenant_id"], "user_id": "sql-admin", "business_unit": None, "branch": None}
 
     def status(self) -> Dict[str, Any]:
         try:
