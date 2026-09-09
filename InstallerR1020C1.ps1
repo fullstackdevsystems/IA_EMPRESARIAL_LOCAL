@@ -306,7 +306,9 @@ $rootFiles = @(
     'InstalarLimpio.ps1',
     'INSTALAR_IA_EMPRESARIAL_LOCAL.bat',
     'ValidarInstalador.ps1',
-    'IA_Local\VERSION.txt'
+    'BuildReleaseR1021A.ps1',
+    'IA_Local\VERSION.txt',
+    'IA_Local\requirements-local.txt'
 )
 
 $vp = Join-Path $ProductRoot '.venv\Scripts\python.exe'
@@ -323,7 +325,7 @@ if(-not(Test-Path $vp)){
 }
 & $vp -m pip install `
     --disable-pip-version-check `
-    -r (Join-Path $RuntimeRoot 'requirements-local.txt')
+    -r (Join-Path $source 'requirements-local.txt')
 
 if($LASTEXITCODE){
     Cleanup-FreshInstallArtifacts
