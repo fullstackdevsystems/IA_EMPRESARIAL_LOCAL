@@ -49,6 +49,8 @@ required = [
     "BuildReleaseR1021A.ps1",
     r"IA_Local\VERSION.txt",
     r"IA_Local\requirements-local.txt",
+    r"IA_Local\tests\test_rc9c_5_upgrade_version_identity.py",
+    r"IA_Local\tests\test_rc9f_4_upgrade_governed_product_surface.py",
 ]
 
 for item in required:

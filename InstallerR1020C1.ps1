@@ -308,7 +308,9 @@ $rootFiles = @(
     'ValidarInstalador.ps1',
     'BuildReleaseR1021A.ps1',
     'IA_Local\VERSION.txt',
-    'IA_Local\requirements-local.txt'
+    'IA_Local\requirements-local.txt',
+    'IA_Local\tests\test_rc9c_5_upgrade_version_identity.py',
+    'IA_Local\tests\test_rc9f_4_upgrade_governed_product_surface.py'
 )
 
 $vp = Join-Path $ProductRoot '.venv\Scripts\python.exe'
