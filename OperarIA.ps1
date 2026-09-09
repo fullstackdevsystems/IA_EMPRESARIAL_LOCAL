@@ -22,6 +22,8 @@
     [string[]]$AllowedTables,
     [string]$SecretReference,
     [string]$SqlUsername,
+    [string]$Driver = "ODBC Driver 18 for SQL Server",
+    [switch]$TrustServerCertificate,
     [string]$Provider,
     [string]$BaseUrl,
     [string]$Model,
@@ -798,6 +800,8 @@ switch ($Action) {
         if ($AllowedTables -and $AllowedTables.Count -gt 0) { $argsList += @('--allowed-tables', ($AllowedTables -join ',')) }
         if (-not [string]::IsNullOrWhiteSpace($SecretReference)) { $argsList += @('--secret-reference', $SecretReference) }
         if (-not [string]::IsNullOrWhiteSpace($SqlUsername)) { $argsList += @('--username', $SqlUsername) }
+        if (-not [string]::IsNullOrWhiteSpace($Driver)) { $argsList += @('--driver', $Driver) }
+        if ($TrustServerCertificate.IsPresent) { $argsList += '--trust-server-certificate' }
         & $Python @argsList
         exit $LASTEXITCODE
     }

@@ -574,11 +574,41 @@ class EnterpriseOnboarding:
         except (TenantRegistryError, IdentityError, PlatformConfigError) as exc:
             raise OnboardingError(exc.code, "Configuración empresarial inválida") from exc
 
-    def configure_sql(self, *, tenant_id, connection_id, server, database, auth_mode, allowed_schemas, allowed_tables, secret_reference="", username=""):
+    def configure_sql(
+        self,
+        *,
+        tenant_id,
+        connection_id,
+        server,
+        database,
+        auth_mode,
+        allowed_schemas,
+        allowed_tables,
+        secret_reference="",
+        username="",
+        driver="ODBC Driver 18 for SQL Server",
+        trust_server_certificate=False,
+    ):
         try:
-            profile = self.sql.register(scope=self._scope(tenant_id), connection_id=connection_id, server=server, database=database, auth_mode=auth_mode, allowed_schemas=allowed_schemas, allowed_tables=allowed_tables, secret_reference=secret_reference, username=username)
+            profile = self.sql.register(
+                scope=self._scope(tenant_id),
+                connection_id=connection_id,
+                server=server,
+                database=database,
+                auth_mode=auth_mode,
+                allowed_schemas=allowed_schemas,
+                allowed_tables=allowed_tables,
+                secret_reference=secret_reference,
+                username=username,
+                driver=driver,
+                trust_server_certificate=bool(trust_server_certificate),
+            )
             return public_sql_profile(profile)
-        except (EnterpriseSqlError, TenantRegistryError) as exc: raise OnboardingError(exc.code, "Configuración SQL inválida") from exc
+        except (EnterpriseSqlError, TenantRegistryError) as exc:
+            raise OnboardingError(
+                exc.code,
+                "Configuración SQL inválida",
+            ) from exc
 
     def configure_ai(self, *, tenant_id, provider):
         try: return self.platform.update_tenant(tenant_id, {"ai_provider": provider})
@@ -600,6 +630,8 @@ def main(argv=None) -> int:
     parser.add_argument("--admin-username")
     parser.add_argument("--admin-display-name")
     parser.add_argument("--connection-id"); parser.add_argument("--server"); parser.add_argument("--database"); parser.add_argument("--auth-mode"); parser.add_argument("--allowed-schemas"); parser.add_argument("--allowed-tables"); parser.add_argument("--secret-reference", default=""); parser.add_argument("--username", default="")
+    parser.add_argument("--driver", default="ODBC Driver 18 for SQL Server")
+    parser.add_argument("--trust-server-certificate", action="store_true")
     parser.add_argument("--provider"); parser.add_argument("--base-url"); parser.add_argument("--model"); parser.add_argument("--timeout", type=int, default=30)
     args = parser.parse_args(argv)
     onboarding = EnterpriseOnboarding(_reports_from_runtime(args.runtime_root))
@@ -617,7 +649,19 @@ def main(argv=None) -> int:
                 raise OnboardingError("CONFIGURATION_REQUIRED", "Campos de configuración requeridos")
             result = onboarding.configure(tenant_id=args.tenant_id, tenant_name=args.tenant_name, admin_user_id=args.admin_user_id, admin_username=args.admin_username, admin_display_name=args.admin_display_name, password=password)
         elif args.action == "configure-sql":
-            result = onboarding.configure_sql(tenant_id=args.tenant_id, connection_id=args.connection_id, server=args.server, database=args.database, auth_mode=args.auth_mode, allowed_schemas=(args.allowed_schemas or "").split(","), allowed_tables=(args.allowed_tables or "").split(","), secret_reference=args.secret_reference, username=args.username)
+            result = onboarding.configure_sql(
+                tenant_id=args.tenant_id,
+                connection_id=args.connection_id,
+                server=args.server,
+                database=args.database,
+                auth_mode=args.auth_mode,
+                allowed_schemas=(args.allowed_schemas or "").split(","),
+                allowed_tables=(args.allowed_tables or "").split(","),
+                secret_reference=args.secret_reference,
+                username=args.username,
+                driver=args.driver,
+                trust_server_certificate=args.trust_server_certificate,
+            )
         else:
             result = onboarding.configure_ai(tenant_id=args.tenant_id, provider={"provider_type": args.provider, "base_url": args.base_url or None, "model": args.model or None, "timeout": args.timeout})
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
