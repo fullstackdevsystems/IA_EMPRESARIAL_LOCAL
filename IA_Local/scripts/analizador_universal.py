@@ -1591,6 +1591,112 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
 )
 
 
+
+# ---------------------------------------------------------------------------
+# R10.22 RC commercial analyzer authentication UX
+# ---------------------------------------------------------------------------
+
+_ANALYZE_LOGIN_GATE = r"""
+<div id="ia-analyze-auth"
+     style="position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.94);
+            display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="width:min(420px,100%);background:#fff;border-radius:16px;padding:24px;
+              box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a">
+    <h2 style="margin:0 0 8px">Acceso a IA Empresarial Local</h2>
+    <p style="margin:0 0 16px;color:#475569">
+      Inicia sesión para ejecutar análisis empresariales.
+    </p>
+    <label>Usuario</label>
+    <input id="ia-auth-user" autocomplete="username"
+           style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+    <label>Contraseña</label>
+    <input id="ia-auth-password" type="password" autocomplete="current-password"
+           style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+    <button id="ia-auth-login" type="button"
+            style="width:100%;padding:11px;font-weight:700;cursor:pointer">
+      Iniciar sesión
+    </button>
+    <div id="ia-auth-status"
+         style="margin-top:10px;font-size:13px;color:#b91c1c"></div>
+  </div>
+</div>
+"""
+
+_ANALYZE_LOGIN_SCRIPT = r"""
+<script>
+window.__IA_ANALYZE_TOKEN__ = '';
+
+(function(){
+  const gate = document.getElementById('ia-analyze-auth');
+  const user = document.getElementById('ia-auth-user');
+  const pass = document.getElementById('ia-auth-password');
+  const button = document.getElementById('ia-auth-login');
+  const status = document.getElementById('ia-auth-status');
+
+  async function login(){
+    status.textContent = '';
+    button.disabled = true;
+
+    try{
+      const response = await fetch('/api/auth/login',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          username:(user.value||'').trim(),
+          password:pass.value||''
+        })
+      });
+
+      const data = await response.json();
+
+      if(!response.ok || !data.token){
+        window.__IA_ANALYZE_TOKEN__ = '';
+        throw new Error(
+          (data.detail && (data.detail.message || data.detail.code))
+          || 'Credenciales inválidas'
+        );
+      }
+
+      // Memory-only token. Never persisted in localStorage/sessionStorage.
+      window.__IA_ANALYZE_TOKEN__ = String(data.token);
+      pass.value = '';
+      gate.style.display = 'none';
+    }
+    catch(error){
+      window.__IA_ANALYZE_TOKEN__ = '';
+      pass.value = '';
+      status.textContent = String(error.message || error);
+    }
+    finally{
+      button.disabled = false;
+    }
+  }
+
+  button.addEventListener('click', login);
+  pass.addEventListener('keydown', function(event){
+    if(event.key === 'Enter') login();
+  });
+})();
+</script>
+"""
+
+if 'id="ia-analyze-auth"' not in base.INDEX_HTML:
+    if "<body>" not in base.INDEX_HTML or "</body>" not in base.INDEX_HTML:
+        raise RuntimeError("ANALYZER_HTML_BODY_NOT_FOUND")
+
+    base.INDEX_HTML = base.INDEX_HTML.replace(
+        "<body>",
+        "<body>" + _ANALYZE_LOGIN_GATE,
+        1,
+    )
+
+    base.INDEX_HTML = base.INDEX_HTML.replace(
+        "</body>",
+        _ANALYZE_LOGIN_SCRIPT + "</body>",
+        1,
+    )
+
+
 @base.app.get("/view/{filename}")
 def view_html_report(filename: str):
     """Abre dashboards HTML en el navegador; otros formatos siguen usando /download."""
@@ -1645,6 +1751,34 @@ def _bearer(authorization: str):
     except IdentityError as exc:_auth_error(exc)
     except TenantRegistryError as exc:
         raise base.HTTPException(status_code=401,detail={"code":"AUTH_SESSION_INVALID","message":"Sesi?n inv?lida"}) from exc
+
+
+def _authorize_analysis(authorization: str) -> Dict[str, Any]:
+    """
+    Commercial analysis authorization.
+
+    A valid enterprise session and the existing analysis:run
+    permission are mandatory before an uploaded file may be stored.
+    """
+    actor = _bearer(authorization)
+    store = _identity_store()
+
+    if not store.has_permission(actor, "analysis:run"):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code": "ANALYSIS_PERMISSION_DENIED",
+                "message": "Permiso de análisis denegado",
+            },
+        )
+
+    return actor
+
+
+# analizador_app owns /api/analyze; the universal commercial runtime
+# supplies its enterprise identity/permission guard at module startup.
+base.ANALYZE_AUTHORIZER = _authorize_analysis
+
 
 @app.post("/api/auth/login")
 def auth_login(payload: Dict[str,Any]):

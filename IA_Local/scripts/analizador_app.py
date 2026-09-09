@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import requests
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Header
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -1008,7 +1008,7 @@ fd.append('file',document.getElementById('file').files[0]);
 fd.append('prompt',requestPrompt);
 fd.append('prompt_sha256',promptHash);
 fd.append('request_id',requestId);
-try{const r=await fetch('/api/analyze',{method:'POST',body:fd});const d=await r.json();if(!r.ok||!d.ok){const detail=d.detail;let msg=d.error||'Error';if(Array.isArray(detail)){msg=detail.map(x=>((x.loc||[]).join('.')+': '+(x.msg||JSON.stringify(x)))).join(' | ');}else if(detail){msg=(typeof detail==='string'?detail:JSON.stringify(detail));}throw new Error(msg);}
+try{const r=await fetch('/api/analyze',{method:'POST',headers:(window.__IA_ANALYZE_TOKEN__?{'Authorization':'Bearer '+window.__IA_ANALYZE_TOKEN__}:{}),body:fd});const d=await r.json();if(!r.ok||!d.ok){const detail=d.detail;let msg=d.error||'Error';if(Array.isArray(detail)){msg=detail.map(x=>((x.loc||[]).join('.')+': '+(x.msg||JSON.stringify(x)))).join(' | ');}else if(detail){msg=(typeof detail==='string'?detail:JSON.stringify(detail));}throw new Error(msg);}
 out.textContent=d.narrativa;
 const details=document.createElement('details');details.style.marginTop='12px';const sm=document.createElement('summary');sm.textContent='Ver detalles tecnicos';details.appendChild(sm);const pre=document.createElement('pre');pre.textContent='Plan legacy: '+JSON.stringify(d.plan,null,2)+'\n\nSecciones: '+JSON.stringify(Object.keys(d.secciones||{}),null,2)+'\n\nDashboard renderer: '+String(d.dashboard_renderer_version||'N/D')+'\nDashboard domain: '+String(d.dashboard_domain||'N/D')+'\nDashboard pages: '+JSON.stringify(d.dashboard_pages||[],null,2);details.appendChild(pre);out.appendChild(details);
 status.innerHTML='<div class="note ok">Listo: '+d.filas.toLocaleString()+' filas procesadas en '+d.segundos+' s.<br><b>Prompt SHA-256:</b> '+String(d.request_prompt_sha256||'N/D')+'</div>';
@@ -1047,9 +1047,24 @@ def health() -> Dict[str, Any]:
     return {"ok": True, "ollama": ollama_available(), "modelo": OLLAMA_MODEL, "entrada": str(ENTRADA), "reportes": str(REPORTES)}
 
 
+# R10.22 RC security hardening: the commercial runtime
+# installs a fail-closed Bearer/permission authorizer.
+ANALYZE_AUTHORIZER = None
+
 @app.post("/api/analyze")
-async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), prompt_sha256: Optional[str] = Form(None), request_id: Optional[str] = Form(None)):
+async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), prompt_sha256: Optional[str] = Form(None), request_id: Optional[str] = Form(None), authorization: str = Header("")):
     try:
+        # Authenticate and authorize BEFORE accepting/persisting the upload.
+        authorizer = ANALYZE_AUTHORIZER
+        if not callable(authorizer):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "ANALYZE_AUTH_GUARD_UNAVAILABLE",
+                    "message": "El control de acceso del analizador no está disponible.",
+                },
+            )
+        authorizer(authorization)
         filename = safe_name(file.filename or "archivo.xlsx")
         ext = Path(filename).suffix.lower()
         if ext not in {".xlsx", ".xls", ".xlsb", ".xlsm", ".csv", ".txt"}:
