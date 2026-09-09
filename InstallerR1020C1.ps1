@@ -20,6 +20,56 @@ function Cleanup-FreshMetadataBootstrap {
     }
 }
 
+function Cleanup-FreshInstallArtifacts {
+    if ($existingInstall) {
+        return
+    }
+
+    Cleanup-FreshMetadataBootstrap
+
+    if (
+        -not $runtimeRootPreExisted -and
+        (Test-Path $RuntimeRoot)
+    ) {
+        Remove-Item `
+            -LiteralPath $RuntimeRoot `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+
+    if (
+        -not $venvPreExisted -and
+        (Test-Path $venvRoot)
+    ) {
+        Remove-Item `
+            -LiteralPath $venvRoot `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+
+    if (
+        -not $productRootPreExisted -and
+        (Test-Path $ProductRoot)
+    ) {
+
+        $remaining = @(
+            Get-ChildItem `
+                -LiteralPath $ProductRoot `
+                -Force `
+                -ErrorAction SilentlyContinue
+        )
+
+        if ($remaining.Count -eq 0) {
+            Remove-Item `
+                -LiteralPath $ProductRoot `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Restore-PreviousManagedScripts {
     if (
         $previousScripts -and
@@ -134,6 +184,22 @@ if($ValidateOnly){Note 'VALIDATE-ONLY: PASS';exit 0}
 $ProductRoot = [System.IO.Path]::GetFullPath($InstallPath)
 $RuntimeRoot = Join-Path $ProductRoot 'IA_Local'
 
+$productRootPreExisted = Test-Path `
+    $ProductRoot `
+    -PathType Container
+
+$runtimeRootPreExisted = Test-Path `
+    $RuntimeRoot `
+    -PathType Container
+
+$venvRoot = Join-Path `
+    $ProductRoot `
+    '.venv'
+
+$venvPreExisted = Test-Path `
+    $venvRoot `
+    -PathType Container
+
 try {
     New-Item -ItemType Directory -Force $ProductRoot | Out-Null
 }
@@ -142,26 +208,50 @@ catch {
 }
 
 ${existingInstall} = Test-Path (Join-Path $RuntimeRoot 'scripts')
+
+if (
+    $runtimeRootPreExisted -and
+    -not $existingInstall
+) {
+    Stop-Install 'RUNTIME_ROOT_CONFLICT'
+}
+
 if (-not $existingInstall) {
     Note 'INSTALL MODE: FRESH'
-    New-Item -ItemType Directory -Force $RuntimeRoot | Out-Null
-    Copy-Item (Join-Path $source '*') $RuntimeRoot -Recurse -Force
 
-    # FRESH_METADATA_BOOTSTRAP
-    # analizador_universal requires canonical release identity
-    # at ProductRoot during import health validation. This copy
-    # is temporary and is removed before the managed root-file
-    # transaction begins.
-    $freshMetadataBootstrap = Join-Path `
-        $ProductRoot `
-        'RELEASE_METADATA.json'
+    try {
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            $RuntimeRoot |
+            Out-Null
 
-    Copy-Item `
-        -LiteralPath $releaseMetadataPath `
-        -Destination $freshMetadataBootstrap `
-        -Force
+        Copy-Item `
+            (Join-Path $source '*') `
+            $RuntimeRoot `
+            -Recurse `
+            -Force
 
-    Note 'FRESH_METADATA_BOOTSTRAP: canonical release metadata prepared for health validation'
+        # FRESH_METADATA_BOOTSTRAP
+        # analizador_universal requires canonical release identity
+        # at ProductRoot during import health validation. This copy
+        # is temporary and is removed before the managed root-file
+        # transaction begins.
+        $freshMetadataBootstrap = Join-Path `
+            $ProductRoot `
+            'RELEASE_METADATA.json'
+
+        Copy-Item `
+            -LiteralPath $releaseMetadataPath `
+            -Destination $freshMetadataBootstrap `
+            -Force
+
+        Note 'FRESH_METADATA_BOOTSTRAP: canonical release metadata prepared for health validation'
+    }
+    catch {
+        Cleanup-FreshInstallArtifacts
+        Stop-Install 'fresh payload deployment failed'
+    }
 }
 else {
     Note 'INSTALL MODE: UPGRADE'
@@ -224,7 +314,7 @@ if(-not(Test-Path $vp)){
     & $py.Command @($py.Args) -m venv (Join-Path $ProductRoot '.venv')
 
     if($LASTEXITCODE){
-        Cleanup-FreshMetadataBootstrap
+        Cleanup-FreshInstallArtifacts
         Restore-PreviousManagedScripts
         Cleanup-ManagedScriptBackup
         Stop-Install 'venv creation failed'
@@ -235,7 +325,7 @@ if(-not(Test-Path $vp)){
     -r (Join-Path $RuntimeRoot 'requirements-local.txt')
 
 if($LASTEXITCODE){
-    Cleanup-FreshMetadataBootstrap
+    Cleanup-FreshInstallArtifacts
     Restore-PreviousManagedScripts
     Cleanup-ManagedScriptBackup
     Stop-Install 'dependency install failed'
@@ -275,7 +365,7 @@ finally {
 }
 
 if($healthExit){
-    Cleanup-FreshMetadataBootstrap
+    Cleanup-FreshInstallArtifacts
     Restore-PreviousManagedScripts
     Cleanup-ManagedScriptBackup
     Stop-Install 'health imports failed'
@@ -422,6 +512,7 @@ catch {
         }
     }
 
+    Cleanup-FreshInstallArtifacts
     Restore-PreviousManagedScripts
     Cleanup-ManagedScriptBackup
 

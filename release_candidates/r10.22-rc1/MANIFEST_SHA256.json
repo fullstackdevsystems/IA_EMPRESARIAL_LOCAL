@@ -118,8 +118,8 @@
     },
     {
       "path": "IA_Local/VERSION.txt",
-      "sha256": "18b5cea63805e5b723725f57019bc3eb5ff90edebe2bded6b3365b2d8471bd33",
-      "size": 319
+      "sha256": "01efa2748138e0ac84bc893f31a1a419797d439b7834c74cb146e4ea35a74a1c",
+      "size": 17
     },
     {
       "path": "IA_Local/config/.keep",
@@ -143,8 +143,8 @@
     },
     {
       "path": "IA_Local/requirements-local.txt",
-      "sha256": "8e21972c11bb0baa0360cf680d0a6aeeacac7ce75a795c8ae6a4501c603be2a8",
-      "size": 192
+      "sha256": "52f43deec238555d160c9b13ebc6dee3626220c9cea11d8dfdfd7455988a6576",
+      "size": 329
     },
     {
       "path": "IA_Local/requirements-optional.txt",
@@ -643,13 +643,13 @@
     },
     {
       "path": "InstalarLimpio.ps1",
-      "sha256": "2876513f19609b19d7dc9962a06218ac0e80e7ed1d8ef4adaf1d885a53edbbea",
-      "size": 3593
+      "sha256": "a79a88c11fa1c5f3ae4d67036d5f3a8a4ef7ddd6e58a383fea4023ec3cf0cf5b",
+      "size": 335
     },
     {
       "path": "InstallerR1020C1.ps1",
-      "sha256": "24ef3ea3d4bc6918a8f9cc31e01f100c069506c7c7da4abe565c37d35a2c1302",
-      "size": 13937
+      "sha256": "ec2bd2c463cc0585c7ec31ff938549c084e6e622f4beff78c2fd9f91f1cbcc3b",
+      "size": 15742
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",
@@ -668,8 +668,8 @@
     },
     {
       "path": "ValidarInstalador.ps1",
-      "sha256": "145e420de03bac9f48cc8ad4b684cf4a56358ab195b99b1c2b7b02316efc0b91",
-      "size": 733
+      "sha256": "2100ccc2580717dcf6a21e654f1bc86ad2c92be8a29c29fb50ed424e024641ee",
+      "size": 4307
     }
   ]
 }

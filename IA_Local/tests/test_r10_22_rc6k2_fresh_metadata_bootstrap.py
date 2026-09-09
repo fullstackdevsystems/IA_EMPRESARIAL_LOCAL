@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import re
 
 
@@ -201,13 +201,46 @@ check(
     ),
 )
 
+full_cleanup_helper = (
+    "function Cleanup-FreshInstallArtifacts"
+)
+
+full_cleanup_start = text.find(
+    full_cleanup_helper
+)
+
+restore_helper_start = text.find(
+    "function Restore-PreviousManagedScripts",
+    full_cleanup_start + 1,
+)
+
+full_cleanup_block = (
+    text[
+        full_cleanup_start:restore_helper_start
+    ]
+    if (
+        full_cleanup_start >= 0
+        and restore_helper_start
+        > full_cleanup_start
+    )
+    else ""
+)
+
 check(
     "fresh_metadata_cleanup_covers_failure_paths",
     (
-        text.count("Cleanup-FreshMetadataBootstrap") >= 5
+        cleanup_helper in text
+        and full_cleanup_start >= 0
+        and "Cleanup-FreshMetadataBootstrap"
+        in full_cleanup_block
+        and text.count(
+            "Cleanup-FreshInstallArtifacts"
+        ) >= 5
         and "venv creation failed" in text
         and "dependency install failed" in text
         and "health imports failed" in text
+        and "fresh payload deployment failed"
+        in text
     ),
 )
 
