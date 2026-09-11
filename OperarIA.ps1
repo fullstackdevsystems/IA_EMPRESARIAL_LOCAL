@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai","backup","restore")]
     [string]$Action = "status",
 
