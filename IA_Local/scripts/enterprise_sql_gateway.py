@@ -37,6 +37,213 @@ class EnterpriseSecretStore:
         if not self.provider: raise EnterpriseSqlError("SQL_SECRET_UNAVAILABLE","Secret store no configurado")
         self.provider.delete(reference)
 
+
+class WindowsCredentialSecretProvider:
+    """
+    Persistent SQL_AUTH secrets backed by Windows Credential Manager.
+
+    Product files persist only an opaque internal reference. Password
+    material remains in the Windows credential vault for the Windows
+    account running IA Empresarial Local.
+    """
+
+    TARGET_PREFIX = "IA_EMPRESARIAL_LOCAL/sql/"
+
+    def __init__(self) -> None:
+        try:
+            import win32cred
+        except Exception as exc:
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "Almacén seguro de credenciales de Windows no disponible",
+            ) from exc
+
+        self._win32cred = win32cred
+
+    @staticmethod
+    def _normalize_reference(reference: str) -> str:
+        value = str(reference or "").strip()
+
+        if not value:
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "Referencia de credencial SQL inválida",
+            )
+
+        return value
+
+    @classmethod
+    def target_name(cls, reference: str) -> str:
+        normalized = cls._normalize_reference(reference)
+
+        digest = hashlib.sha256(
+            normalized.encode("utf-8")
+        ).hexdigest()
+
+        return cls.TARGET_PREFIX + digest
+
+    @staticmethod
+    def _error_code(exc: Exception):
+        code = getattr(
+            exc,
+            "winerror",
+            None,
+        )
+
+        if code is not None:
+            return code
+
+        args = getattr(
+            exc,
+            "args",
+            (),
+        )
+
+        if args:
+            try:
+                return int(args[0])
+            except Exception:
+                return None
+
+        return None
+
+    @classmethod
+    def _is_not_found(cls, exc: Exception) -> bool:
+        return cls._error_code(exc) == 1168
+
+    @staticmethod
+    def _decode_blob(blob) -> Optional[str]:
+        if isinstance(blob, str):
+            value = blob
+
+        elif isinstance(
+            blob,
+            (
+                bytes,
+                bytearray,
+                memoryview,
+            ),
+        ):
+            try:
+                value = bytes(blob).decode(
+                    "utf-16-le"
+                )
+            except UnicodeDecodeError as exc:
+                raise EnterpriseSqlError(
+                    "SQL_SECRET_UNAVAILABLE",
+                    "Credencial SQL protegida no legible",
+                ) from exc
+
+        else:
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "Credencial SQL protegida no legible",
+            )
+
+        value = value.rstrip("\x00")
+
+        return value or None
+
+    def set(
+        self,
+        reference: str,
+        value: str,
+    ) -> None:
+        if (
+            not isinstance(value, str)
+            or not value
+        ):
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "Secret SQL requerido",
+            )
+
+        target = self.target_name(
+            reference
+        )
+
+        credential = {
+            "Type":
+                self._win32cred.CRED_TYPE_GENERIC,
+            "TargetName":
+                target,
+            "UserName":
+                "IA_EMPRESARIAL_LOCAL",
+            "CredentialBlob":
+                value,
+            "Persist":
+                self._win32cred.CRED_PERSIST_LOCAL_MACHINE,
+            "Comment":
+                "IA Empresarial Local SQL credential",
+        }
+
+        try:
+            self._win32cred.CredWrite(
+                credential,
+                0,
+            )
+
+        except Exception as exc:
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "No fue posible guardar la credencial SQL protegida",
+            ) from exc
+
+    def get(
+        self,
+        reference: str,
+    ) -> Optional[str]:
+        target = self.target_name(
+            reference
+        )
+
+        try:
+            credential = self._win32cred.CredRead(
+                target,
+                self._win32cred.CRED_TYPE_GENERIC,
+                0,
+            )
+
+        except Exception as exc:
+            if self._is_not_found(exc):
+                return None
+
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "No fue posible leer la credencial SQL protegida",
+            ) from exc
+
+        return self._decode_blob(
+            credential.get(
+                "CredentialBlob"
+            )
+        )
+
+    def delete(
+        self,
+        reference: str,
+    ) -> None:
+        target = self.target_name(
+            reference
+        )
+
+        try:
+            self._win32cred.CredDelete(
+                target,
+                self._win32cred.CRED_TYPE_GENERIC,
+                0,
+            )
+
+        except Exception as exc:
+            if self._is_not_found(exc):
+                return
+
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "No fue posible eliminar la credencial SQL protegida",
+            ) from exc
+
+
 def public_sql_profile(record: Dict[str,Any]) -> Dict[str,Any]:
     public = {key:record.get(key) for key in ("connection_id","server","database","auth_mode","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","read_only","enabled","status","display_name","created_at","updated_at","last_test_at","last_test_status","last_latency_ms","last_error_code","last_discovery_at","last_discovery_status","last_discovery_ms","discovered_object_count","last_query_at","last_query_status","last_query_ms","last_query_row_count")}
     public["secret_configured"] = bool(record.get("secret_reference"))
@@ -145,6 +352,260 @@ class SqlServerPyodbcProvider:
             except Exception: pass
             try: conn.close()
             except Exception: pass
+
+
+def build_transient_sql_probe_profile(
+    *,
+    server: str,
+    database: str,
+    auth_mode: str,
+    driver: str = "ODBC Driver 18 for SQL Server",
+    timeout_seconds: int = 30,
+    trust_server_certificate: bool = False,
+    username: str = "",
+    secret_reference: str = "",
+) -> Dict[str, Any]:
+    """
+    Build an in-memory SQL Server profile used only for connection
+    validation and metadata discovery before a governed allowlist exists.
+
+    This profile is deliberately not compatible with persistence through
+    EnterpriseSqlConnectionStore.register(): it has no allowlist and is
+    never written to the SQL profile store.
+    """
+
+    mode = str(auth_mode or "").strip().upper()
+
+    if mode in {"INTEGRATED", "WINDOWS"}:
+        mode = "WINDOWS_INTEGRATED"
+
+    if mode not in {
+        "WINDOWS_INTEGRATED",
+        "SQL_AUTH",
+    }:
+        raise EnterpriseSqlError(
+            "SQL_CONNECTION_PROFILE_INVALID",
+            "Modo de autenticación inválido",
+        )
+
+    server_value = str(server or "").strip()
+    database_value = str(database or "").strip()
+    driver_value = str(driver or "").strip()
+
+    if (
+        not server_value
+        or not database_value
+        or not driver_value
+    ):
+        raise EnterpriseSqlError(
+            "SQL_CONNECTION_PROFILE_INVALID",
+            "Servidor, base de datos y driver son obligatorios",
+        )
+
+    if isinstance(timeout_seconds, bool):
+        raise EnterpriseSqlError(
+            "SQL_CONNECTION_PROFILE_INVALID",
+            "Timeout inválido",
+        )
+
+    try:
+        timeout_value = int(timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        raise EnterpriseSqlError(
+            "SQL_CONNECTION_PROFILE_INVALID",
+            "Timeout inválido",
+        ) from exc
+
+    if not 1 <= timeout_value <= 120:
+        raise EnterpriseSqlError(
+            "SQL_CONNECTION_PROFILE_INVALID",
+            "Timeout inválido",
+        )
+
+    username_value = str(username or "").strip()
+    reference_value = str(secret_reference or "").strip()
+
+    if mode == "SQL_AUTH":
+        if not username_value or not reference_value:
+            raise EnterpriseSqlError(
+                "SQL_SECRET_UNAVAILABLE",
+                "Credenciales SQL incompletas",
+            )
+
+    return {
+        "provider": "sqlserver",
+        "server": server_value,
+        "database": database_value,
+        "auth_mode": mode,
+        "driver": driver_value,
+        "timeout_seconds": timeout_value,
+        "trust_server_certificate": bool(
+            trust_server_certificate
+        ),
+        "username": (
+            username_value
+            or None
+        ),
+        "secret_reference": (
+            reference_value
+            or None
+        ),
+        "credential_ref": "",
+        "read_only": True,
+        "enabled": True,
+        "status": "ACTIVE",
+        "allowed_schemas": [],
+        "allowed_tables": [],
+    }
+
+
+def probe_sql_server_metadata(
+    provider: SqlServerProvider,
+    profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Test a transient SQL Server profile and return safe selectable
+    schema/table metadata without persisting either the profile or a secret.
+
+    Column metadata is intentionally omitted from this pre-allowlist stage.
+    """
+
+    timeout = int(
+        profile.get(
+            "timeout_seconds"
+        )
+        or 30
+    )
+
+    started = time.monotonic()
+
+    try:
+        provider.test_connection(
+            profile,
+            timeout,
+        )
+    except Exception as exc:
+        error = _safe_provider_error(
+            exc,
+            "SQL_CONNECTION_TEST_FAILED",
+        )
+        raise error from exc
+
+    try:
+        raw_objects = list(
+            provider.discover(
+                profile
+            )
+            or []
+        )
+    except Exception as exc:
+        error = _safe_provider_error(
+            exc,
+            "SQL_SCHEMA_DISCOVERY_FAILED",
+        )
+        raise error from exc
+
+    safe_objects: List[Dict[str, str]] = []
+    seen = set()
+
+    for item in raw_objects:
+        if not isinstance(item, dict):
+            continue
+
+        schema = str(
+            item.get("schema")
+            or ""
+        ).strip()
+
+        name = str(
+            item.get("name")
+            or ""
+        ).strip()
+
+        object_type = str(
+            item.get("type")
+            or ""
+        ).strip()
+
+        if not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*",
+            schema,
+        ):
+            continue
+
+        if not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*",
+            name,
+        ):
+            continue
+
+        key = (
+            schema.lower(),
+            name.lower(),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        safe_objects.append(
+            {
+                "schema": schema,
+                "name": name,
+                "type": object_type,
+                "qualified_name":
+                    f"{schema}.{name}",
+            }
+        )
+
+    safe_objects.sort(
+        key=lambda item: (
+            item["schema"].lower(),
+            item["name"].lower(),
+        )
+    )
+
+    maximum = 5000
+    truncated = (
+        len(safe_objects)
+        > maximum
+    )
+
+    returned = safe_objects[
+        :maximum
+    ]
+
+    schemas = sorted(
+        {
+            item["schema"]
+            for item in returned
+        },
+        key=str.lower,
+    )
+
+    elapsed = (
+        time.monotonic()
+        - started
+    ) * 1000
+
+    return {
+        "status": "PASS",
+        "database": str(
+            profile.get("database")
+            or ""
+        ),
+        "schemas": schemas,
+        "objects": returned,
+        "discovered_object_count":
+            len(returned),
+        "truncated": truncated,
+        "probe_ms": round(
+            elapsed,
+            3,
+        ),
+    }
+
 
 
 def _canonical(value: Dict[str, Any]) -> bytes:

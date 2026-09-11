@@ -4,14 +4,63 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>IA Empresarial Local - Administración</title>
 <style>
+.guided-ai{border:1px solid #c7d2fe;background:#fafaff}.guided-ai-choice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.guided-ai-choice label{display:block;border:1px solid #cbd5e1;border-radius:10px;padding:10px;cursor:pointer;background:#fff}.guided-ai-choice input{width:auto;margin-right:6px}.guided-ai-status{margin-top:12px}.advanced-ai-toggle{margin-top:12px}@media(max-width:950px){.guided-ai-choice{grid-template-columns:1fr}}
 :root{--bg:#f4f7fb;--card:#fff;--ink:#142033;--muted:#64748b;--line:#dbe3ee;--blue:#2563eb;--green:#15803d;--red:#b91c1c;--amber:#b45309;--nav:#0f172a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Segoe UI,Arial,sans-serif}.layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:20px 14px}.brand{font-weight:800;font-size:18px;margin:4px 8px 22px}.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button.active,.nav button:hover{background:#1e293b;color:#fff}.main{padding:24px;min-width:0}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.links a{margin-left:12px;color:var(--blue);text-decoration:none}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.metric,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #2342a30c}.metric{padding:15px}.metric b{font-size:24px;display:block;margin-top:4px}.card{padding:18px;margin:14px 0}.panel{display:none}.panel.active{display:block}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}input,select,textarea{border:1px solid #cbd5e1;border-radius:8px;padding:8px;width:100%;font:inherit}textarea{min-height:75px}.btn{border:0;border-radius:8px;padding:8px 11px;background:var(--blue);color:#fff;cursor:pointer}.btn.ok{background:var(--green)}.btn.warn{background:var(--amber)}.btn.danger{background:var(--red)}.btn.muted{background:#64748b}.table{overflow:auto}.table table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:9px;border-bottom:1px solid #e5e7eb;vertical-align:top}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#e2e8f0;font-size:11px}.pill.VALIDADO{background:#dcfce7;color:#166534}.pill.PROPUESTO{background:#fef3c7;color:#92400e}.pill.RECHAZADO,.pill.OBSOLETO{background:#fee2e2;color:#991b1b}.pill.READY,.pill.TESTED{background:#dcfce7;color:#166534}.pill.CONFIGURED{background:#dbeafe;color:#1d4ed8}.pill.DEGRADED{background:#fef3c7;color:#92400e}.pill.BLOCKED{background:#fee2e2;color:#991b1b}.pill.NOT_REQUIRED{background:#e2e8f0;color:#475569}.mutedtxt{color:var(--muted);font-size:12px}.notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;margin:12px 0}.error{background:#fef2f2;border-color:#fecaca}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.actions{white-space:nowrap}.empty{padding:18px;color:var(--muted)}pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;max-height:420px;overflow:auto}@media(max-width:950px){.layout{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:5;padding:10px}.brand{margin:0 8px 8px}.nav{display:flex;overflow:auto}.nav button{width:auto;white-space:nowrap}.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Segoe UI,Arial,sans-serif}.layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:20px 14px}.brand{font-weight:800;font-size:18px;margin:4px 8px 22px}.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button.active,.nav button:hover{background:#1e293b;color:#fff}.main{padding:24px;min-width:0}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.links a{margin-left:12px;color:var(--blue);text-decoration:none}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.metric,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #2342a30c}.metric{padding:15px}.metric b{font-size:24px;display:block;margin-top:4px}.card{padding:18px;margin:14px 0}.panel{display:none}.panel.active{display:block}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}input,select,textarea{border:1px solid #cbd5e1;border-radius:8px;padding:8px;width:100%;font:inherit}textarea{min-height:75px}.btn{border:0;border-radius:8px;padding:8px 11px;background:var(--blue);color:#fff;cursor:pointer}.btn.ok{background:var(--green)}.btn.warn{background:var(--amber)}.btn.danger{background:var(--red)}.btn.muted{background:#64748b}.table{overflow:auto}.table table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:9px;border-bottom:1px solid #e5e7eb;vertical-align:top}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#e2e8f0;font-size:11px}.pill.VALIDADO{background:#dcfce7;color:#166534}.pill.PROPUESTO{background:#fef3c7;color:#92400e}.pill.RECHAZADO,.pill.OBSOLETO{background:#fee2e2;color:#991b1b}.pill.READY,.pill.TESTED{background:#dcfce7;color:#166534}.pill.CONFIGURED{background:#dbeafe;color:#1d4ed8}.pill.DEGRADED{background:#fef3c7;color:#92400e}.pill.BLOCKED{background:#fee2e2;color:#991b1b}.pill.NOT_REQUIRED{background:#e2e8f0;color:#475569}.mutedtxt{color:var(--muted);font-size:12px}.notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;margin:12px 0}.error{background:#fef2f2;border-color:#fecaca}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.actions{white-space:nowrap}.empty{padding:18px;color:var(--muted)}.guided-sql{border:1px solid #bfdbfe;background:#f8fbff}.guided-steps{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.guided-step{background:#e2e8f0;border-radius:999px;padding:5px 9px;font-size:12px}.guided-step.active{background:#dbeafe;color:#1d4ed8;font-weight:700}.guided-object-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:320px;overflow:auto;padding:8px;border:1px solid #dbe3ee;border-radius:10px;background:#fff}.guided-object-item{display:flex;align-items:center;gap:8px;padding:7px;border:1px solid #e5e7eb;border-radius:8px}.guided-object-item input{width:auto}.guided-success{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px}.advanced-sql-toggle{margin-top:12px}@media(max-width:950px){.guided-object-list{grid-template-columns:1fr}}pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;max-height:420px;overflow:auto}@media(max-width:950px){.layout{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:5;padding:10px}.brand{margin:0 8px 8px}.nav{display:flex;overflow:auto}.nav button{width:auto;white-space:nowrap}.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="layout"><aside class="side"><div class="brand">IA Empresarial Local<br><span style="font-size:11px;font-weight:400;color:#94a3b8">Administración</span></div><div class="nav" id="nav">
 <button data-p="resumen" class="active">Resumen</button><button data-p="controlplane">Plataforma</button><button data-p="memoria">Memoria</button><button data-p="documentos">Documentos / RAG</button><button data-p="semantica">Diccionario</button><button data-p="reglas">Reglas empresariales</button><button data-p="analiticas">Reglas analíticas</button><button data-p="feedback">Feedback</button><button data-p="trazas">Trazabilidad</button><button data-p="historial">Historial</button><button data-p="auditoria">Auditoría</button></div></aside>
 <main class="main"><div class="top"><div><h2 style="margin:0">Administración empresarial</h2><div class="mutedtxt">Conocimiento, gobernanza, aprendizaje y trazabilidad en una sola consola.</div></div><div class="links"><a id="assistant" href="/assistant">Asistente</a><a href="/">Analizador</a><button class="btn muted" onclick="enterpriseLogout()">Cerrar sesión</button></div></div><div id="auth" class="notice error" style="display:none"></div><div id="msg"></div>
 <section id="resumen" class="panel active"><div class="grid" id="metrics"></div><div class="card"><h3>Estado de conocimiento</h3><div id="statusSummary"></div></div></section>
-<section id="controlplane" class="panel"><div class="card"><h3>Administración de plataforma</h3><div class="mutedtxt">Administración segura de empresa, usuarios, SQL Server e inteligencia artificial.</div><div id="controlSummary"></div></div><div class="card" id="cpReadinessCard"><h3>Preparación de empresa</h3><div class="mutedtxt">Estado de empresa, administrador, SQL Server, inteligencia artificial e identidad visual. Configurado no equivale a conexión validada.</div><div id="controlReadiness" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn muted" data-cp-permission="config:read" onclick="controlLoadReadiness(false)">Actualizar estado</button><button class="btn ok" data-cp-permission="config:read" onclick="controlValidateReadiness()">Validar preparación</button></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div><div id="cpTenantCreate" data-cp-permission="tenant:update" data-cp-system-admin="true" class="settings" style="margin-top:12px"><label>ID empresa<input id="cpTenantId" autocomplete="off" placeholder="empresa-norte"></label><label>Nombre<input id="cpTenantName" autocomplete="off"></label><label>Unidad de negocio predeterminada<input id="cpTenantBusinessUnit" autocomplete="off"></label><label>Sucursal predeterminada<input id="cpTenantBranch" autocomplete="off"></label><label>Idioma<input id="cpTenantLocale" autocomplete="off" value="es-MX"></label><label>Zona horaria<input id="cpTenantTimezone" autocomplete="off" placeholder="America/Mazatlan"></label></div><button id="cpCreateTenantBtn" class="btn" data-cp-permission="tenant:update" data-cp-system-admin="true" onclick="controlCreateTenant()">Crear empresa</button></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contraseña<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div><div class="card table"><h3>Fuentes SQL Server</h3><div id="controlSql"></div><div id="cpSqlCreate" data-cp-permission="sql:configure" class="settings" style="margin-top:12px"><label>ID conexión<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticación<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Autenticación integrada de Windows</option><option value="SQL_AUTH">Autenticación de SQL Server</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Credencial SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Esquemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Máximo de filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" onclick="controlCreateSql()">Crear conexión SQL</button></div><div class="card"><h3>Proveedor de inteligencia artificial</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo de proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">Compatible local con OpenAI</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Tiempo máximo de espera (segundos)<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Ventana de contexto<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Sí</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
+<section id="controlplane" class="panel"><div class="card"><h3>Administración de plataforma</h3><div class="mutedtxt">Administración segura de empresa, usuarios, SQL Server e inteligencia artificial.</div><div id="controlSummary"></div></div><div class="card" id="cpReadinessCard"><h3>Preparación de empresa</h3><div class="mutedtxt">Estado de empresa, administrador, SQL Server, inteligencia artificial e identidad visual. Configurado no equivale a conexión validada.</div><div id="controlReadiness" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn muted" data-cp-permission="config:read" onclick="controlLoadReadiness(false)">Actualizar estado</button><button class="btn ok" data-cp-permission="config:read" onclick="controlValidateReadiness()">Validar preparación</button></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div><div id="cpTenantCreate" data-cp-permission="tenant:update" data-cp-system-admin="true" class="settings" style="margin-top:12px"><label>ID empresa<input id="cpTenantId" autocomplete="off" placeholder="empresa-norte"></label><label>Nombre<input id="cpTenantName" autocomplete="off"></label><label>Unidad de negocio predeterminada<input id="cpTenantBusinessUnit" autocomplete="off"></label><label>Sucursal predeterminada<input id="cpTenantBranch" autocomplete="off"></label><label>Idioma<input id="cpTenantLocale" autocomplete="off" value="es-MX"></label><label>Zona horaria<input id="cpTenantTimezone" autocomplete="off" placeholder="America/Mazatlan"></label></div><button id="cpCreateTenantBtn" class="btn" data-cp-permission="tenant:update" data-cp-system-admin="true" onclick="controlCreateTenant()">Crear empresa</button></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contraseña<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div>
+<div class="card guided-sql" id="guidedSqlCard" data-cp-permission="sql:configure">
+<h3>Conectar SQL Server</h3>
+<div class="mutedtxt">Conecta la base de datos, comprueba el acceso y elige visualmente la información que esta empresa podrá consultar.</div>
+<div class="guided-steps">
+<span class="guided-step active">1. Conexión</span>
+<span class="guided-step">2. Probar</span>
+<span class="guided-step">3. Elegir tablas</span>
+<span class="guided-step">4. Guardar</span>
+</div>
+<div class="formgrid">
+<label>Nombre de la fuente
+<input id="gsSqlDisplay" autocomplete="off" placeholder="Sistema principal">
+</label>
+<label>Servidor
+<input id="gsSqlServer" autocomplete="off" placeholder="SERVIDOR\INSTANCIA" oninput="guidedSqlInvalidate()">
+</label>
+<label>Base de datos
+<input id="gsSqlDatabase" autocomplete="off" placeholder="Nombre de la base" oninput="guidedSqlInvalidate()">
+</label>
+<label>Tipo de acceso
+<select id="gsSqlAuth" onchange="guidedSqlAuthChanged();guidedSqlInvalidate()">
+<option value="WINDOWS_INTEGRATED">Usar cuenta de Windows</option>
+<option value="SQL_AUTH">Usuario y contraseña de SQL Server</option>
+</select>
+</label>
+<label id="gsSqlUsernameWrap" style="display:none">Usuario SQL
+<input id="gsSqlUsername" autocomplete="off" oninput="guidedSqlInvalidate()">
+</label>
+<label id="gsSqlSecretWrap" style="display:none">Contraseña SQL
+<input id="gsSqlSecret" type="password" autocomplete="new-password" oninput="guidedSqlInvalidate()">
+</label>
+</div>
+<div class="row" style="margin-top:12px">
+<button id="gsSqlProbeBtn" class="btn" data-cp-permission="sql:configure" onclick="guidedSqlProbe()">Probar conexión y buscar tablas</button>
+</div>
+<div id="gsSqlStatus"></div>
+<div id="gsSqlObjects" style="display:none;margin-top:12px"></div>
+<div id="gsSqlSelectionActions" class="row" style="display:none;margin-top:10px">
+<button class="btn muted" type="button" onclick="guidedSqlSelectAll(true)">Seleccionar todo</button>
+<button class="btn muted" type="button" onclick="guidedSqlSelectAll(false)">Quitar selección</button>
+<button id="gsSqlSaveBtn" class="btn ok" type="button" disabled onclick="guidedSqlSave()">Guardar fuente SQL</button>
+</div>
+</div>
+<div class="card table"><h3>Fuentes SQL Server</h3>
+<div class="mutedtxt">Conexiones configuradas. Las opciones técnicas permanecen disponibles sólo en configuración avanzada.</div>
+<div id="controlSql"></div>
+<button id="cpSqlAdvancedToggle" class="btn muted advanced-sql-toggle" data-cp-permission="sql:configure" onclick="controlToggleSqlAdvanced()">Configuración avanzada</button>
+<div id="cpSqlCreate" data-cp-permission="sql:configure" data-cp-advanced-sql="true" class="settings" style="margin-top:12px;display:none"><label>ID conexión<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticación<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Autenticación integrada de Windows</option><option value="SQL_AUTH">Autenticación de SQL Server</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Credencial SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Esquemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Máximo de filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" data-cp-advanced-sql="true" style="display:none" onclick="controlCreateSql()">Crear conexión SQL</button></div><div class="card"><h3>Proveedor de inteligencia artificial</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo de proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">Compatible local con OpenAI</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Tiempo máximo de espera (segundos)<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Ventana de contexto<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Sí</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
 <section id="memoria" class="panel"><div class="card"><h3>Memoria permanente</h3><div class="formgrid"><input id="memText" placeholder="Conocimiento o preferencia"><select id="memCategory"><option>conocimiento_empresa</option><option>regla_negocio</option><option>definicion</option><option>preferencia</option><option>procedimiento</option></select></div><div style="margin-top:8px"><button class="btn" onclick="createMemory()">Guardar memoria</button></div></div><div class="card table" id="memoryTable"></div></section>
 <section id="documentos" class="panel"><div class="card"><h3>Documentos / RAG</h3><input type="file" id="docFile"><div style="margin-top:8px"><button class="btn" onclick="uploadDoc()">Indexar documento</button></div></div><div class="card table" id="docsTable"></div></section>
 <section id="semantica" class="panel"><div class="card"><h3>Diccionario empresarial</h3><div class="formgrid"><input id="semPhysical" placeholder="Nombre físico: Cve_Clie"><input id="semName" placeholder="Concepto: customer_id"><input id="semArea" placeholder="Área (opcional)"><input id="semDesc" placeholder="Descripción"></div><div style="margin-top:8px"><button class="btn" onclick="proposeSemantic()">Crear propuesta</button></div></div><div class="card table" id="semanticTable"></div></section>
@@ -79,7 +128,35 @@ function controlApplyCapabilities(){
     });
     document.querySelectorAll('[data-cp-system-admin]').forEach(el=>{
         el.style.display=(controlSystemAdmin()&&can(el.dataset.cpPermission))?'':'none'
-    })
+    });
+    controlApplySqlAdvancedVisibility()
+}
+
+let CONTROL_SQL_ADVANCED=false;
+
+function controlApplySqlAdvancedVisibility(){
+    document.querySelectorAll('[data-cp-advanced-sql]').forEach(el=>{
+        el.style.display=(
+            CONTROL_SQL_ADVANCED &&
+            can('sql:configure')
+        )?'':'none'
+    });
+
+    const toggle=controlElement('cpSqlAdvancedToggle');
+
+    if(toggle){
+        toggle.textContent=
+            CONTROL_SQL_ADVANCED
+                ?'Ocultar configuración avanzada'
+                :'Configuración avanzada'
+    }
+}
+
+function controlToggleSqlAdvanced(){
+    if(!can('sql:configure'))return;
+    CONTROL_SQL_ADVANCED=!CONTROL_SQL_ADVANCED;
+    controlApplySqlAdvancedVisibility();
+    controlRenderSqlTable()
 }
 
 function controlUnavailable(id,message){
@@ -734,8 +811,425 @@ async function controlResetPassword(userId){
     }
 }
 
+
+let GUIDED_SQL_PROBE=null;
+
+function guidedSqlAuthChanged(){
+    const sqlAuth=
+        controlElement('gsSqlAuth').value==='SQL_AUTH';
+
+    controlElement('gsSqlUsernameWrap').style.display=
+        sqlAuth?'':'none';
+
+    controlElement('gsSqlSecretWrap').style.display=
+        sqlAuth?'':'none';
+
+    if(!sqlAuth){
+        controlElement('gsSqlUsername').value='';
+        controlElement('gsSqlSecret').value=''
+    }
+}
+
+function guidedSqlInvalidate(){
+    GUIDED_SQL_PROBE=null;
+
+    const status=controlElement('gsSqlStatus');
+    const objects=controlElement('gsSqlObjects');
+    const actions=controlElement('gsSqlSelectionActions');
+    const save=controlElement('gsSqlSaveBtn');
+
+    if(status)status.innerHTML='';
+    if(objects){
+        objects.innerHTML='';
+        objects.style.display='none'
+    }
+    if(actions)actions.style.display='none';
+    if(save)save.disabled=true
+}
+
+function guidedSqlSlug(value){
+    return String(value||'')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g,'-')
+        .replace(/^-+|-+$/g,'')
+        .slice(0,48)
+}
+
+function guidedSqlConnectionId(){
+    const database=
+        controlElement('gsSqlDatabase').value.trim();
+
+    const display=
+        controlElement('gsSqlDisplay').value.trim();
+
+    const slug=
+        guidedSqlSlug(database||display||'principal') ||
+        'principal';
+
+    const base='sql-'+slug;
+
+    let candidate=base;
+    let number=2;
+
+    while(
+        CONTROL_SQL.some(
+            item=>String(item.connection_id||'')===candidate
+        )
+    ){
+        candidate=base+'-'+number;
+        number+=1
+    }
+
+    return candidate
+}
+
+function guidedSqlPayload(){
+    const auth=controlElement('gsSqlAuth').value;
+
+    const body={
+        server:controlElement('gsSqlServer').value.trim(),
+        database:controlElement('gsSqlDatabase').value.trim(),
+        auth_mode:auth,
+        username:controlElement('gsSqlUsername').value.trim()
+    };
+
+    if(!body.server||!body.database){
+        throw new Error(
+            'Indica el servidor y la base de datos.'
+        )
+    }
+
+    if(auth==='SQL_AUTH'){
+        const password=controlElement('gsSqlSecret').value;
+
+        if(!body.username||!password){
+            throw new Error(
+                'Indica el usuario y la contraseña de SQL Server.'
+            )
+        }
+
+        body.password=password
+    }
+
+    return body
+}
+
+async function guidedSqlRequest(url,opt={}){
+    const response=await fetch(url,opt);
+
+    let data={};
+
+    try{
+        data=await response.json()
+    }catch{}
+
+    if(response.status===401){
+        showLogin(
+            'La sesión expiró o fue revocada.'
+        );
+        throw new Error('Sesión requerida')
+    }
+
+    if(!response.ok){
+        const detail=data&&data.detail;
+
+        if(
+            detail &&
+            typeof detail==='object'
+        ){
+            throw new Error(
+                detail.message ||
+                detail.code ||
+                ('HTTP '+response.status)
+            )
+        }
+
+        throw new Error(
+            detail ||
+            data.error ||
+            ('HTTP '+response.status)
+        )
+    }
+
+    return data
+}
+
+function guidedSqlRenderObjects(objects){
+    const container=controlElement('gsSqlObjects');
+
+    if(!objects||!objects.length){
+        container.innerHTML=
+            '<div class="empty">La conexión funcionó, pero no se encontraron tablas o vistas disponibles.</div>';
+        container.style.display='';
+        controlElement('gsSqlSelectionActions').style.display='none';
+        return
+    }
+
+    container.innerHTML=
+        '<div class="mutedtxt" style="margin-bottom:8px">'+
+        'Selecciona únicamente la información que esta empresa podrá consultar.'+
+        '</div>'+
+        '<div class="guided-object-list">'+
+        objects.map((item,index)=>
+            '<label class="guided-object-item">'+
+            '<input type="checkbox" class="gsSqlObject" '+
+            'data-schema="'+esc(item.schema||'')+'" '+
+            'data-qualified="'+esc(item.qualified_name||'')+'" '+
+            'onchange="guidedSqlSelectionChanged()">'+
+            '<span><b>'+esc(item.name||'')+'</b>'+
+            '<br><span class="mutedtxt">'+
+            esc(item.schema||'')+
+            (
+                item.type
+                    ?' · '+esc(item.type)
+                    :''
+            )+
+            '</span></span>'+
+            '</label>'
+        ).join('')+
+        '</div>';
+
+    container.style.display='';
+    controlElement('gsSqlSelectionActions').style.display='flex';
+    guidedSqlSelectionChanged()
+}
+
+function guidedSqlSelectionChanged(){
+    const selected=
+        document.querySelectorAll('.gsSqlObject:checked').length;
+
+    const save=controlElement('gsSqlSaveBtn');
+
+    if(save){
+        save.disabled=(
+            !GUIDED_SQL_PROBE ||
+            selected===0
+        )
+    }
+}
+
+function guidedSqlSelectAll(selected){
+    document.querySelectorAll('.gsSqlObject').forEach(item=>{
+        item.checked=Boolean(selected)
+    });
+
+    guidedSqlSelectionChanged()
+}
+
+async function guidedSqlProbe(){
+    if(!can('sql:configure'))return;
+
+    const button=controlElement('gsSqlProbeBtn');
+    const status=controlElement('gsSqlStatus');
+
+    try{
+        guidedSqlInvalidate();
+
+        const body=guidedSqlPayload();
+
+        button.disabled=true;
+        button.textContent='Probando conexión...';
+
+        status.innerHTML=
+            '<div class="notice">Comprobando acceso al servidor local...</div>';
+
+        const result=await guidedSqlRequest(
+            '/api/admin/sql/probe'+controlTenantQuery(),
+            {
+                method:'POST',
+                headers:{
+                    ...H(),
+                    'Content-Type':'application/json'
+                },
+                body:JSON.stringify(body)
+            }
+        );
+
+        GUIDED_SQL_PROBE={
+            server:body.server,
+            database:body.database,
+            auth_mode:body.auth_mode,
+            username:body.username||'',
+            objects:result.objects||[]
+        };
+
+        status.innerHTML=
+            '<div class="guided-success">'+
+            '<b>Conexión correcta.</b> '+
+            esc(result.discovered_object_count||0)+
+            ' tablas o vistas disponibles para seleccionar.'+
+            (
+                result.truncated
+                    ?' Se muestran los primeros resultados disponibles.'
+                    :''
+            )+
+            '</div>';
+
+        guidedSqlRenderObjects(
+            result.objects||[]
+        )
+    }catch(e){
+        GUIDED_SQL_PROBE=null;
+
+        status.innerHTML=
+            '<div class="notice error">'+
+            esc(e.message)+
+            '</div>'
+    }finally{
+        button.disabled=false;
+        button.textContent=
+            'Probar conexión y buscar tablas'
+    }
+}
+
+function guidedSqlSelectedObjects(){
+    return Array.from(
+        document.querySelectorAll(
+            '.gsSqlObject:checked'
+        )
+    ).map(item=>({
+        schema:String(
+            item.dataset.schema||''
+        ),
+        qualified_name:String(
+            item.dataset.qualified||''
+        )
+    }))
+}
+
+async function guidedSqlSave(){
+    if(!can('sql:configure'))return;
+
+    const secret=controlElement('gsSqlSecret');
+    const status=controlElement('gsSqlStatus');
+    const save=controlElement('gsSqlSaveBtn');
+
+    try{
+        if(!GUIDED_SQL_PROBE){
+            throw new Error(
+                'Primero prueba la conexión.'
+            )
+        }
+
+        const current=guidedSqlPayload();
+
+        if(
+            current.server!==GUIDED_SQL_PROBE.server ||
+            current.database!==GUIDED_SQL_PROBE.database ||
+            current.auth_mode!==GUIDED_SQL_PROBE.auth_mode ||
+            current.username!==GUIDED_SQL_PROBE.username
+        ){
+            throw new Error(
+                'Los datos cambiaron. Vuelve a probar la conexión.'
+            )
+        }
+
+        const selected=guidedSqlSelectedObjects();
+
+        if(!selected.length){
+            throw new Error(
+                'Selecciona al menos una tabla o vista.'
+            )
+        }
+
+        const schemas=[
+            ...new Set(
+                selected.map(item=>item.schema)
+            )
+        ];
+
+        const objects=[
+            ...new Set(
+                selected.map(item=>item.qualified_name)
+            )
+        ];
+
+        const display=
+            controlElement('gsSqlDisplay').value.trim() ||
+            ('SQL Server - '+current.database);
+
+        const body={
+            connection_id:guidedSqlConnectionId(),
+            display_name:display,
+            server:current.server,
+            database:current.database,
+            auth_mode:current.auth_mode,
+            username:current.username,
+            allowed_schemas:schemas,
+            allowed_tables:objects,
+            max_rows:500
+        };
+
+        if(current.auth_mode==='SQL_AUTH'){
+            body.secret=secret.value
+        }
+
+        save.disabled=true;
+
+        await guidedSqlRequest(
+            '/api/admin/sql/connections'+controlTenantQuery(),
+            {
+                method:'POST',
+                headers:{
+                    ...H(),
+                    'Content-Type':'application/json'
+                },
+                body:JSON.stringify(body)
+            }
+        );
+
+        status.innerHTML=
+            '<div class="guided-success">'+
+            '<b>Fuente SQL guardada.</b> '+
+            'La empresa sólo podrá consultar los objetos seleccionados.'+
+            '</div>';
+
+        toast('Fuente SQL configurada.');
+
+        GUIDED_SQL_PROBE=null;
+
+        controlElement('gsSqlDisplay').value='';
+        controlElement('gsSqlServer').value='';
+        controlElement('gsSqlDatabase').value='';
+        controlElement('gsSqlUsername').value='';
+        secret.value='';
+
+        controlElement('gsSqlObjects').innerHTML='';
+        controlElement('gsSqlObjects').style.display='none';
+        controlElement('gsSqlSelectionActions').style.display='none';
+
+        await Promise.allSettled([
+            controlLoadSql(),
+            controlLoadReadiness(false)
+        ])
+    }catch(e){
+        status.innerHTML=
+            '<div class="notice error">'+
+            esc(e.message)+
+            '</div>'
+    }finally{
+        secret.value='';
+        guidedSqlSelectionChanged()
+    }
+}
+
+
 function controlSqlActions(profile){
     const actions=[];
+
+    if(!CONTROL_SQL_ADVANCED){
+        if(can('sql:read')){
+            actions.push(
+                '<button class="btn" onclick="controlSqlRun(\''+
+                esc(profile.connection_id)+
+                '\',\'test\')">Comprobar conexión</button>'
+            )
+        }
+
+        return actions.join(' ')
+    }
 
     if(can('sql:read')){
         actions.push(
@@ -743,6 +1237,7 @@ function controlSqlActions(profile){
             esc(profile.connection_id)+
             '\',\'test\')">Probar</button>'
         );
+
         actions.push(
             '<button class="btn" onclick="controlSqlRun(\''+
             esc(profile.connection_id)+
@@ -756,19 +1251,29 @@ function controlSqlActions(profile){
             esc(profile.connection_id)+
             '\')">Editar</button>'
         );
+
         actions.push(
             '<button class="btn" onclick="controlSqlAllowlist(\''+
             esc(profile.connection_id)+
             '\')">Allowlist</button>'
         );
 
-        const action=profile.enabled?'disable':'enable';
-        const label=profile.enabled?'Deshabilitar':'Habilitar';
+        const action=
+            profile.enabled
+                ?'disable'
+                :'enable';
+
+        const label=
+            profile.enabled
+                ?'Deshabilitar'
+                :'Habilitar';
 
         actions.push(
             '<button class="btn" onclick="controlSqlRun(\''+
             esc(profile.connection_id)+
-            '\',\''+action+'\')">'+label+'</button>'
+            '\',\''+action+'\')">'+
+            label+
+            '</button>'
         );
 
         if(profile.auth_mode==='SQL_AUTH'){
@@ -783,21 +1288,14 @@ function controlSqlActions(profile){
     return actions.join(' ')
 }
 
-async function controlLoadSql(){
-    if(!can('sql:read')){
-        controlUnavailable('controlSql','SQL no autorizado.');
-        return
-    }
 
-    try{
-        const data=await api(
-            '/api/admin/sql/connections'+controlTenantQuery(),
-            {headers:H()}
-        );
+function controlRenderSqlTable(){
+    const target=controlElement('controlSql');
 
-        CONTROL_SQL=data.items||[];
+    if(!target)return;
 
-        controlElement('controlSql').innerHTML=
+    if(CONTROL_SQL_ADVANCED){
+        target.innerHTML=
             table(
                 CONTROL_SQL,
                 [
@@ -806,14 +1304,67 @@ async function controlLoadSql(){
                     ['Base','database'],
                     ['Estado','status',(v)=>pill(v)],
                     ['Max filas','max_rows'],
-                    ['Secret','secret_configured',(v)=>v?'Configurado':'N/A']
+                    [
+                        'Secret',
+                        'secret_configured',
+                        (v)=>v?'Configurado':'N/A'
+                    ]
                 ],
                 controlSqlActions
-            )
+            );
+
+        return
+    }
+
+    target.innerHTML=
+        table(
+            CONTROL_SQL,
+            [
+                [
+                    'Fuente',
+                    'display_name',
+                    (v,r)=>esc(
+                        v ||
+                        r.database ||
+                        'SQL Server'
+                    )
+                ],
+                ['Servidor','server'],
+                ['Base de datos','database'],
+                ['Estado','status',(v)=>pill(v)]
+            ],
+            controlSqlActions
+        )
+}
+
+
+async function controlLoadSql(){
+    if(!can('sql:read')){
+        controlUnavailable(
+            'controlSql',
+            'SQL no autorizado.'
+        );
+        return
+    }
+
+    try{
+        const data=await api(
+            '/api/admin/sql/connections'+
+            controlTenantQuery(),
+            {headers:H()}
+        );
+
+        CONTROL_SQL=data.items||[];
+
+        controlRenderSqlTable()
     }catch(e){
-        controlUnavailable('controlSql',e.message)
+        controlUnavailable(
+            'controlSql',
+            e.message
+        )
     }
 }
+
 
 async function controlCreateSql(){
     if(!can('sql:configure'))return;
@@ -1282,6 +1833,170 @@ async function controlValidateReadiness(){
     )
 }
 
+let GUIDED_AI_TEST=null;
+
+function controlToggleAiAdvanced(){
+    const editor=controlElement('cpAiEditor');
+    const actions=controlElement('cpAiAdvancedActions');
+    const open=editor.style.display==='none';
+    editor.style.display=open?'grid':'none';
+    actions.style.display=open?'flex':'none';
+    controlElement('cpAiAdvancedToggle').textContent=
+        open?'Ocultar configuración avanzada':'Configuración avanzada';
+}
+
+function guidedAiChoice(){
+    const selected=document.querySelector('input[name="gsAiChoice"]:checked');
+    return selected?selected.value:'DISABLED';
+}
+
+function guidedAiFingerprint(provider){return JSON.stringify(provider)}
+
+function guidedAiRenderStatus(message,status='NOT_CONFIGURED'){
+    const target=controlElement('gsAiStatus');
+    if(!target)return;
+    target.innerHTML='<div class="notice"><span class="pill '+esc(status)+'">'+
+        esc(status)+'</span> '+esc(message)+'</div>';
+}
+
+function guidedAiInvalidate(){
+    GUIDED_AI_TEST=null;
+    if(controlElement('gsAiStatus'))guidedAiRenderStatus(
+        'La configuración cambió. Prueba la IA antes de guardarla.',
+        'NOT_CONFIGURED'
+    );
+}
+
+function guidedAiProvider(){
+    const type=guidedAiChoice();
+    if(type==='DISABLED')return {
+        provider_id:'disabled',provider_type:'DISABLED',enabled:false,timeout:30
+    };
+    const technical=controlAiFromForm();
+    return {
+        provider_id:type.toLowerCase(),provider_type:type,
+        base_url:technical.base_url||
+            (type==='OLLAMA'?'http://127.0.0.1:11434':'http://127.0.0.1:1234/v1'),
+        model:controlElement('gsAiModel').value.trim()||technical.model||null,
+        enabled:true,timeout:Number(technical.timeout||30),
+        context_window:technical.context_window||null
+    }
+}
+
+function guidedAiSyncAdvanced(provider){
+    controlElement('cpAiType').value=provider.provider_type;
+    controlElement('cpAiUrl').value=provider.base_url||'';
+    controlElement('cpAiModel').value=provider.model||'';
+    controlElement('cpAiTimeout').value=provider.timeout||30;
+    controlElement('cpAiContext').value=provider.context_window||'';
+    controlElement('cpAiEnabled').value=String(Boolean(provider.enabled));
+}
+
+function guidedAiSelectionChanged(){
+    const type=guidedAiChoice();
+    controlElement('gsAiModelWrap').style.display=type==='DISABLED'?'none':'block';
+    if(type==='DISABLED')controlElement('gsAiModel').value='';
+    guidedAiSyncAdvanced(guidedAiProvider());
+    guidedAiInvalidate();
+}
+
+function guidedAiApplyProvider(provider){
+    const type=(provider&&provider.provider_type)||'DISABLED';
+    const choice=document.querySelector('input[name="gsAiChoice"][value="'+type+'"]')||
+        document.querySelector('input[name="gsAiChoice"][value="DISABLED"]');
+    choice.checked=true;
+    controlElement('gsAiModel').value=(provider&&provider.model)||'';
+    guidedAiSyncAdvanced(provider||{provider_type:'DISABLED',enabled:false,timeout:30});
+    controlElement('gsAiModelWrap').style.display=
+        choice.value==='DISABLED'?'none':'block';
+}
+
+async function guidedAiTest(){
+    if(!can('config:read'))return;
+    const tenant=controlTenantId();
+    if(!tenant){toast('Empresa requerida.',true);return}
+    const provider=guidedAiProvider();
+    try{
+        const result=await api('/api/admin/ai/provider/test',{
+            method:'POST',headers:{...H(),'Content-Type':'application/json'},
+            body:JSON.stringify({tenant_id:tenant,provider})
+        });
+        const status=String(result.status||'BLOCKED').toUpperCase();
+        GUIDED_AI_TEST={fingerprint:guidedAiFingerprint(provider),status,result};
+        guidedAiRenderStatus(
+            status==='PASS'||status==='DISABLED'
+                ?'La prueba terminó correctamente.'
+                :'La prueba no confirmó disponibilidad.',status
+        );
+    }catch(e){GUIDED_AI_TEST=null;guidedAiRenderStatus(e.message,'BLOCKED')}
+}
+
+async function guidedAiSave(){
+    if(!can('config:write'))return;
+    const tenant=controlTenantId();
+    if(!tenant){toast('Empresa requerida.',true);return}
+    const provider=guidedAiProvider();
+    const tested=GUIDED_AI_TEST&&
+        GUIDED_AI_TEST.fingerprint===guidedAiFingerprint(provider)&&
+        ['PASS','DISABLED'].includes(GUIDED_AI_TEST.status);
+    if(provider.provider_type!=='DISABLED'&&!tested){
+        guidedAiRenderStatus('Primero prueba la IA con la configuración actual.','BLOCKED');
+        return;
+    }
+    try{
+        const current=await api('/api/admin/tenants/'+encodeURIComponent(tenant)+'/config',{headers:H()});
+        const features={...((current.effective&&current.effective.enabled_features)||{}),
+            ai_enabled:Boolean(provider.enabled)};
+        await api('/api/admin/tenants/'+encodeURIComponent(tenant)+'/config',{
+            method:'PATCH',headers:{...H(),'Content-Type':'application/json'},
+            body:JSON.stringify({ai_provider:provider,enabled_features:features})
+        });
+        guidedAiRenderStatus(
+            provider.provider_type==='DISABLED'
+                ?'La empresa continuará sin IA.'
+                :'Configuración IA guardada.',
+            provider.provider_type==='DISABLED'?'DISABLED':'CONFIGURED'
+        );
+        await Promise.allSettled([controlLoadAi(),controlLoadReadiness(false)]);
+    }catch(e){guidedAiRenderStatus(e.message,'BLOCKED')}
+}
+
+async function guidedAiValidateReadiness(){
+    const result=await controlValidateReadiness();
+    const readiness=(result&&result.readiness)||{};
+    const status=String(readiness.status||'BLOCKED').toUpperCase();
+    guidedAiRenderStatus(
+        status==='READY'
+            ?'Listo: la preparación fue confirmada por el servidor.'
+            :'La preparación aún no está lista. Revisa los pasos indicados.',status
+    );
+}
+
+function controlInitializeGuidedAi(){
+    if(controlElement('guidedAiCard'))return;
+    const editor=controlElement('cpAiEditor');
+    if(!editor)return;
+    const advanced=editor.closest('.card');
+    advanced.querySelector('h3').textContent='Proveedor de IA — configuración avanzada';
+    editor.style.display='none';
+    [...advanced.querySelectorAll('button')].forEach(button=>button.style.display='none');
+    const toggle=document.createElement('button');
+    toggle.id='cpAiAdvancedToggle';toggle.className='btn muted advanced-ai-toggle';
+    toggle.setAttribute('data-cp-permission','config:read');
+    toggle.textContent='Configuración avanzada';toggle.onclick=controlToggleAiAdvanced;
+    advanced.insertBefore(toggle,editor);
+    const actions=document.createElement('div');
+    actions.id='cpAiAdvancedActions';actions.className='row';actions.style.display='none';
+    actions.innerHTML='<button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button>';
+    advanced.appendChild(actions);
+    const guided=document.createElement('div');
+    guided.id='guidedAiCard';guided.className='card guided-ai';
+    guided.setAttribute('data-cp-permission','config:read');
+    guided.innerHTML='<h3>Configurar inteligencia artificial</h3><div class="mutedtxt">Elige cómo asistirá la IA local a esta empresa. Puedes continuar sin IA y activarla después.</div><div class="guided-ai-choice"><label><input type="radio" name="gsAiChoice" value="OLLAMA" onchange="guidedAiSelectionChanged()">Ollama local</label><label><input type="radio" name="gsAiChoice" value="OPENAI_COMPATIBLE_LOCAL" onchange="guidedAiSelectionChanged()">Servidor local compatible</label><label><input type="radio" name="gsAiChoice" value="DISABLED" checked onchange="guidedAiSelectionChanged()">Continuar sin IA</label></div><div class="formgrid"><label id="gsAiModelWrap" style="display:none">Modelo<input id="gsAiModel" autocomplete="off" placeholder="Modelo instalado localmente" oninput="guidedAiInvalidate()"></label></div><div class="row"><button id="gsAiTestBtn" class="btn" data-cp-permission="config:read" onclick="guidedAiTest()">Probar IA</button><button id="gsAiSaveBtn" class="btn ok" data-cp-permission="config:write" onclick="guidedAiSave()">Guardar y continuar</button><button id="gsAiValidateBtn" class="btn muted" data-cp-permission="config:read" onclick="guidedAiValidateReadiness()">Validar preparación</button></div><div id="gsAiStatus" class="guided-ai-status"></div>';
+    advanced.parentNode.insertBefore(guided,advanced);
+    controlApplyCapabilities();
+}
+
 function controlAiFromForm(){
     const type=controlElement('cpAiType').value;
 
@@ -1331,6 +2046,16 @@ function controlRenderAi(provider){
 
     controlElement('cpAiEnabled').value=
         String(Boolean(p.enabled));
+
+    if(controlElement('guidedAiCard')){
+        guidedAiApplyProvider(p);
+        guidedAiRenderStatus(
+            p.provider_type==='DISABLED'
+                ?'La empresa está configurada para continuar sin IA.'
+                :'Configuración actual cargada.',
+            p.provider_type==='DISABLED'?'DISABLED':'CONFIGURED'
+        );
+    }
 
     controlElement('controlAi').innerHTML=
         '<pre>'+
@@ -1424,6 +2149,19 @@ async function controlSaveAi(){
     try{
         const provider=controlAiFromForm();
 
+        const current=await api(
+            '/api/admin/tenants/'+
+            encodeURIComponent(tenant)+
+            '/config',
+            {headers:H()}
+        );
+
+        const enabledFeatures={
+            ...((current.effective&&
+                current.effective.enabled_features)||{}),
+            ai_enabled:Boolean(provider.enabled)
+        };
+
         await api(
             '/api/admin/tenants/'+
             encodeURIComponent(tenant)+
@@ -1431,7 +2169,10 @@ async function controlSaveAi(){
             {
                 method:'PATCH',
                 headers:{...H(),'Content-Type':'application/json'},
-                body:JSON.stringify({ai_provider:provider})
+                body:JSON.stringify({
+                    ai_provider:provider,
+                    enabled_features:enabledFeatures
+                })
             }
         );
 
@@ -1446,6 +2187,7 @@ async function controlSaveAi(){
 }
 
 async function loadControlPlane(){
+    controlInitializeGuidedAi();
     const jobs=[];
 
     if(can('config:read')){

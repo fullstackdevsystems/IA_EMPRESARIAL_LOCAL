@@ -78,8 +78,9 @@ from enterprise_knowledge_store import (
 )
 from enterprise_sql_gateway import (
     EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor,
-    EnterpriseSecretStore, SqlServerPyodbcProvider, discover_schema,
-    execute_smoke_query, public_sql_profile, test_connection,
+    EnterpriseSecretStore, SqlServerPyodbcProvider, WindowsCredentialSecretProvider, build_transient_sql_probe_profile,
+    discover_schema, execute_smoke_query, probe_sql_server_metadata,
+    public_sql_profile, test_connection,
 )
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
@@ -3187,8 +3188,30 @@ def _sql_http_error(exc: EnterpriseSqlError):
     raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
 
 
+
+def _production_sql_secret_store() -> EnterpriseSecretStore:
+    """
+    Production SQL_AUTH secrets use Windows Credential Manager.
+
+    SQL profile files contain only the opaque secret reference.
+    """
+    return EnterpriseSecretStore(
+        WindowsCredentialSecretProvider()
+    )
+
+
 def _sql_executor():
-    return EnterpriseSqlExecutor(EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections"), SqlServerPyodbcProvider())
+    secrets = _production_sql_secret_store()
+
+    return EnterpriseSqlExecutor(
+        EnterpriseSqlConnectionStore(
+            base.REPORTES
+            / ".sql_connections"
+        ),
+        SqlServerPyodbcProvider(
+            secrets
+        ),
+    )
 
 
 # R10.20B.3.3: SQL administration is deliberately wired through the B.2
@@ -3205,10 +3228,31 @@ def configure_sql_admin_services(*, store=None, provider=None, secret_store=None
     _sql_admin_events = audit_events if audit_events is not None else []
 
 
+
 def _sql_admin_services():
-    store = _sql_admin_overrides.get("store") or EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections", _tenant_registry())
-    secrets = _sql_admin_overrides.get("secret_store") or EnterpriseSecretStore()
-    provider = _sql_admin_overrides.get("provider") or SqlServerPyodbcProvider(secrets)
+    store = (
+        _sql_admin_overrides.get("store")
+        or EnterpriseSqlConnectionStore(
+            base.REPORTES
+            / ".sql_connections",
+            _tenant_registry(),
+        )
+    )
+
+    secrets = _sql_admin_overrides.get(
+        "secret_store"
+    )
+
+    if secrets is None:
+        secrets = _production_sql_secret_store()
+
+    provider = (
+        _sql_admin_overrides.get("provider")
+        or SqlServerPyodbcProvider(
+            secrets
+        )
+    )
+
     return store, provider, secrets
 
 
@@ -3253,6 +3297,266 @@ def _sql_admin_http_error(exc: EnterpriseSqlError):
 def _sql_profile_or_error(store, scope, connection_id):
     try: return store.get(scope, connection_id)
     except EnterpriseSqlError as exc: _sql_admin_http_error(exc)
+
+
+class _TransientSqlSecretProvider:
+    """Request-local secret provider for a single SQL probe."""
+
+    def __init__(self) -> None:
+        self._values: Dict[str, str] = {}
+
+    def set(
+        self,
+        reference: str,
+        value: str,
+    ) -> None:
+        self._values[
+            str(reference)
+        ] = str(value)
+
+    def get(
+        self,
+        reference: str,
+    ) -> Optional[str]:
+        return self._values.get(
+            str(reference)
+        )
+
+    def delete(
+        self,
+        reference: str,
+    ) -> None:
+        self._values.pop(
+            str(reference),
+            None,
+        )
+
+    def clear(self) -> None:
+        self._values.clear()
+
+
+@app.post("/api/admin/sql/probe")
+def admin_sql_probe(
+    payload: Dict[str, Any],
+    tenant_id: Optional[str] = None,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    """
+    Validate SQL connectivity and discover selectable metadata before a
+    governed profile exists.
+
+    No connection profile is persisted and SQL_AUTH credentials live only
+    inside the request-local transient secret provider.
+    """
+
+    actor = _sql_admin_actor(
+        authorization,
+        "sql:configure",
+    )
+
+    scope = _sql_admin_scope(
+        actor,
+        tenant_id,
+    )
+
+    allowed = {
+        "server",
+        "database",
+        "auth_mode",
+        "driver",
+        "timeout_seconds",
+        "trust_server_certificate",
+        "username",
+        "secret",
+        "password",
+    }
+
+    if (
+        not isinstance(
+            payload,
+            dict,
+        )
+        or set(payload)
+        - allowed
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "SQL_CONNECTION_PROFILE_INVALID",
+                "message":
+                    "Campos SQL no permitidos",
+            },
+        )
+
+    mode = str(
+        payload.get(
+            "auth_mode"
+        )
+        or ""
+    ).strip().upper()
+
+    if mode in {
+        "INTEGRATED",
+        "WINDOWS",
+    }:
+        mode = "WINDOWS_INTEGRATED"
+
+    secret = payload.get(
+        "secret",
+        payload.get(
+            "password"
+        ),
+    )
+
+    username = str(
+        payload.get(
+            "username"
+        )
+        or ""
+    ).strip()
+
+    if (
+        mode == "SQL_AUTH"
+        and (
+            not username
+            or not isinstance(
+                secret,
+                str,
+            )
+            or not secret
+        )
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "SQL_SECRET_UNAVAILABLE",
+                "message":
+                    "Usuario y contraseña SQL son obligatorios",
+            },
+        )
+
+    _, configured_provider, _ = (
+        _sql_admin_services()
+    )
+
+    transient_backend = None
+    transient_store = None
+    transient_reference = ""
+
+    try:
+        provider = configured_provider
+
+        if mode == "SQL_AUTH":
+            transient_backend = (
+                _TransientSqlSecretProvider()
+            )
+
+            transient_store = (
+                EnterpriseSecretStore(
+                    transient_backend
+                )
+            )
+
+            transient_reference = (
+                "probe:"
+                + uuid.uuid4().hex
+            )
+
+            transient_store.set(
+                transient_reference,
+                secret,
+            )
+
+            if isinstance(
+                configured_provider,
+                SqlServerPyodbcProvider,
+            ):
+                provider = (
+                    SqlServerPyodbcProvider(
+                        transient_store
+                    )
+                )
+
+        profile = (
+            build_transient_sql_probe_profile(
+                server=payload.get(
+                    "server"
+                ),
+                database=payload.get(
+                    "database"
+                ),
+                auth_mode=mode,
+                driver=payload.get(
+                    "driver",
+                    "ODBC Driver 18 for SQL Server",
+                ),
+                timeout_seconds=payload.get(
+                    "timeout_seconds",
+                    30,
+                ),
+                trust_server_certificate=bool(
+                    payload.get(
+                        "trust_server_certificate",
+                        False,
+                    )
+                ),
+                username=username,
+                secret_reference=(
+                    transient_reference
+                    if mode
+                    == "SQL_AUTH"
+                    else ""
+                ),
+            )
+        )
+
+        result = (
+            probe_sql_server_metadata(
+                provider,
+                profile,
+            )
+        )
+
+    except EnterpriseSqlError as exc:
+        _sql_admin_http_error(
+            exc
+        )
+
+    finally:
+        if (
+            transient_store
+            and transient_reference
+        ):
+            try:
+                transient_store.delete(
+                    transient_reference
+                )
+            except EnterpriseSqlError:
+                pass
+
+        if transient_backend:
+            transient_backend.clear()
+
+    _sql_admin_audit(
+        "SQL_CONNECTION_PROBED",
+        actor,
+        "transient-probe",
+        scope["company_id"],
+        {
+            "auth_mode": mode,
+            "discovered_object_count":
+                result[
+                    "discovered_object_count"
+                ],
+            "result_status":
+                result["status"],
+        },
+    )
+
+    return result
+
 
 
 @app.get("/api/admin/sql/connections")
