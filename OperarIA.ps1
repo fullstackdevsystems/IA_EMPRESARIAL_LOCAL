@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai","backup","restore")]
     [string]$Action = "status",
 
@@ -115,6 +115,36 @@ function Get-PortListenerPid {
     return $null
 }
 
+function Test-AnalyzerCommandLineOwnership {
+    param([string]$CommandLine)
+
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) {
+        return $false
+    }
+
+    try {
+        $expectedAnalyzer = (
+            [System.IO.Path]::GetFullPath($Analyzer)
+        ).Replace('/', '\')
+
+        $normalizedCommand = $CommandLine.Replace('/', '\')
+
+        $analyzerPattern = (
+            '(?i)(?:"|\s|^)' +
+            [regex]::Escape($expectedAnalyzer) +
+            '(?:"|\s|$)'
+        )
+
+        return [regex]::IsMatch(
+            $normalizedCommand,
+            $analyzerPattern
+        )
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-OwnedAnalyzerProcess {
     param([int]$ProcessId)
 
@@ -131,11 +161,9 @@ function Get-OwnedAnalyzerProcess {
             return $null
         }
 
-        $command = [string]$p.CommandLine
-
         if (
-            $command -like "*analizador_universal.py*" -and
-            $command -like "*IA_EMPRESARIAL_LOCAL*"
+            Test-AnalyzerCommandLineOwnership `
+                -CommandLine ([string]$p.CommandLine)
         ) {
             return $p
         }
