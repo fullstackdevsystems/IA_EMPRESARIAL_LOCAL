@@ -17,6 +17,8 @@ import math
 import os
 import re
 import uuid
+import ipaddress
+import threading
 
 import hashlib
 import unicodedata
@@ -24,7 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
-from fastapi import Header
+from fastapi import Header, Request
 
 import analizador_app as base
 
@@ -82,7 +84,7 @@ from enterprise_sql_gateway import (
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
 from enterprise_platform_config import EnterprisePlatformConfigStore, PlatformConfigError
-from enterprise_onboarding import EnterpriseOnboarding
+from enterprise_onboarding import EnterpriseOnboarding, OnboardingError
 from enterprise_ai.providers import OllamaProvider, LMStudioProvider
 from enterprise_source_execution import (
     execute_uploaded_file_source_with_reader,
@@ -1600,24 +1602,93 @@ _ANALYZE_LOGIN_GATE = r"""
 <div id="ia-analyze-auth"
      style="position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.94);
             display:flex;align-items:center;justify-content:center;padding:20px">
-  <div style="width:min(420px,100%);background:#fff;border-radius:16px;padding:24px;
+  <div style="width:min(470px,100%);background:#fff;border-radius:18px;padding:26px;
               box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a">
-    <h2 style="margin:0 0 8px">Acceso a IA Empresarial Local</h2>
-    <p style="margin:0 0 16px;color:#475569">
-      Inicia sesión para ejecutar análisis empresariales.
-    </p>
-    <label>Usuario</label>
-    <input id="ia-auth-user" autocomplete="username"
-           style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
-    <label>Contraseña</label>
-    <input id="ia-auth-password" type="password" autocomplete="current-password"
-           style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
-    <button id="ia-auth-login" type="button"
-            style="width:100%;padding:11px;font-weight:700;cursor:pointer">
-      Iniciar sesión
-    </button>
-    <div id="ia-auth-status"
-         style="margin-top:10px;font-size:13px;color:#b91c1c"></div>
+
+    <div id="ia-first-run-panel" style="display:none">
+      <div style="font-size:13px;color:#2563eb;font-weight:700;margin-bottom:6px">
+        Primera configuración
+      </div>
+      <h2 style="margin:0 0 8px">Configura tu empresa</h2>
+      <p style="margin:0 0 18px;color:#475569;line-height:1.45">
+        Crea la empresa y la cuenta administradora.
+        Después podrás conectar SQL Server y elegir la inteligencia artificial.
+      </p>
+
+      <label>Nombre de la empresa</label>
+      <input id="ia-setup-company"
+             autocomplete="organization"
+             placeholder="Mi Empresa"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <label>Tu nombre</label>
+      <input id="ia-setup-display"
+             autocomplete="name"
+             placeholder="Administrador"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <label>Usuario administrador</label>
+      <input id="ia-setup-user"
+             autocomplete="username"
+             placeholder="admin"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <label>Contraseña</label>
+      <input id="ia-setup-password"
+             type="password"
+             autocomplete="new-password"
+             placeholder="Mínimo 12 caracteres"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <label>Confirmar contraseña</label>
+      <input id="ia-setup-confirm"
+             type="password"
+             autocomplete="new-password"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 16px">
+
+      <button id="ia-setup-submit"
+              type="button"
+              style="width:100%;padding:12px;border:0;border-radius:8px;
+                     background:#2563eb;color:white;font-weight:700;cursor:pointer">
+        Crear empresa y continuar
+      </button>
+
+      <div id="ia-setup-status"
+           style="margin-top:12px;font-size:13px;color:#b91c1c"></div>
+
+      <div style="margin-top:16px;padding:10px;border-radius:8px;background:#f8fafc;
+                  color:#64748b;font-size:12px;line-height:1.45">
+        La configuración inicial sólo está disponible desde este equipo
+        y se desactiva automáticamente después de crear el administrador.
+      </div>
+    </div>
+
+    <div id="ia-login-panel">
+      <h2 style="margin:0 0 8px">Acceso a IA Empresarial Local</h2>
+      <p style="margin:0 0 16px;color:#475569">
+        Inicia sesión para ejecutar análisis empresariales.
+      </p>
+
+      <label>Usuario</label>
+      <input id="ia-auth-user"
+             autocomplete="username"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <label>Contraseña</label>
+      <input id="ia-auth-password"
+             type="password"
+             autocomplete="current-password"
+             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+
+      <button id="ia-auth-login"
+              type="button"
+              style="width:100%;padding:11px;font-weight:700;cursor:pointer">
+        Iniciar sesión
+      </button>
+
+      <div id="ia-auth-status"
+           style="margin-top:10px;font-size:13px;color:#b91c1c"></div>
+    </div>
   </div>
 </div>
 """
@@ -1627,55 +1698,291 @@ _ANALYZE_LOGIN_SCRIPT = r"""
 window.__IA_ANALYZE_TOKEN__ = '';
 
 (function(){
-  const gate = document.getElementById('ia-analyze-auth');
-  const user = document.getElementById('ia-auth-user');
-  const pass = document.getElementById('ia-auth-password');
-  const button = document.getElementById('ia-auth-login');
-  const status = document.getElementById('ia-auth-status');
+  const gate =
+    document.getElementById('ia-analyze-auth');
+
+  const loginPanel =
+    document.getElementById('ia-login-panel');
+
+  const user =
+    document.getElementById('ia-auth-user');
+
+  const pass =
+    document.getElementById('ia-auth-password');
+
+  const button =
+    document.getElementById('ia-auth-login');
+
+  const status =
+    document.getElementById('ia-auth-status');
+
+  const setupPanel =
+    document.getElementById('ia-first-run-panel');
+
+  const setupCompany =
+    document.getElementById('ia-setup-company');
+
+  const setupDisplay =
+    document.getElementById('ia-setup-display');
+
+  const setupUser =
+    document.getElementById('ia-setup-user');
+
+  const setupPassword =
+    document.getElementById('ia-setup-password');
+
+  const setupConfirm =
+    document.getElementById('ia-setup-confirm');
+
+  const setupButton =
+    document.getElementById('ia-setup-submit');
+
+  const setupStatus =
+    document.getElementById('ia-setup-status');
+
+  let bootstrapNonce = '';
+
+
+  function showLogin(){
+    setupPanel.style.display = 'none';
+    loginPanel.style.display = '';
+  }
+
+
+  function showFirstRun(data){
+    bootstrapNonce =
+      String(data.bootstrap_nonce || '');
+
+    loginPanel.style.display = 'none';
+    setupPanel.style.display = '';
+  }
+
+
+  async function detectFirstRun(){
+    try{
+      const response = await fetch(
+        '/api/onboarding/status',
+        {
+          method:'GET',
+          cache:'no-store'
+        }
+      );
+
+      if(!response.ok){
+        showLogin();
+        return;
+      }
+
+      const data = await response.json();
+
+      if(
+        data.status === 'FIRST_RUN'
+        && data.bootstrap_available
+        && data.bootstrap_nonce
+      ){
+        showFirstRun(data);
+        return;
+      }
+    }
+    catch(error){
+      // Remote/non-local access intentionally falls back to login.
+    }
+
+    showLogin();
+  }
+
+
+  async function bootstrap(){
+    setupStatus.textContent = '';
+
+    if(
+      !setupCompany.value.trim()
+      || !setupUser.value.trim()
+      || !setupPassword.value
+    ){
+      setupStatus.textContent =
+        'Completa empresa, usuario y contraseña.';
+      return;
+    }
+
+    if(setupPassword.value.length < 12){
+      setupStatus.textContent =
+        'La contraseña debe tener al menos 12 caracteres.';
+      return;
+    }
+
+    if(setupPassword.value !== setupConfirm.value){
+      setupStatus.textContent =
+        'Las contraseñas no coinciden.';
+      return;
+    }
+
+    setupButton.disabled = true;
+
+    try{
+      const response = await fetch(
+        '/api/onboarding/bootstrap',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'X-IA-Bootstrap-Nonce':bootstrapNonce
+          },
+          body:JSON.stringify({
+            company_name:
+              setupCompany.value.trim(),
+            admin_display_name:
+              setupDisplay.value.trim(),
+            admin_username:
+              setupUser.value.trim(),
+            password:
+              setupPassword.value,
+            password_confirmation:
+              setupConfirm.value
+          })
+        }
+      );
+
+      let data = {};
+
+      try{
+        data = await response.json();
+      }
+      catch(error){}
+
+      if(!response.ok || !data.token){
+        const detail = data.detail || {};
+
+        throw new Error(
+          detail.message
+          || detail.code
+          || 'No se pudo completar la configuración inicial.'
+        );
+      }
+
+      setupPassword.value = '';
+      setupConfirm.value = '';
+      bootstrapNonce = '';
+
+      sessionStorage.setItem(
+        'iaEnterpriseSession',
+        String(data.token)
+      );
+
+      window.location.assign(
+        data.next || '/admin'
+      );
+    }
+    catch(error){
+      setupPassword.value = '';
+      setupConfirm.value = '';
+
+      setupStatus.textContent =
+        String(
+          error.message
+          || error
+        );
+    }
+    finally{
+      setupButton.disabled = false;
+    }
+  }
+
 
   async function login(){
     status.textContent = '';
     button.disabled = true;
 
     try{
-      const response = await fetch('/api/auth/login',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          username:(user.value||'').trim(),
-          password:pass.value||''
-        })
-      });
+      const response = await fetch(
+        '/api/auth/login',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify({
+            username:
+              (user.value || '').trim(),
+            password:
+              pass.value || ''
+          })
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      if(!response.ok || !data.token){
+      if(
+        !response.ok
+        || !data.token
+      ){
         window.__IA_ANALYZE_TOKEN__ = '';
+
         throw new Error(
-          (data.detail && (data.detail.message || data.detail.code))
+          (
+            data.detail
+            && (
+              data.detail.message
+              || data.detail.code
+            )
+          )
           || 'Credenciales inválidas'
         );
       }
 
-      // Memory-only token. Never persisted in localStorage/sessionStorage.
-      window.__IA_ANALYZE_TOKEN__ = String(data.token);
+      // Analyzer token stays memory-only.
+      window.__IA_ANALYZE_TOKEN__ =
+        String(data.token);
+
       pass.value = '';
       gate.style.display = 'none';
     }
     catch(error){
       window.__IA_ANALYZE_TOKEN__ = '';
       pass.value = '';
-      status.textContent = String(error.message || error);
+
+      status.textContent =
+        String(
+          error.message
+          || error
+        );
     }
     finally{
       button.disabled = false;
     }
   }
 
-  button.addEventListener('click', login);
-  pass.addEventListener('keydown', function(event){
-    if(event.key === 'Enter') login();
-  });
+
+  button.addEventListener(
+    'click',
+    login
+  );
+
+  pass.addEventListener(
+    'keydown',
+    function(event){
+      if(event.key === 'Enter'){
+        login();
+      }
+    }
+  );
+
+  setupButton.addEventListener(
+    'click',
+    bootstrap
+  );
+
+  setupConfirm.addEventListener(
+    'keydown',
+    function(event){
+      if(event.key === 'Enter'){
+        bootstrap();
+      }
+    }
+  );
+
+  detectFirstRun();
 })();
 </script>
 """
@@ -1778,6 +2085,406 @@ def _authorize_analysis(authorization: str) -> Dict[str, Any]:
 # analizador_app owns /api/analyze; the universal commercial runtime
 # supplies its enterprise identity/permission guard at module startup.
 base.ANALYZE_AUTHORIZER = _authorize_analysis
+
+
+
+# ---------------------------------------------------------------------------
+# GA.3-B1: secure guided first-run web bootstrap.
+#
+# This is deliberately NOT a general unauthenticated administration API.
+# It is available only while the canonical onboarding state is FIRST_RUN,
+# only to loopback clients using a local Host header, and only with an
+# ephemeral process-local nonce obtained by the same local browser session.
+# ---------------------------------------------------------------------------
+
+_BOOTSTRAP_LOCK = threading.Lock()
+_BOOTSTRAP_NONCE = uuid.uuid4().hex
+
+
+def _bootstrap_client_is_loopback(value: str) -> bool:
+    host = str(value or "").strip().lower()
+
+    if not host:
+        return False
+
+    try:
+        return bool(
+            ipaddress.ip_address(
+                host
+            ).is_loopback
+        )
+    except ValueError:
+        return False
+
+
+def _bootstrap_host_is_local(value: str) -> bool:
+    host = (
+        str(value or "")
+        .strip()
+        .lower()
+        .strip("[]")
+    )
+
+    if host == "localhost":
+        return True
+
+    try:
+        return bool(
+            ipaddress.ip_address(
+                host
+            ).is_loopback
+        )
+    except ValueError:
+        return False
+
+
+def _require_local_bootstrap(
+    request: Request,
+) -> None:
+    client_host = (
+        request.client.host
+        if request.client
+        else ""
+    )
+
+    request_host = (
+        request.url.hostname
+        or ""
+    )
+
+    if (
+        not _bootstrap_client_is_loopback(
+            client_host
+        )
+        or not _bootstrap_host_is_local(
+            request_host
+        )
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "BOOTSTRAP_LOCAL_ONLY",
+                "message":
+                    "La configuración inicial "
+                    "sólo puede realizarse "
+                    "desde este equipo.",
+            },
+        )
+
+
+def _bootstrap_identifier(
+    value: str,
+    fallback: str,
+) -> str:
+    normalized = unicodedata.normalize(
+        "NFKD",
+        str(value or ""),
+    )
+
+    normalized = (
+        normalized
+        .encode(
+            "ascii",
+            "ignore",
+        )
+        .decode("ascii")
+        .lower()
+    )
+
+    result = []
+
+    separator = False
+
+    for char in normalized:
+        if (
+            char.isalnum()
+            or char in "._-"
+        ):
+            result.append(char)
+            separator = False
+        elif not separator:
+            result.append("-")
+            separator = True
+
+    identifier = (
+        "".join(result)
+        .strip("._-")
+    )
+
+    if not identifier:
+        identifier = fallback
+
+    return identifier[:80]
+
+
+def _bootstrap_public_status() -> Dict[str, Any]:
+    state = EnterpriseOnboarding(
+        base.REPORTES
+    ).status()
+
+    first_run = (
+        state.get("status")
+        == "FIRST_RUN"
+    )
+
+    return {
+        "status":
+            state.get(
+                "status",
+                "INVALID_CONFIGURATION",
+            ),
+        "bootstrap_available":
+            first_run,
+        "password_min_length":
+            12,
+        "bootstrap_nonce":
+            (
+                _BOOTSTRAP_NONCE
+                if first_run
+                else None
+            ),
+    }
+
+
+@app.get("/api/onboarding/status")
+def onboarding_web_status(
+    request: Request,
+) -> Dict[str, Any]:
+    _require_local_bootstrap(
+        request
+    )
+
+    return _bootstrap_public_status()
+
+
+@app.post("/api/onboarding/bootstrap")
+def onboarding_web_bootstrap(
+    payload: Dict[str, Any],
+    request: Request,
+    bootstrap_nonce: str = Header(
+        "",
+        alias="X-IA-Bootstrap-Nonce",
+    ),
+) -> Dict[str, Any]:
+    global _BOOTSTRAP_NONCE
+
+    _require_local_bootstrap(
+        request
+    )
+
+    supplied_nonce = str(
+        bootstrap_nonce
+        or ""
+    ).strip()
+
+    if (
+        not supplied_nonce
+        or supplied_nonce
+        != _BOOTSTRAP_NONCE
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "BOOTSTRAP_NONCE_INVALID",
+                "message":
+                    "La sesión de configuración "
+                    "inicial no es válida. "
+                    "Actualiza la página.",
+            },
+        )
+
+    company_name = str(
+        payload.get("company_name")
+        or ""
+    ).strip()
+
+    raw_username = str(
+        payload.get("admin_username")
+        or ""
+    ).strip()
+
+    admin_display_name = str(
+        payload.get("admin_display_name")
+        or ""
+    ).strip()
+
+    password = payload.get(
+        "password"
+    )
+
+    confirmation = payload.get(
+        "password_confirmation"
+    )
+
+    if (
+        not company_name
+        or len(company_name) > 120
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "COMPANY_NAME_INVALID",
+                "message":
+                    "Escribe el nombre de tu empresa.",
+            },
+        )
+
+    if not raw_username:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "ADMIN_USERNAME_REQUIRED",
+                "message":
+                    "Escribe el usuario administrador.",
+            },
+        )
+
+    if (
+        not isinstance(
+            password,
+            str,
+        )
+        or password
+        != confirmation
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "PASSWORD_CONFIRMATION_MISMATCH",
+                "message":
+                    "Las contraseñas no coinciden.",
+            },
+        )
+
+    tenant_id = _bootstrap_identifier(
+        company_name,
+        "empresa",
+    )
+
+    login_username = _bootstrap_identifier(
+        raw_username,
+        "admin",
+    )
+
+    display_name = (
+        admin_display_name
+        or "Administrador"
+    )
+
+    with _BOOTSTRAP_LOCK:
+        onboarding = EnterpriseOnboarding(
+            base.REPORTES
+        )
+
+        state = onboarding.status()
+
+        if (
+            state.get("status")
+            != "FIRST_RUN"
+        ):
+            raise base.HTTPException(
+                status_code=409,
+                detail={
+                    "code":
+                        "BOOTSTRAP_ALREADY_COMPLETE",
+                    "message":
+                        "La configuración inicial "
+                        "ya fue completada.",
+                },
+            )
+
+        try:
+            onboarding.configure(
+                tenant_id=tenant_id,
+                tenant_name=company_name,
+                admin_user_id=login_username,
+                admin_username=login_username,
+                admin_display_name=display_name,
+                password=password,
+            )
+        except OnboardingError as exc:
+            status_code = (
+                409
+                if exc.code
+                == "CONFIGURATION_CONFLICT"
+                else 400
+            )
+
+            message = {
+                "PASSWORD_INVALID":
+                    "La contraseña debe tener "
+                    "al menos 12 caracteres.",
+                "CONFIGURATION_CONFLICT":
+                    "La configuración inicial "
+                    "entra en conflicto con "
+                    "datos existentes.",
+                "USER_INVALID_ID":
+                    "El usuario administrador "
+                    "no es válido.",
+            }.get(
+                exc.code,
+                "No se pudo completar "
+                "la configuración inicial.",
+            )
+
+            raise base.HTTPException(
+                status_code=status_code,
+                detail={
+                    "code": exc.code,
+                    "message": message,
+                },
+            ) from exc
+
+        try:
+            token, user = (
+                _identity_store().login(
+                    login_username,
+                    password,
+                )
+            )
+        except IdentityError as exc:
+            raise base.HTTPException(
+                status_code=500,
+                detail={
+                    "code":
+                        "BOOTSTRAP_LOGIN_FAILED",
+                    "message":
+                        "La empresa fue configurada, "
+                        "pero no se pudo iniciar "
+                        "la sesión administrativa.",
+                },
+            ) from exc
+
+        # Rotate even though the endpoint is now closed by state.
+        _BOOTSTRAP_NONCE = (
+            uuid.uuid4().hex
+        )
+
+        return {
+            "status":
+                "CONFIGURED",
+            "bootstrap_available":
+                False,
+            "company": {
+                "tenant_id":
+                    tenant_id,
+                "name":
+                    company_name,
+            },
+            "user":
+                user,
+            "login_username":
+                login_username,
+            "token":
+                token,
+            "next":
+                "/admin",
+        }
 
 
 @app.post("/api/auth/login")

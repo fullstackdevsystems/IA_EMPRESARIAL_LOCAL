@@ -74,14 +74,21 @@ class EnterpriseOnboarding:
         ]
 
     def sql_readiness_scope(self, tenant_id):
-        """Return the existing administrative scope used by SQL readiness."""
-        admins = self._readiness_admins(tenant_id)
+        """Return the canonical SQL administrative scope used by readiness."""
+        tenant = self.tenants.get(tenant_id)
+        canonical = tenant["tenant_id"]
+        admins = self._readiness_admins(canonical)
         if not admins:
             raise OnboardingError(
                 "CONFIGURATION_REQUIRED",
                 "Administrador requerido",
             )
-        return self.identity.scope(admins[0])
+        return {
+            "company_id": canonical,
+            "user_id": "sql-admin",
+            "business_unit": None,
+            "branch": None,
+        }
 
     def readiness(self, tenant_id, *, ai_test=None):
         try:

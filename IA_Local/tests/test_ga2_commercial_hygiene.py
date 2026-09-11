@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 import unittest
 from pathlib import Path
 
@@ -15,11 +13,9 @@ MANIFEST = ROOT / "MANIFEST_SHA256.json"
 class CommercialHygieneTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        subprocess.run(
-            [sys.executable, str(ROOT / "tools" / "regenerate_manifest.py")],
-            check=True,
-            cwd=ROOT,
-        )
+        # The root manifest is a frozen release authority.
+        # Tests may inspect it but must never regenerate it
+        # from a mutable development worktree.
         cls.paths = {
             item["path"]
             for item in json.loads(MANIFEST.read_text(encoding="utf-8"))["files"]

@@ -202,15 +202,9 @@ with tempfile.TemporaryDirectory() as td:
         == "CONFIGURED",
     )
 
-    admin = (
-        onboarding.identity.get(
-            "admin"
-        )
-    )
-
     scope = (
-        onboarding.identity.scope(
-            admin
+        onboarding.sql_readiness_scope(
+            "services"
         )
     )
 
