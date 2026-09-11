@@ -328,8 +328,8 @@
                   },
                   {
                       "path":  "IA_Local/scripts/enterprise_onboarding.py",
-                      "sha256":  "7c0a0121170f2bf3db8c2a495dab0f9c631747658461b1da3d91a7f35f3bf76c",
-                      "size":  24125
+                      "sha256":  "52f09be866fef2e67c6d77f477984ac9aa2ab7403b5aeeec4087b419ae99b308",
+                      "size":  23450
                   },
                   {
                       "path":  "IA_Local/scripts/enterprise_platform_config.py",
@@ -428,18 +428,18 @@
                   },
                   {
                       "path":  "IA_Local/scripts/templates/dashboard_bi.html",
-                      "sha256":  "e0371c23b3b712f3cca6d9b1f8dcdc08ab2019293db986df5c9f49566a8389af",
-                      "size":  45383
+                      "sha256":  "02f03d715b2eb5d3b3219166a89ccc2d0e3392c9bf69e98960249d8f4f635f64",
+                      "size":  45322
                   },
                   {
                       "path":  "IA_Local/scripts/templates/dashboard_clientes.html",
-                      "sha256":  "046205ecc1aba22731070db6faa731d03569957dd9a66120fbb4bfa71350b028",
-                      "size":  15866
+                      "sha256":  "30885fcfe0d19cf53b979b850ac790e99a138d0bb9205933e3484bd9653534ce",
+                      "size":  15841
                   },
                   {
                       "path":  "IA_Local/scripts/templates/dashboard_generico.html",
-                      "sha256":  "ba14584c22c15c4de51c4c66919cd3476985d8c83ee292ec0e9066ed9c2a8c07",
-                      "size":  2256
+                      "sha256":  "8d8a08ddc8e29c37f34fe1738e36de8e1c9af3dcfe7c1dd5617aecaf64276716",
+                      "size":  2255
                   },
                   {
                       "path":  "IA_Local/scripts/universal_prompt_engine.py",
@@ -498,8 +498,8 @@
                   },
                   {
                       "path":  "RELEASE_METADATA.json",
-                      "sha256":  "90d528335f511866ace4cd8f727913c7f1aa627892cb6ab1ce6238d0e0743a85",
-                      "size":  160
+                      "sha256":  "2c6f2413fa49b256d1542594ae054724698b254939ad13ec4dae09272e1557cc",
+                      "size":  154
                   },
                   {
                       "path":  "ValidarInstalador.ps1",
