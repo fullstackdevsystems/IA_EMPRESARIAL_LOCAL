@@ -8,17 +8,29 @@ aislada. No reutiliza datos, credenciales ni secretos de otra instalación.
 
 PRIMER USO
 
-Al finalizar la instalación, abre la interfaz local y completa la configuración
-de empresa con un administrador autorizado. La consola de Administración permite
-gestionar usuarios, fuentes SQL Server, inteligencia artificial, conocimiento y
-respaldo de forma gobernada.
+La configuración normal se realiza desde la interfaz local y no requiere
+PowerShell ni identificadores técnicos.
+
+1. Abre la interfaz local después de finalizar la instalación.
+2. En "Configura tu empresa", registra el nombre de la empresa y crea la cuenta
+   del administrador inicial con una contraseña segura.
+3. En Administración, utiliza "Conectar SQL Server" para probar la conexión,
+   descubrir los objetos disponibles y seleccionar las tablas autorizadas.
+4. En "Configurar inteligencia artificial", elige Ollama local, un servidor
+   local compatible o "Continuar sin IA". La inteligencia artificial es
+   opcional. Si la habilitas, primero prueba la configuración y después guarda.
+5. Selecciona "Validar preparación". El sistema mostrará "Listo" únicamente
+   cuando el servidor confirme que los requisitos activos están preparados.
+
+La configuración avanzada permanece disponible para administración y soporte,
+pero no es necesaria para completar el recorrido normal de puesta en marcha.
 
 OPERACIÓN
 
-OperarIA.ps1 es la herramienta de soporte para iniciar, detener, validar y
-diagnosticar la instalación. Los diagnósticos sanitizan credenciales, tokens y
-secretos conocidos. La documentación detallada de administración y soporte se
-entrega por separado con cada versión comercial.
+Para el uso diario utiliza la interfaz local. OperarIA.ps1 queda disponible como
+herramienta de soporte para iniciar, detener, consultar estado, validar,
+diagnosticar, respaldar y restaurar la instalación. Los diagnósticos sanitizan
+credenciales, tokens y secretos conocidos.
 
 SEGURIDAD
 
