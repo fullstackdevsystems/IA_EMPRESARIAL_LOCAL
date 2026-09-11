@@ -20,6 +20,24 @@ if (-not (Test-Path $ManifestPath -PathType Leaf)) {
 
 $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
 
+# Defense in depth: a commercial build never trusts a hand-edited manifest to
+# reintroduce development, regression, or secret-display utilities.
+$forbiddenManifestPatterns = @(
+    '^IA_Local/tests/',
+    '^IA_Local/scripts/(run_.*tests.*|prueba_regresion.*)\.py$',
+    '^IA_Local/MOSTRAR_TOKEN_LOCAL\.bat$',
+    '^IA_Local/(LEEME_PRIMERO|README_INSTALACION|GUIA_PRUEBAS_MEMORIA_RAG_V8|ARQUITECTURA_MEMORIA_RAG_V8|PROMPT_).*'
+)
+
+foreach ($item in $manifest.files) {
+    $relative = ([string]$item.path).Replace('\', '/')
+    foreach ($pattern in $forbiddenManifestPatterns) {
+        if ($relative -match $pattern) {
+            throw "FORBIDDEN_COMMERCIAL_MANIFEST_CONTENT: $relative"
+        }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($ReleaseMetadataPath)) {
     $ReleaseMetadataPath = [System.IO.Path]::Combine(
         $Root,
@@ -123,7 +141,8 @@ $requiredRootFiles = @(
     "InstalarLimpio.ps1",
     "InstallerR1020C1.ps1",
     "OperarIA.ps1",
-    "LEEME_INSTALACION_LIMPIA.txt"
+    "LEEME_INSTALACION_LIMPIA.txt",
+    "ValidarInstalador.ps1"
 )
 
 foreach ($relative in $requiredRootFiles) {

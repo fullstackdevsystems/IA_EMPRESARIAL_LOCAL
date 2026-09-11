@@ -46,11 +46,9 @@ block = (
 )
 
 required = [
-    "BuildReleaseR1021A.ps1",
     r"IA_Local\VERSION.txt",
     r"IA_Local\requirements-local.txt",
-    r"IA_Local\tests\test_rc9c_5_upgrade_version_identity.py",
-    r"IA_Local\tests\test_rc9f_4_upgrade_governed_product_surface.py",
+    "ValidarInstalador.ps1",
 ]
 
 for item in required:
@@ -63,6 +61,17 @@ for item in required:
             "_",
         ),
         block.count(item) == 1,
+    )
+
+for forbidden_development_file in [
+    "BuildReleaseR1021A.ps1",
+    r"IA_Local\tests\test_rc9c_5_upgrade_version_identity.py",
+    r"IA_Local\tests\test_rc9f_4_upgrade_governed_product_surface.py",
+]:
+    ck(
+        "development_not_managed_"
+        + forbidden_development_file.replace("\\", "_").replace(".", "_"),
+        forbidden_development_file not in block,
     )
 
 ck(

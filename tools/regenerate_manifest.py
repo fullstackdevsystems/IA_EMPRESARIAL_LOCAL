@@ -47,23 +47,47 @@ if metadata["product"] != "IA_EMPRESARIAL_LOCAL":
 
 release = metadata["release"].strip()
 
-paths = {item["path"] for item in old["files"]}
-
-# Root commercial/runtime files.
-paths |= {
+# The customer manifest is an allowlist.  Never inherit paths from a prior
+# manifest: that would make historical tests, prompts, or support utilities
+# silently distributable forever.
+paths = {
     "RELEASE_METADATA.json",
     "InstalarLimpio.ps1",
     "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
     "InstallerR1020C1.ps1",
     "OperarIA.ps1",
-    "BuildReleaseR1021A.ps1",
+    "ValidarInstalador.ps1",
     "LEEME_INSTALACION_LIMPIA.txt",
+    "IA_Local/VERSION.txt",
+    "IA_Local/requirements-local.txt",
+    "IA_Local/requirements-optional.txt",
+    "IA_Local/config/.keep",
+    "IA_Local/data/enterprise/.keep",
+    "IA_Local/data/open-webui/.keep",
+    "IA_Local/logs/.keep",
+    "IA_Local/workspace/Conocimiento/.keep",
+    "IA_Local/workspace/Entrada/.keep",
+    "IA_Local/workspace/Historico/.keep",
+    "IA_Local/workspace/Reportes/.keep",
 }
 
 # All canonical Python runtime modules under IA_Local/scripts.
 scripts_dir = ROOT / "IA_Local" / "scripts"
 
+excluded_runtime_scripts = {
+    "run_enterprise_tests.py",
+    "prueba_regresion_v7.py",
+}
+
 for file in scripts_dir.rglob("*.py"):
+    if file.is_file():
+        if file.name not in excluded_runtime_scripts:
+            paths.add(file.relative_to(ROOT).as_posix())
+
+# Runtime templates are part of the product surface, unlike tests and sample
+# prompts.  Keep the extension list deliberately narrow and deterministic.
+templates_dir = scripts_dir / "templates"
+for file in templates_dir.rglob("*.html"):
     if file.is_file():
         paths.add(file.relative_to(ROOT).as_posix())
 

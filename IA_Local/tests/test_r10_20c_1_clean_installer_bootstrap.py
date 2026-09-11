@@ -10,7 +10,7 @@ ck('installer_files',(ROOT/'InstallerR1020C1.ps1').is_file() and 'InstalarLimpio
 ck('prechecks','Windows x64 required' in ps and 'Python 3.11 or 3.12 required' in ps and 'Install path not writable' in ps)
 ck('venv_dependencies','-m venv' in ps and 'pip install' in ps and 'requirements-local.txt' in ps and 'Resolve-CompatiblePython' in ps)
 ck("idempotent", "INSTALL MODE: UPGRADE" in ps and "ValidateOnly" in ps)
-ck('product_layout','$ProductRoot' in ps and '$RuntimeRoot' in ps and "Join-Path $ProductRoot '.venv\\Scripts\\python.exe'" in ps and "Join-Path $RuntimeRoot 'requirements-local.txt'" in ps)
+ck('product_layout','$ProductRoot' in ps and "$RuntimeRoot = Join-Path $ProductRoot 'IA_Local'" in ps and "Join-Path $ProductRoot '.venv\\Scripts\\python.exe'" in ps and "-r (Join-Path $source 'requirements-local.txt')" in ps)
 ck('secure_bootstrap','No hardcoded tenant/admin/password' in ps and 'AdminPassword' not in ps and 'no model download' in ps)
 ck('health_optional','HEALTH:PASS' in ps and 'AI_PROVIDER: NOT CONFIGURED' in ps and 'SkipSqlCheck' in ps)
 ck('dirs_log','config' in ps and 'Reportes' in ps and 'logs\\installer-{0}.log' in ps and '-f $release' in ps)
