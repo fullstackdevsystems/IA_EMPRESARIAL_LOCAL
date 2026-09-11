@@ -32,6 +32,51 @@ herramienta de soporte para iniciar, detener, consultar estado, validar,
 diagnosticar, respaldar y restaurar la instalación. Los diagnósticos sanitizan
 credenciales, tokens y secretos conocidos.
 
+SOLUCIÓN DE PROBLEMAS
+
+SI LA INSTALACIÓN FALLA
+
+El instalador se detiene cuando una comprobación obligatoria falla y muestra un
+mensaje "FAIL" con la causa detectada. No considere terminada una instalación
+que haya finalizado con ese mensaje.
+
+Conserve el mensaje completo mostrado por el instalador para soporte. En una
+actualización, los mecanismos de instalación protegen el runtime administrado y
+restauran los componentes anteriores cuando falla una etapa gobernada. No copie
+manualmente archivos de otra instalación ni reutilice credenciales o secretos
+para intentar completar una instalación fallida.
+
+Si necesita escalar el problema, indique a soporte el mensaje "FAIL", la etapa
+en la que ocurrió y la versión que intentaba instalar. No comparta contraseñas,
+tokens ni secretos.
+
+READINESS: DEGRADED
+
+"READINESS: DEGRADED" no significa necesariamente que el runtime esté detenido.
+El servicio puede estar activo pero tener algún requisito configurado que todavía
+no está preparado.
+
+Utiliza OperarIA.ps1 para soporte con estas acciones:
+
+  .\OperarIA.ps1 -Action status
+  .\OperarIA.ps1 -Action validate
+  .\OperarIA.ps1 -Action diagnostics
+
+Revisa también en la interfaz local la configuración activa de SQL Server y de
+inteligencia artificial. La IA es opcional: si la organización no la utilizará,
+puede continuar con IA deshabilitada mediante el flujo gobernado de configuración.
+
+Después de corregir la causa, vuelve a ejecutar la validación de preparación.
+El estado "Listo" debe provenir de la validación del servidor; no debe asumirse
+manualmente.
+
+Si el problema continúa, genera el paquete sanitizado para soporte:
+
+  .\OperarIA.ps1 -Action diagnostic-bundle
+
+El paquete de diagnóstico aplica sanitización de credenciales, tokens y secretos
+conocidos antes de prepararse para soporte.
+
 RECUPERACIÓN Y SOPORTE
 
 Antes de cambios importantes, crea un respaldo gobernado de la instalación.
