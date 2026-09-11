@@ -1,4 +1,59 @@
-﻿param(
+﻿<#
+.SYNOPSIS
+Opera, valida y diagnostica una instalación local de IA Empresarial Local.
+
+.DESCRIPTION
+Herramienta de soporte para consultar estado, validar la instalación, iniciar o
+detener el runtime, generar diagnósticos sanitizados, crear respaldos gobernados
+y restaurar respaldos validados.
+
+El uso diario normal se realiza desde la interfaz local. Este script está
+orientado a administración, recuperación y soporte técnico.
+
+.PARAMETER Action
+Acción operativa. Entre las acciones de soporte se incluyen status, validate,
+diagnostics, diagnostic-bundle, backup y restore.
+
+.PARAMETER BackupPath
+Ruta de destino del archivo ZIP de respaldo. Se requiere cuando Action es
+backup. El respaldo gobernado excluye secretos locales de ejecución.
+
+.PARAMETER RestorePath
+Ruta del archivo ZIP de respaldo que se desea restaurar. Se requiere cuando
+Action es restore. La restauración valida la integridad del respaldo y falla de
+forma cerrada si el archivo no es válido.
+
+.PARAMETER RuntimeRoot
+Ruta raíz de la instalación de IA Empresarial Local. Normalmente no es necesario
+especificarla cuando OperarIA.ps1 se ejecuta desde la instalación.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action status
+Muestra el estado del runtime, liveness, readiness, versión y puerto.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action validate
+Valida la estructura básica de la instalación y sus dependencias principales.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action diagnostics
+Muestra información de diagnóstico sanitizada para soporte.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action diagnostic-bundle
+Genera un paquete ZIP de diagnóstico sanitizado dentro del área de logs.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action backup -BackupPath "C:\Respaldos\IA_Empresarial.zip"
+Crea un respaldo gobernado del estado persistente. Los secretos locales de
+ejecución no se incluyen en el archivo de respaldo.
+
+.EXAMPLE
+.\OperarIA.ps1 -Action restore -RestorePath "C:\Respaldos\IA_Empresarial.zip"
+Restaura un respaldo cuya estructura e integridad sean válidas. Si la validación
+falla, la restauración se rechaza sin sustituir silenciosamente el estado válido.
+#>
+param(
     [ValidateSet("start","stop","restart","status","health","validate","diagnostics","diagnostic-bundle","configure","configuration","configure-sql","configure-ai","backup","restore")]
     [string]$Action = "status",
 

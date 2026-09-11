@@ -32,6 +32,23 @@ herramienta de soporte para iniciar, detener, consultar estado, validar,
 diagnosticar, respaldar y restaurar la instalación. Los diagnósticos sanitizan
 credenciales, tokens y secretos conocidos.
 
+RECUPERACIÓN Y SOPORTE
+
+Antes de cambios importantes, crea un respaldo gobernado de la instalación.
+Los respaldos incluyen el estado persistente administrado, pero no incorporan
+los secretos locales de ejecución.
+
+Para restaurar, utiliza únicamente un respaldo conocido y autorizado. El sistema
+valida la estructura y la integridad del archivo antes de aplicar la recuperación.
+Un respaldo corrupto, inseguro o inválido se rechaza. Si una restauración falla
+durante el proceso, el mecanismo de recuperación protege el estado válido previo
+en lugar de aceptar silenciosamente un estado parcial.
+
+Para soporte técnico, OperarIA.ps1 permite consultar estado, validar la
+instalación, ejecutar diagnósticos y generar un paquete de diagnóstico sanitizado.
+La ayuda integrada del script muestra la sintaxis y ejemplos de respaldo,
+restauración y diagnóstico.
+
 SEGURIDAD
 
 No comparta contraseñas, tokens, archivos de configuración ni respaldos fuera de
