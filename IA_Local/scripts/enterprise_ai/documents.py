@@ -16,7 +16,7 @@ from pypdf import PdfReader
 
 from .config import EnterpriseConfig
 from .database import Database, utcnow
-from .providers import EmbeddingProvider
+from .providers import EmbeddingProvider, ProviderError
 from .security import Principal, detect_prompt_injection, safe_component, safe_join, scope_clause
 from .vector_store import VectorStore
 
@@ -51,6 +51,15 @@ class DocumentService:
         self.embeddings = embeddings
         self.vectors = vectors
         self.dataset_service = dataset_service
+
+    @staticmethod
+    def _structured_embedding_unavailable(exc: ProviderError) -> bool:
+        """Only a reachable-provider failure may degrade tabular ingestion."""
+        message = str(exc).lower()
+        return any(marker in message for marker in (
+            "no disponible", "connection refused", "timed out", "timeout",
+            "connection reset", "network is unreachable", "deneg", "urlopen error",
+        ))
 
     def _validate(self, path: Path) -> None:
         doc_cfg = self.cfg.section("documents")
@@ -199,18 +208,28 @@ class DocumentService:
             new_vector_ids.append(vector_id)
             if not self.vectors.has("document", vector_id):
                 missing_chunks.append((vector_id, chunk))
+        semantic_index_available = True
+        is_structured = source.suffix.lower() in {".csv", ".xlsx", ".xls", ".xlsm", ".xlsb"}
         if missing_chunks:
-            vectors = self.embeddings.embed([chunk.text for _, chunk in missing_chunks])
-            for (vector_id, chunk), vector in zip(missing_chunks, vectors):
-                self.vectors.upsert(
-                    "document", vector_id, vector,
-                    {
-                        "document_id": document_id, "company_id": principal.company_id, "user_id": owner,
-                        "scope": scope, "name": name, "page": chunk.page, "sheet": chunk.sheet,
-                        "section": chunk.section, "row_range": chunk.row_range,
-                        "injection_flag": detect_prompt_injection(chunk.text),
-                    },
-                )
+            try:
+                vectors = self.embeddings.embed([chunk.text for _, chunk in missing_chunks])
+                for (vector_id, chunk), vector in zip(missing_chunks, vectors):
+                    self.vectors.upsert(
+                        "document", vector_id, vector,
+                        {
+                            "document_id": document_id, "company_id": principal.company_id, "user_id": owner,
+                            "scope": scope, "name": name, "page": chunk.page, "sheet": chunk.sheet,
+                            "section": chunk.section, "row_range": chunk.row_range,
+                            "injection_flag": detect_prompt_injection(chunk.text),
+                        },
+                    )
+            except ProviderError as exc:
+                if not is_structured or not self._structured_embedding_unavailable(exc):
+                    raise
+                semantic_index_available = False
+                missing_chunks = []
+                metadata["semantic_index_available"] = False
+                metadata["semantic_index_degraded"] = "provider_unavailable"
         old_vector_ids = [row["vector_id"] for row in self.db.query("SELECT vector_id FROM document_chunks WHERE document_id=? AND active=1", (document_id,))]
         with self.db.tx() as con:
             con.execute("UPDATE document_chunks SET active=0 WHERE document_id=?", (document_id,))
@@ -251,6 +270,7 @@ class DocumentService:
             "document.index", principal.company_id, principal.user_id, "document", document_id,
             details={"name": name, "version": version, "chunks": len(chunks), "new_embeddings": len(missing_chunks), "removed_vectors": len(removed)},
         )
+        metadata.setdefault("semantic_index_available", semantic_index_available)
         return {"ok": True, "unchanged": False, "document_id": document_id, "version": version, "name": name, "hash": file_hash, "chunks": len(chunks), "new_embeddings": len(missing_chunks), "metadata": metadata}
 
     def list(self, principal: Principal, include_inactive: bool = False) -> List[Dict[str, Any]]:
