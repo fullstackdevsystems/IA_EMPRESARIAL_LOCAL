@@ -9,6 +9,88 @@ from enterprise_deliverable_registry import GovernedDeliverableRegistry
 from enterprise_deliverable_manifest import build_governed_deliverable_manifest
 from enterprise_sql_gateway import EnterpriseSqlError
 import analizador_universal as analyzer
+
+
+# GA.5 authenticated migration fixture.
+#
+# These historical tests intentionally keep their original local scope
+# semantics while exercising the now-authenticated HTTP/API contract.
+_GA5_HISTORICAL_TOKEN = "ga5-historical-analyst"
+
+
+class _Ga5HistoricalIdentity:
+    def __init__(self):
+        self.actor = {
+            "user_id": "admin-local",
+            "username": "admin-local",
+            "tenant_id": "empresa-local",
+            "roles": ["ANALYST"],
+            "business_units": [],
+            "branches": [],
+        }
+
+        self.permissions = {
+            "analysis:run",
+            "deliverable:read",
+            "knowledge:read",
+            "knowledge:write",
+            "sql:read",
+            "config:read",
+        }
+
+    def authenticate(self, token):
+        if str(token or "") != _GA5_HISTORICAL_TOKEN:
+            raise RuntimeError(
+                "INVALID_GA5_HISTORICAL_TOKEN"
+            )
+
+        return dict(
+            self.actor
+        )
+
+    def has_permission(
+        self,
+        actor,
+        permission,
+    ):
+        return (
+            str(permission)
+            in self.permissions
+        )
+
+    def scope(self, actor):
+        return {
+            "company_id":
+                str(
+                    actor["tenant_id"]
+                ),
+            "user_id":
+                str(
+                    actor["user_id"]
+                ),
+            "business_unit":
+                None,
+            "branch":
+                None,
+        }
+
+
+_GA5_IDENTITY = _Ga5HistoricalIdentity()
+
+HISTORICAL_AUTHORIZATION = (
+    "Bearer "
+    + _GA5_HISTORICAL_TOKEN
+)
+
+HISTORICAL_HEADERS = {
+    "Authorization":
+        HISTORICAL_AUTHORIZATION
+}
+
+analyzer._identity_store = (
+    lambda:
+        _GA5_IDENTITY
+)
 SCOPE={"company_id":"obra","user_id":"ana","business_unit":None,"branch":None}; OTHER={"company_id":"otra","user_id":"ana","business_unit":None,"branch":None}
 def ck(n,x):
  if not x: raise AssertionError(n)
@@ -42,8 +124,8 @@ with tempfile.TemporaryDirectory() as td:
  old_reports,old_executor=analyzer.base.REPORTES,analyzer._sql_executor; analyzer.base.REPORTES=reports; run(reports,run_id="api-r",scope=analyzer._local_deliverable_scope()); analyzer._sql_executor=lambda:FakeSql()
  try:
   with TestClient(analyzer.app) as client:
-   plain=client.post("/api/ask",json={"question":"ventas","run_id":"api-r"}); ck("api_without_sql",plain.status_code==200 and plain.json()["result"]["status"]=="ANSWERED")
-   via=client.post("/api/ask",json={"question":"avance","sql":{"connection_id":"c","query_plan":{"sql":"SELECT"}}}); ck("api_with_sql",via.status_code==200 and via.json()["result"]["routing"]["selected_sources"]==["governed_sql"])
-   danger=client.post("/api/ask",json={"question":"x","sql":{"connection_id":"c","query_plan":{"sql":"UPDATE x"}}}); ck("api_sql_policy",danger.status_code==400)
+   plain=client.post("/api/ask",headers=HISTORICAL_HEADERS,json={"question":"ventas","run_id":"api-r"}); ck("api_without_sql",plain.status_code==200 and plain.json()["result"]["status"]=="ANSWERED")
+   via=client.post("/api/ask",headers=HISTORICAL_HEADERS,json={"question":"avance","sql":{"connection_id":"c","query_plan":{"sql":"SELECT"}}}); ck("api_with_sql",via.status_code==200 and via.json()["result"]["routing"]["selected_sources"]==["governed_sql"])
+   danger=client.post("/api/ask",headers=HISTORICAL_HEADERS,json={"question":"x","sql":{"connection_id":"c","query_plan":{"sql":"UPDATE x"}}}); ck("api_sql_policy",danger.status_code==400)
  finally: analyzer.base.REPORTES,analyzer._sql_executor=old_reports,old_executor
 print("PASS R10.19D")

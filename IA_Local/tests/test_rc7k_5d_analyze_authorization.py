@@ -122,14 +122,38 @@ ck(
 ck(
     "frontend_has_login",
     'id="ia-analyze-auth"' in universal
-    and "fetch('/api/auth/login'" in universal,
+    and "/api/auth/login" in universal
+    and "async function login()" in universal,
 )
+
+login_start = universal.index(
+    "async function login()"
+)
+login_end = universal.index(
+    "button.addEventListener(",
+    login_start,
+)
+login_block = universal[
+    login_start:login_end
+]
 
 ck(
     "frontend_token_memory_only",
-    "window.__IA_ANALYZE_TOKEN__ = String(data.token)" in universal
-    and "localStorage.setItem" not in universal
-    and "sessionStorage.setItem" not in universal,
+    re.search(
+        r"window\.__IA_ANALYZE_TOKEN__\s*=\s*"
+        r"String\s*\(\s*data\.token\s*\)",
+        login_block,
+    )
+    is not None
+    and "localStorage" not in login_block
+    and "sessionStorage.setItem" not in login_block,
+)
+
+ck(
+    "enterprise_session_storage_is_scoped",
+    "sessionStorage.setItem(" in universal
+    and "'iaEnterpriseSession'" in universal
+    and "localStorage" not in universal,
 )
 
 ck(

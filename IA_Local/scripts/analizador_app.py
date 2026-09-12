@@ -1,4 +1,5 @@
 from __future__ import annotations
+import contextvars
 
 import argparse
 import html
@@ -1050,6 +1051,10 @@ def health() -> Dict[str, Any]:
 # R10.22 RC security hardening: the commercial runtime
 # installs a fail-closed Bearer/permission authorizer.
 ANALYZE_AUTHORIZER = None
+ANALYZE_AUTH_CONTEXT = contextvars.ContextVar(
+    "ia_analyze_auth_context",
+    default=None,
+)
 
 @app.post("/api/analyze")
 async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), prompt_sha256: Optional[str] = Form(None), request_id: Optional[str] = Form(None), authorization: str = Header("")):
@@ -1064,7 +1069,7 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), pro
                     "message": "El control de acceso del analizador no está disponible.",
                 },
             )
-        authorizer(authorization)
+        auth_actor = authorizer(authorization)
         filename = safe_name(file.filename or "archivo.xlsx")
         ext = Path(filename).suffix.lower()
         if ext not in {".xlsx", ".xls", ".xlsb", ".xlsm", ".csv", ".txt"}:
@@ -1087,7 +1092,11 @@ async def api_analyze(file: UploadFile = File(...), prompt: str = Form(...), pro
             raise HTTPException(status_code=409, detail="PROMPT_INTEGRITY_MISMATCH: el prompt recibido no coincide con su SHA-256.")
         rid = str(request_id or "").strip() or f"server-{uuid.uuid4()}"
         transport_mode = "client-verified" if supplied_hash and request_id else "server-fallback"
-        result = analyze_file(dest, request_prompt)
+        auth_context_token = ANALYZE_AUTH_CONTEXT.set(auth_actor)
+        try:
+            result = analyze_file(dest, request_prompt)
+        finally:
+            ANALYZE_AUTH_CONTEXT.reset(auth_context_token)
         if isinstance(result, dict):
             result["request_id"] = rid
             result["request_prompt_sha256"] = actual_hash

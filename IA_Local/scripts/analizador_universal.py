@@ -970,10 +970,20 @@ def _register_governed_deliverables(
     profile: Dict[str, Any],
     outputs: Dict[str, Optional[str]],
     domain: str,
+    scope: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    registry = GovernedDeliverableRegistry(base.REPORTES)
+    registry = GovernedDeliverableRegistry(
+        base.REPORTES
+    )
+
+    effective_scope = (
+        _local_deliverable_scope()
+        if scope is None
+        else scope
+    )
+
     return registry.register(
-        scope=_local_deliverable_scope(),
+        scope=effective_scope,
         run_id=f"run-{uuid.uuid4().hex}",
         manifest=profile["deliverable_manifest"],
         outputs=outputs,
@@ -1193,16 +1203,55 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
             pro.pdf_report_professional(pdf_path, prompt, profile, sections, notes, narrative, domain)
             outputs["pdf"] = pdf_path.name
 
+    auth_actor = (
+        base.ANALYZE_AUTH_CONTEXT.get()
+        if hasattr(base, "ANALYZE_AUTH_CONTEXT")
+        else None
+    )
+
+    analysis_scope = (
+        _authenticated_content_scope(auth_actor)
+        if isinstance(auth_actor, dict)
+        else _local_deliverable_scope()
+    )
+
     # Registra el archivo tabular para consultas deterministicas futuras del ContextEngine.
     try:
         if ENTERPRISE_COMPONENTS is not None:
-            sec = ENTERPRISE_COMPONENTS.cfg.section("security")
-            principal = Principal(sec.get("default_company", "empresa-local"), sec.get("default_user", "admin-local"), "admin")
-            ENTERPRISE_COMPONENTS.datasets.register(principal, path, name=path.name, scope="company", roles=roles)
+            if isinstance(auth_actor, dict):
+                principal = Principal(
+                    str(auth_actor["tenant_id"]),
+                    str(auth_actor["user_id"]),
+                    (
+                        "admin"
+                        if "SYSTEM_ADMIN" in set(auth_actor.get("roles") or [])
+                        else "user"
+                    ),
+                )
+            else:
+                sec = ENTERPRISE_COMPONENTS.cfg.section("security")
+                principal = Principal(
+                    sec.get("default_company", "empresa-local"),
+                    sec.get("default_user", "admin-local"),
+                    "admin",
+                )
+
+            ENTERPRISE_COMPONENTS.datasets.register(
+                principal,
+                path,
+                name=path.name,
+                scope="company",
+                roles=roles,
+            )
     except Exception as _dataset_exc:
         notes.append(f"V8: no se pudo registrar el dataset para consultas futuras: {_dataset_exc}")
 
-    deliverable_run = _register_governed_deliverables(profile=profile, outputs=outputs, domain=domain)
+    deliverable_run = _register_governed_deliverables(
+        profile=profile,
+        outputs=outputs,
+        domain=domain,
+        scope=analysis_scope,
+    )
     response = {
         "ok": True,
         "request_prompt_sha256": request_prompt_sha256,
@@ -1485,12 +1534,27 @@ async function enterpriseAsk(){
                 window.__enterpriseRunId;
         }
 
+        const sessionToken=
+            window.__IA_ANALYZE_TOKEN__ ||
+            sessionStorage.getItem(
+                'iaEnterpriseSession'
+            ) ||
+            '';
+
+        if(!sessionToken){
+            throw new Error(
+                'Sesión empresarial requerida.'
+            );
+        }
+
         const response=
             await fetch('/api/ask',{
                 method:'POST',
                 headers:{
                     'Content-Type':
-                        'application/json; charset=utf-8'
+                        'application/json; charset=utf-8',
+                    'Authorization':
+                        'Bearer '+sessionToken
                 },
                 body:JSON.stringify(body)
             });
@@ -2081,6 +2145,65 @@ def _authorize_analysis(authorization: str) -> Dict[str, Any]:
         )
 
     return actor
+
+def _require_actor_permission(
+    actor: Dict[str, Any],
+    permission: str,
+    *,
+    code: str = "PERMISSION_DENIED",
+    message: str = "Permiso denegado",
+) -> Dict[str, Any]:
+    if not _identity_store().has_permission(
+        actor,
+        permission,
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code": code,
+                "message": message,
+            },
+        )
+
+    return actor
+
+
+def _actor_with_permission(
+    authorization: str,
+    permission: str,
+    *,
+    code: str = "PERMISSION_DENIED",
+    message: str = "Permiso denegado",
+) -> Dict[str, Any]:
+    actor = _bearer(
+        authorization
+    )
+
+    return _require_actor_permission(
+        actor,
+        permission,
+        code=code,
+        message=message,
+    )
+
+
+def _authenticated_content_scope(
+    actor: Dict[str, Any],
+) -> Dict[str, Optional[str]]:
+    try:
+        return _identity_store().scope(
+            actor
+        )
+
+    except IdentityError as exc:
+        _auth_error(
+            exc
+        )
+
+    raise AssertionError(
+        "unreachable"
+    )
+
 
 
 # analizador_app owns /api/analyze; the universal commercial runtime
@@ -3156,31 +3279,141 @@ def enable_admin_tenant(tenant_id: str, authorization: str = Header("")) -> Dict
 
 
 @app.get("/api/deliverables")
-def list_governed_deliverables(limit: int = 100) -> Dict[str, Any]:
+def list_governed_deliverables(
+    limit: int = 100,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _actor_with_permission(
+        authorization,
+        "deliverable:read",
+        code="DELIVERABLE_PERMISSION_DENIED",
+        message="Permiso de entregables denegado",
+    )
+
+    scope = _authenticated_content_scope(
+        actor
+    )
+
     try:
-        records = GovernedDeliverableRegistry(base.REPORTES).list(_local_deliverable_scope(), limit=limit)
-        return {"registry": deliverable_registry_public_audit(records), "items": records}
+        records = GovernedDeliverableRegistry(
+            base.REPORTES
+        ).list(
+            scope,
+            limit=limit,
+        )
+
+        return {
+            "registry":
+                deliverable_registry_public_audit(
+                    records
+                ),
+            "items":
+                records,
+        }
+
     except DeliverableRegistryError as exc:
-        raise base.HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+            },
+        ) from exc
 
 
 @app.get("/api/deliverables/{run_id}")
-def get_governed_deliverable(run_id: str) -> Dict[str, Any]:
+def get_governed_deliverable(
+    run_id: str,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _actor_with_permission(
+        authorization,
+        "deliverable:read",
+        code="DELIVERABLE_PERMISSION_DENIED",
+        message="Permiso de entregables denegado",
+    )
+
+    scope = _authenticated_content_scope(
+        actor
+    )
+
     try:
-        return GovernedDeliverableRegistry(base.REPORTES).get(_local_deliverable_scope(), run_id)
+        return GovernedDeliverableRegistry(
+            base.REPORTES
+        ).get(
+            scope,
+            run_id,
+        )
+
     except DeliverableRegistryError as exc:
-        status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
-        raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+        status = (
+            404
+            if exc.code
+            in {
+                "RUN_NOT_FOUND",
+                "ARTIFACT_NOT_FOUND",
+            }
+            else 400
+        )
+
+        raise base.HTTPException(
+            status_code=status,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+            },
+        ) from exc
 
 
 @app.get("/api/deliverables/{run_id}/download/{kind}")
-def download_governed_deliverable(run_id: str, kind: str):
+def download_governed_deliverable(
+    run_id: str,
+    kind: str,
+    authorization: str = Header(""),
+):
+    actor = _actor_with_permission(
+        authorization,
+        "deliverable:read",
+        code="DELIVERABLE_PERMISSION_DENIED",
+        message="Permiso de entregables denegado",
+    )
+
+    scope = _authenticated_content_scope(
+        actor
+    )
+
     try:
-        path = GovernedDeliverableRegistry(base.REPORTES).artifact_path(_local_deliverable_scope(), run_id, kind)
-        return base.FileResponse(path, filename=path.name)
+        path = GovernedDeliverableRegistry(
+            base.REPORTES
+        ).artifact_path(
+            scope,
+            run_id,
+            kind,
+        )
+
+        return base.FileResponse(
+            path,
+            filename=path.name,
+        )
+
     except DeliverableRegistryError as exc:
-        status = 404 if exc.code in {"RUN_NOT_FOUND", "ARTIFACT_NOT_FOUND"} else 400
-        raise base.HTTPException(status_code=status, detail={"code": exc.code, "message": str(exc)}) from exc
+        status = (
+            404
+            if exc.code
+            in {
+                "RUN_NOT_FOUND",
+                "ARTIFACT_NOT_FOUND",
+            }
+            else 400
+        )
+
+        raise base.HTTPException(
+            status_code=status,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+            },
+        ) from exc
 
 
 def _sql_http_error(exc: EnterpriseSqlError):
@@ -3682,45 +3915,184 @@ def admin_sql_smoke(connection_id: str, payload: Dict[str, Any], tenant_id: Opti
 
 
 @app.get("/api/sql/connections")
-def list_sql_connections() -> Dict[str, Any]:
+def list_sql_connections(
+    tenant_id: Optional[str] = None,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _sql_admin_actor(
+        authorization,
+        "sql:read",
+    )
+
+    scope = _sql_admin_scope(
+        actor,
+        tenant_id,
+    )
+
     try:
-        records = EnterpriseSqlConnectionStore(base.REPORTES / ".sql_connections").list(_local_deliverable_scope())
-        fields = ("connection_id", "provider", "server", "database", "auth_mode", "enabled", "allowed_schemas", "allowed_tables", "read_only")
-        return {"items": [{key: item.get(key) for key in fields} for item in records]}
-    except EnterpriseSqlError as exc: _sql_http_error(exc)
+        records = EnterpriseSqlConnectionStore(
+            base.REPORTES
+            / ".sql_connections"
+        ).list(
+            scope
+        )
+
+        fields = (
+            "connection_id",
+            "provider",
+            "server",
+            "database",
+            "auth_mode",
+            "enabled",
+            "allowed_schemas",
+            "allowed_tables",
+            "read_only",
+        )
+
+        return {
+            "items": [
+                {
+                    key:
+                        item.get(key)
+                    for key in fields
+                }
+                for item in records
+            ]
+        }
+
+    except EnterpriseSqlError as exc:
+        _sql_http_error(exc)
 
 
 @app.get("/api/sql/schema")
-def sql_schema(connection_id: str) -> Dict[str, Any]:
-    try: return _sql_executor().discover(_local_deliverable_scope(), connection_id)
-    except EnterpriseSqlError as exc: _sql_http_error(exc)
+def sql_schema(
+    connection_id: str,
+    tenant_id: Optional[str] = None,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _sql_admin_actor(
+        authorization,
+        "sql:read",
+    )
+
+    scope = _sql_admin_scope(
+        actor,
+        tenant_id,
+    )
+
+    try:
+        return _sql_executor().discover(
+            scope,
+            connection_id,
+        )
+
+    except EnterpriseSqlError as exc:
+        _sql_http_error(exc)
 
 
 @app.post("/api/sql/query")
-def sql_query(payload: Dict[str, Any]) -> Dict[str, Any]:
+def sql_query(
+    payload: Dict[str, Any],
+    tenant_id: Optional[str] = None,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _sql_admin_actor(
+        authorization,
+        "sql:read",
+    )
+
+    scope = _sql_admin_scope(
+        actor,
+        tenant_id,
+    )
+
     try:
-        connection_id = str(payload.get("connection_id") or "").strip()
-        if not connection_id: raise EnterpriseSqlError("SQL_CONNECTION_NOT_FOUND", "connection_id es obligatorio")
-        return _sql_executor().execute(_local_deliverable_scope(), connection_id, payload.get("query_plan") or {})
-    except EnterpriseSqlError as exc: _sql_http_error(exc)
+        connection_id = str(
+            payload.get("connection_id")
+            or ""
+        ).strip()
+
+        if not connection_id:
+            raise EnterpriseSqlError(
+                "SQL_CONNECTION_NOT_FOUND",
+                "connection_id es obligatorio",
+            )
+
+        return _sql_executor().execute(
+            scope,
+            connection_id,
+            payload.get("query_plan")
+            or {},
+        )
+
+    except EnterpriseSqlError as exc:
+        _sql_http_error(exc)
 
 
 @app.post("/api/ask")
 def ask_enterprise_question(
     payload: Dict[str, Any],
+    authorization: str = Header(""),
 ) -> Dict[str, Any]:
-    """
-    R10.19A - Governed Enterprise Question Answering.
+    actor = _authorize_analysis(
+        authorization
+    )
 
-    El endpoint:
-    - usa el registro gobernado;
-    - puede resolver el \u00faltimo run autom\u00e1ticamente;
-    - no concede autoridad computacional al LLM;
-    - respeta BLOCKED / UNRESOLVED;
-    - verifica artefactos antes de responder.
-    """
+    _require_actor_permission(
+        actor,
+        "deliverable:read",
+        code="DELIVERABLE_PERMISSION_DENIED",
+        message="Permiso de entregables denegado",
+    )
+
+    sql_context = payload.get(
+        "sql"
+    )
+
+    if sql_context is None:
+        _require_actor_permission(
+            actor,
+            "knowledge:read",
+            code="KNOWLEDGE_PERMISSION_DENIED",
+            message="Permiso de conocimiento denegado",
+        )
+
+        sql_scope = None
+
+    else:
+        _require_actor_permission(
+            actor,
+            "sql:read",
+            code="SQL_PERMISSION_DENIED",
+            message="Permiso SQL denegado",
+        )
+
+        if not isinstance(
+            sql_context,
+            dict,
+        ):
+            raise base.HTTPException(
+                status_code=400,
+                detail={
+                    "code": "SQL_CONTEXT_INVALID",
+                    "message": "El contexto SQL debe ser un objeto",
+                },
+            )
+
+        sql_scope = _sql_admin_scope(
+            actor,
+            sql_context.get(
+                "tenant_id"
+            ),
+        )
+
+    scope = _authenticated_content_scope(
+        actor
+    )
+
     question = str(
-        payload.get("question") or ""
+        payload.get("question")
+        or ""
     ).strip()
 
     if not question:
@@ -3733,14 +4105,13 @@ def ask_enterprise_question(
         )
 
     requested_run_id = str(
-        payload.get("run_id") or ""
+        payload.get("run_id")
+        or ""
     ).strip()
 
     registry = GovernedDeliverableRegistry(
         base.REPORTES
     )
-
-    scope = _local_deliverable_scope()
 
     try:
         run_id = requested_run_id
@@ -3753,20 +4124,28 @@ def ask_enterprise_question(
 
             if runs:
                 run_id = str(
-                    runs[0].get("run_id") or ""
+                    runs[0].get("run_id")
+                    or ""
                 ).strip()
 
         knowledge_store = EnterpriseKnowledgeStore(
-            base.REPORTES / ".knowledge"
+            base.REPORTES
+            / ".knowledge"
         )
+
         result = answer_enterprise_question_orchestrated(
             registry=registry,
             knowledge_store=knowledge_store,
             scope=scope,
+            sql_scope=sql_scope,
             run_id=run_id,
             question=question,
-            sql_context=payload.get("sql"),
-            sql_executor=_sql_executor() if payload.get("sql") is not None else None,
+            sql_context=sql_context,
+            sql_executor=(
+                _sql_executor()
+                if sql_context is not None
+                else None
+            ),
         )
 
         return {
@@ -3797,7 +4176,10 @@ def ask_enterprise_question(
     except EnterpriseKnowledgeError as exc:
         raise base.HTTPException(
             status_code=400,
-            detail={"code": exc.code, "message": str(exc)},
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+            },
         ) from exc
 
     except ValueError as exc:

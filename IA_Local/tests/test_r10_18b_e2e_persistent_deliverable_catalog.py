@@ -15,6 +15,88 @@ import analizador_universal as analyzer
 from enterprise_deliverable_registry import GovernedDeliverableRegistry
 
 
+# GA.5 authenticated migration fixture.
+#
+# These historical tests intentionally keep their original local scope
+# semantics while exercising the now-authenticated HTTP/API contract.
+_GA5_HISTORICAL_TOKEN = "ga5-historical-analyst"
+
+
+class _Ga5HistoricalIdentity:
+    def __init__(self):
+        self.actor = {
+            "user_id": "admin-local",
+            "username": "admin-local",
+            "tenant_id": "empresa-local",
+            "roles": ["ANALYST"],
+            "business_units": [],
+            "branches": [],
+        }
+
+        self.permissions = {
+            "analysis:run",
+            "deliverable:read",
+            "knowledge:read",
+            "knowledge:write",
+            "sql:read",
+            "config:read",
+        }
+
+    def authenticate(self, token):
+        if str(token or "") != _GA5_HISTORICAL_TOKEN:
+            raise RuntimeError(
+                "INVALID_GA5_HISTORICAL_TOKEN"
+            )
+
+        return dict(
+            self.actor
+        )
+
+    def has_permission(
+        self,
+        actor,
+        permission,
+    ):
+        return (
+            str(permission)
+            in self.permissions
+        )
+
+    def scope(self, actor):
+        return {
+            "company_id":
+                str(
+                    actor["tenant_id"]
+                ),
+            "user_id":
+                str(
+                    actor["user_id"]
+                ),
+            "business_unit":
+                None,
+            "branch":
+                None,
+        }
+
+
+_GA5_IDENTITY = _Ga5HistoricalIdentity()
+
+HISTORICAL_AUTHORIZATION = (
+    "Bearer "
+    + _GA5_HISTORICAL_TOKEN
+)
+
+HISTORICAL_HEADERS = {
+    "Authorization":
+        HISTORICAL_AUTHORIZATION
+}
+
+analyzer._identity_store = (
+    lambda:
+        _GA5_IDENTITY
+)
+
+
 def check(name, condition):
     if not condition:
         print("FAIL", name)
@@ -53,16 +135,16 @@ with tempfile.TemporaryDirectory() as td:
         loaded = restarted.get(analyzer._local_deliverable_scope(), run["run_id"])
         check("restart_recovery", loaded["record_fingerprint_sha256"] == run["record_fingerprint_sha256"])
         check("artifacts_verified", all(restarted.artifact_path(analyzer._local_deliverable_scope(), run["run_id"], item["format"]).is_file() for item in run["deliverables"]))
-        catalog = analyzer.list_governed_deliverables()
+        catalog = analyzer.list_governed_deliverables(authorization=HISTORICAL_AUTHORIZATION)
         check("catalog_api", catalog["registry"]["run_count"] == 1 and catalog["items"][0]["run_id"] == run["run_id"])
-        detail = analyzer.get_governed_deliverable(run["run_id"])
+        detail = analyzer.get_governed_deliverable(run["run_id"], authorization=HISTORICAL_AUTHORIZATION)
         check("detail_api", detail["run_id"] == run["run_id"])
         with TestClient(analyzer.app) as client:
-            http_catalog = client.get("/api/deliverables")
+            http_catalog = client.get("/api/deliverables", headers=HISTORICAL_HEADERS)
             check("http_catalog", http_catalog.status_code == 200 and http_catalog.json()["items"][0]["run_id"] == run["run_id"])
-            http_detail = client.get(f"/api/deliverables/{run['run_id']}")
+            http_detail = client.get(f"/api/deliverables/{run['run_id']}", headers=HISTORICAL_HEADERS)
             check("http_detail", http_detail.status_code == 200 and http_detail.json()["record_fingerprint_sha256"] == run["record_fingerprint_sha256"])
-            http_download = client.get(f"/api/deliverables/{run['run_id']}/download/html")
+            http_download = client.get(f"/api/deliverables/{run['run_id']}/download/html", headers=HISTORICAL_HEADERS)
             check("http_download", http_download.status_code == 200 and b"const DATA=" in http_download.content)
         other_scope = {"company_id":"otra-empresa", "user_id":"admin-local", "business_unit":None, "branch":None}
         check("cross_company_empty", restarted.list(other_scope) == [])

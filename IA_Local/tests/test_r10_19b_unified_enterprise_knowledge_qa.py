@@ -17,6 +17,88 @@ from enterprise_knowledge_qa import answer_unified_enterprise_question
 from enterprise_knowledge_store import EnterpriseKnowledgeError, EnterpriseKnowledgeStore
 
 
+# GA.5 authenticated migration fixture.
+#
+# These historical tests intentionally keep their original local scope
+# semantics while exercising the now-authenticated HTTP/API contract.
+_GA5_HISTORICAL_TOKEN = "ga5-historical-analyst"
+
+
+class _Ga5HistoricalIdentity:
+    def __init__(self):
+        self.actor = {
+            "user_id": "admin-local",
+            "username": "admin-local",
+            "tenant_id": "empresa-local",
+            "roles": ["ANALYST"],
+            "business_units": [],
+            "branches": [],
+        }
+
+        self.permissions = {
+            "analysis:run",
+            "deliverable:read",
+            "knowledge:read",
+            "knowledge:write",
+            "sql:read",
+            "config:read",
+        }
+
+    def authenticate(self, token):
+        if str(token or "") != _GA5_HISTORICAL_TOKEN:
+            raise RuntimeError(
+                "INVALID_GA5_HISTORICAL_TOKEN"
+            )
+
+        return dict(
+            self.actor
+        )
+
+    def has_permission(
+        self,
+        actor,
+        permission,
+    ):
+        return (
+            str(permission)
+            in self.permissions
+        )
+
+    def scope(self, actor):
+        return {
+            "company_id":
+                str(
+                    actor["tenant_id"]
+                ),
+            "user_id":
+                str(
+                    actor["user_id"]
+                ),
+            "business_unit":
+                None,
+            "branch":
+                None,
+        }
+
+
+_GA5_IDENTITY = _Ga5HistoricalIdentity()
+
+HISTORICAL_AUTHORIZATION = (
+    "Bearer "
+    + _GA5_HISTORICAL_TOKEN
+)
+
+HISTORICAL_HEADERS = {
+    "Authorization":
+        HISTORICAL_AUTHORIZATION
+}
+
+analyzer._identity_store = (
+    lambda:
+        _GA5_IDENTITY
+)
+
+
 SCOPE_A = {"company_id": "empresa-a", "user_id": "ana", "business_unit": None, "branch": None}
 SCOPE_B = {"company_id": "empresa-b", "user_id": "ana", "business_unit": None, "branch": None}
 
@@ -99,7 +181,7 @@ with tempfile.TemporaryDirectory() as td:
         local_store = EnterpriseKnowledgeStore(reports / ".knowledge")
         add(local_store, analyzer._local_deliverable_scope(), "medical-term", "Convenio Premium", "Convenio Premium usa tabulador X.")
         with TestClient(analyzer.app) as client:
-            response = client.post("/api/ask", json={"question": "¿Qué es Convenio Premium?"})
+            response = client.post("/api/ask", headers=HISTORICAL_HEADERS, json={"question": "¿Qué es Convenio Premium?"})
             check("api_ask_compatible", response.status_code == 200 and response.json()["result"]["status"] == "ANSWERED")
     finally:
         analyzer.base.REPORTES = old_reports

@@ -8,6 +8,88 @@ if str(SCRIPTS) not in sys.path: sys.path.insert(0, str(SCRIPTS))
 import analizador_universal as analyzer
 from enterprise_sql_gateway import EnterpriseSqlConnectionStore, EnterpriseSqlError, EnterpriseSqlExecutor, SqlServerPyodbcProvider, validate_query_plan
 
+
+# GA.5 authenticated migration fixture.
+#
+# These historical tests intentionally keep their original local scope
+# semantics while exercising the now-authenticated HTTP/API contract.
+_GA5_HISTORICAL_TOKEN = "ga5-historical-analyst"
+
+
+class _Ga5HistoricalIdentity:
+    def __init__(self):
+        self.actor = {
+            "user_id": "admin-local",
+            "username": "admin-local",
+            "tenant_id": "empresa-local",
+            "roles": ["ANALYST"],
+            "business_units": [],
+            "branches": [],
+        }
+
+        self.permissions = {
+            "analysis:run",
+            "deliverable:read",
+            "knowledge:read",
+            "knowledge:write",
+            "sql:read",
+            "config:read",
+        }
+
+    def authenticate(self, token):
+        if str(token or "") != _GA5_HISTORICAL_TOKEN:
+            raise RuntimeError(
+                "INVALID_GA5_HISTORICAL_TOKEN"
+            )
+
+        return dict(
+            self.actor
+        )
+
+    def has_permission(
+        self,
+        actor,
+        permission,
+    ):
+        return (
+            str(permission)
+            in self.permissions
+        )
+
+    def scope(self, actor):
+        return {
+            "company_id":
+                str(
+                    actor["tenant_id"]
+                ),
+            "user_id":
+                str(
+                    actor["user_id"]
+                ),
+            "business_unit":
+                None,
+            "branch":
+                None,
+        }
+
+
+_GA5_IDENTITY = _Ga5HistoricalIdentity()
+
+HISTORICAL_AUTHORIZATION = (
+    "Bearer "
+    + _GA5_HISTORICAL_TOKEN
+)
+
+HISTORICAL_HEADERS = {
+    "Authorization":
+        HISTORICAL_AUTHORIZATION
+}
+
+analyzer._identity_store = (
+    lambda:
+        _GA5_IDENTITY
+)
+
 SCOPE = {"company_id":"empresa-a","user_id":"ana","business_unit":None,"branch":None}
 OTHER = {"company_id":"empresa-b","user_id":"ana","business_unit":None,"branch":None}
 def check(n, ok):
@@ -52,8 +134,8 @@ with tempfile.TemporaryDirectory() as td:
     old_reports=analyzer.base.REPORTES; analyzer.base.REPORTES=Path(td)/"api-reports"; analyzer.base.REPORTES.mkdir()
     try:
         with TestClient(analyzer.app) as client:
-            api=client.get("/api/sql/connections"); check("api_connections",api.status_code==200 and api.json()["items"]==[])
-            blocked_api=client.post("/api/sql/query",json={"connection_id":"missing","query_plan":{"sql":"UPDATE dbo.Orders SET x=1"}})
+            api=client.get("/api/sql/connections",headers=HISTORICAL_HEADERS); check("api_connections",api.status_code==200 and api.json()["items"]==[])
+            blocked_api=client.post("/api/sql/query",headers=HISTORICAL_HEADERS,json={"connection_id":"missing","query_plan":{"sql":"UPDATE dbo.Orders SET x=1"}})
             check("api_error_contract",blocked_api.status_code==404 and blocked_api.json()["detail"]["code"]=="SQL_CONNECTION_NOT_FOUND")
     finally: analyzer.base.REPORTES=old_reports
 print("PASS R10.19C GOVERNED SQL SERVER INTELLIGENCE")

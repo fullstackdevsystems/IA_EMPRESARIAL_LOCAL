@@ -19,6 +19,88 @@ from enterprise_deliverable_registry import (
 from enterprise_question_answering import answer_enterprise_question
 
 
+# GA.5 authenticated migration fixture.
+#
+# These historical tests intentionally keep their original local scope
+# semantics while exercising the now-authenticated HTTP/API contract.
+_GA5_HISTORICAL_TOKEN = "ga5-historical-analyst"
+
+
+class _Ga5HistoricalIdentity:
+    def __init__(self):
+        self.actor = {
+            "user_id": "admin-local",
+            "username": "admin-local",
+            "tenant_id": "empresa-local",
+            "roles": ["ANALYST"],
+            "business_units": [],
+            "branches": [],
+        }
+
+        self.permissions = {
+            "analysis:run",
+            "deliverable:read",
+            "knowledge:read",
+            "knowledge:write",
+            "sql:read",
+            "config:read",
+        }
+
+    def authenticate(self, token):
+        if str(token or "") != _GA5_HISTORICAL_TOKEN:
+            raise RuntimeError(
+                "INVALID_GA5_HISTORICAL_TOKEN"
+            )
+
+        return dict(
+            self.actor
+        )
+
+    def has_permission(
+        self,
+        actor,
+        permission,
+    ):
+        return (
+            str(permission)
+            in self.permissions
+        )
+
+    def scope(self, actor):
+        return {
+            "company_id":
+                str(
+                    actor["tenant_id"]
+                ),
+            "user_id":
+                str(
+                    actor["user_id"]
+                ),
+            "business_unit":
+                None,
+            "branch":
+                None,
+        }
+
+
+_GA5_IDENTITY = _Ga5HistoricalIdentity()
+
+HISTORICAL_AUTHORIZATION = (
+    "Bearer "
+    + _GA5_HISTORICAL_TOKEN
+)
+
+HISTORICAL_HEADERS = {
+    "Authorization":
+        HISTORICAL_AUTHORIZATION
+}
+
+analyzer._identity_store = (
+    lambda:
+        _GA5_IDENTITY
+)
+
+
 SCOPE = {"company_id": "empresa-a", "user_id": "ana", "business_unit": None, "branch": None}
 OTHER_SCOPE = {"company_id": "empresa-b", "user_id": "ana", "business_unit": None, "branch": None}
 
@@ -134,7 +216,7 @@ with tempfile.TemporaryDirectory() as td:
             scope=analyzer._local_deliverable_scope(),
         )
         with TestClient(analyzer.app) as client:
-            api = client.post("/api/ask", json={"run_id": "run-main", "question": "¿Qué formatos generó?"})
+            api = client.post("/api/ask", headers=HISTORICAL_HEADERS, json={"run_id": "run-main", "question": "¿Qué formatos generó?"})
             check("api_ask", api.status_code == 200 and api.json()["result"]["status"] == "ANSWERED")
             page = client.get("/")
             check("dashboard_html_compatibility", b"const dashboardFile=d.dashboard||d.html||null;" in page.content and b"/dashboard/undefined" not in page.content)
