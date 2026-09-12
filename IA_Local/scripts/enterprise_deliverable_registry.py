@@ -262,6 +262,48 @@ class GovernedDeliverableRegistry:
                 return (artifacts / item["filename"]).resolve()
         raise DeliverableRegistryError("ARTIFACT_NOT_FOUND", "El formato no existe en esta ejecución")
 
+    def _import_migrated_record(self, record: Dict[str, Any], target_scope: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
+        """Import a verified record into an explicit new scope for an upgrade migration.
+
+        This intentionally preserves the source record and artifacts.  It is the
+        only supported cross-scope write because scope participates in the record
+        fingerprint.
+        """
+        if not isinstance(record, dict):
+            raise DeliverableRegistryError("MIGRATION_RECORD_INVALID", "Registro de entrega inválido")
+        source_scope = record.get("scope")
+        run_id = _safe_id(record.get("run_id"), "run_id")
+        # Verify both the record closure and the referenced artifacts before use.
+        expected = str(record.get("record_fingerprint_sha256") or "").lower()
+        unsigned = dict(record); unsigned.pop("record_fingerprint_sha256", None)
+        if not isinstance(source_scope, dict) or expected != hashlib.sha256(_canonical(unsigned)).hexdigest():
+            raise DeliverableRegistryError("RECORD_INTEGRITY_MISMATCH", "Registro de entrega alterado")
+        for item in list(record.get("deliverables") or []):
+            current = self._artifact(str(item.get("format") or ""), item.get("filename"))
+            if current["sha256"] != item.get("sha256") or current["size_bytes"] != item.get("size_bytes"):
+                raise DeliverableRegistryError("ARTIFACT_INTEGRITY_MISMATCH", "Un entregable fue modificado")
+        target = normalize_deliverable_scope(target_scope)
+        assert_tenant_active(target, self.tenant_registry)
+        candidate = dict(unsigned); candidate["scope"] = target
+        candidate["record_fingerprint_sha256"] = hashlib.sha256(_canonical(candidate)).hexdigest()
+        path = self._record_path(target, run_id, create_dir=True)
+        if path.exists():
+            existing = self.get(target, run_id, verify_artifacts=True)
+            if existing == candidate:
+                return dict(existing), False
+            raise DeliverableRegistryError("MIGRATION_TARGET_CONFLICT", "Ya existe una entrega distinta en el scope destino")
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                os.link(temporary, path)
+            except FileExistsError as exc:
+                raise DeliverableRegistryError("MIGRATION_TARGET_CONFLICT", "Conflicto concurrente en el scope destino") from exc
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+        return dict(candidate), True
+
 
 def deliverable_registry_public_audit(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     formats = sorted({item.get("format") for record in records for item in list(record.get("deliverables") or []) if item.get("format")})

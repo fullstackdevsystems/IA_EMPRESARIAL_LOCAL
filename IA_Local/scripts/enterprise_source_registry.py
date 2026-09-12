@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -69,6 +71,146 @@ def _validate_scope(scope: Any, source_id: str, index: int) -> List[str]:
     if invalid:
         errors.append(f"source_{index}:invalid_scope_values:{source_id}:{','.join(sorted(invalid))}")
     return errors
+
+
+def _migration_scope(scope: Any) -> Dict[str, str]:
+    """Internal upgrade-only scope validator; Source Registry has its own schema."""
+    if not isinstance(scope, dict) or set(scope) - _ALLOWED_SCOPE_KEYS:
+        raise ValueError("invalid source migration scope")
+    normalized = {key: _normalized_scalar(value) for key, value in scope.items()}
+    if not normalized or any(value is None for value in normalized.values()):
+        raise ValueError("invalid source migration scope")
+    if "tenant_id" not in normalized and "company_id" not in normalized:
+        raise ValueError("source migration requires tenant/company")
+    return {key: str(value) for key, value in normalized.items()}
+
+
+
+def _prepare_scope_clone(
+    payload: Dict[str, Any],
+    source_scope: Dict[str, Any],
+    target_scope: Dict[str, Any],
+    source_id_map: Dict[str, str],
+) -> tuple[Dict[str, Any], Dict[str, str]]:
+    """Internal upgrade helper; preserves source entries and clones explicit scope.
+
+    Source IDs are globally unique. An already-existing target ID is accepted
+    only when its full governed entry is exactly the candidate that this
+    migration would create; otherwise migration fails closed.
+    """
+    source = _migration_scope(source_scope)
+    target = _migration_scope(target_scope)
+
+    if (
+        not isinstance(payload, dict)
+        or str(payload.get("schema_version") or "")
+        != ENTERPRISE_SOURCE_REGISTRY_VERSION
+    ):
+        raise ValueError("invalid source registry payload")
+
+    sources = payload.get("sources")
+
+    if not isinstance(sources, list):
+        raise ValueError("invalid source registry payload")
+
+    out = [
+        dict(item)
+        for item in sources
+        if isinstance(item, dict)
+    ]
+
+    if len(out) != len(sources):
+        raise ValueError("invalid source registry entry")
+
+    by_id: Dict[str, Dict[str, Any]] = {}
+
+    for item in out:
+        source_id = str(
+            item.get("source_id")
+            or ""
+        ).strip()
+
+        if (
+            not source_id
+            or source_id in by_id
+        ):
+            raise ValueError("invalid source registry entry")
+
+        by_id[source_id] = item
+
+    migrated: Dict[str, str] = {}
+
+    for index, item in enumerate(
+        list(out)
+    ):
+        if item.get("scope") != source:
+            continue
+
+        old_id = str(
+            item.get("source_id")
+            or ""
+        ).strip()
+
+        new_id = str(
+            source_id_map.get(old_id)
+            or ""
+        ).strip()
+
+        if not old_id or not new_id:
+            raise ValueError(
+                "source migration target conflict"
+            )
+
+        clone = dict(item)
+        clone["source_id"] = new_id
+        clone["scope"] = dict(target)
+
+        if _validate_source(
+            clone,
+            index,
+        ):
+            raise ValueError(
+                "invalid migrated source"
+            )
+
+        existing = by_id.get(
+            new_id
+        )
+
+        if existing is not None:
+            if existing != clone:
+                raise ValueError(
+                    "source migration target conflict"
+                )
+
+            migrated[old_id] = new_id
+            continue
+
+        out.append(clone)
+        by_id[new_id] = clone
+        migrated[old_id] = new_id
+
+    result = dict(payload)
+    result["sources"] = out
+
+    return result, migrated
+
+
+def _write_migrated_registry(path: Path, payload: Dict[str, Any]) -> None:
+    """Internal atomic writer used only by the governed upgrade migrator."""
+    candidate = load_governed_enterprise_source_registry(str(path))
+    # Validate the supplied payload through the same validator in a sibling temp.
+    handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=".sources-migration-", suffix=".tmp", delete=False)
+    try:
+        with handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        checked = load_governed_enterprise_source_registry(handle.name)
+        if checked.get("status") == "INVALID":
+            raise ValueError("invalid migrated source registry")
+        os.replace(handle.name, path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
 
 def _validate_no_inline_secrets(value: Any, path: str = "") -> List[str]:
     errors: List[str] = []

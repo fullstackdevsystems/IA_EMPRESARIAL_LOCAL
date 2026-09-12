@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence
@@ -150,6 +151,41 @@ class QdrantVectorStore(VectorStore):
     def _collection(self, kind: str) -> str:
         return "ia_empresarial_" + "".join(c if c.isalnum() else "_" for c in kind)[:40]
 
+    @staticmethod
+    def _migration_vector_values(value):
+        """Normalize qdrant-client vector representations for upgrade checks."""
+        if isinstance(value, dict):
+            if len(value) != 1:
+                raise ValueError("multi-vector migration is unsupported")
+            value = next(iter(value.values()))
+        return list(value)
+
+    @classmethod
+    def _migration_vectors_equal(cls, left, right) -> bool:
+        a, b = cls._migration_vector_values(left), cls._migration_vector_values(right)
+        return len(a) == len(b) and all(math.isclose(float(x), float(y), rel_tol=1e-6, abs_tol=1e-7) for x, y in zip(a, b))
+
+    def _migration_canonical_vector(self, collection: str, value):
+        """Apply the collection's documented dense-vector persistence semantics.
+
+        Local Qdrant can expose a legacy cosine point in its pre-normalized
+        form after reopen, while a new upsert is normalized.  Migration uses
+        the collection configuration, not an embedding provider, to copy the
+        canonical dense representation that Qdrant writes for COSINE.
+        """
+        params = self.client.get_collection(collection).config.params.vectors
+        if isinstance(params, dict) or getattr(params, "multivector_config", None) is not None:
+            raise ValueError("named or multi-vector migration is unsupported")
+        vector = self._migration_vector_values(value)
+        if len(vector) != int(params.size):
+            raise ValueError("qdrant vector dimension mismatch")
+        if str(params.distance).lower().endswith("cosine"):
+            magnitude = math.sqrt(sum(float(item) * float(item) for item in vector))
+            if magnitude == 0.0:
+                raise ValueError("zero cosine vector migration is unsupported")
+            return [float(item) / magnitude for item in vector]
+        return vector
+
     def _ensure(self, kind: str, dimension: int) -> str:
         name = self._collection(kind)
         try:
@@ -221,6 +257,66 @@ class QdrantVectorStore(VectorStore):
             self.client.delete(self._collection(kind), points_selector=PointIdsList(points=ids), wait=True)
         except Exception:
             pass
+
+    def _plan_scope_clone(self, source_company: str, source_user: str, target_company: str, target_user: str, vector_id_map=None, document_id_map=None, dataset_id_map=None):
+        """Internal upgrade-only point copier; never deletes source points."""
+        try:
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
+            out = []
+            for collection in self.client.get_collections().collections:
+                name = collection.name
+                offset = None
+                while True:
+                    points, offset = self.client.scroll(name, scroll_filter=Filter(must=[FieldCondition(key="company_id", match=MatchValue(value=source_company))]), limit=256, offset=offset, with_payload=True, with_vectors=True)
+                    for point in points:
+                        payload = dict(point.payload or {})
+                        if payload.get("user_id") != source_user:
+                            continue
+                        vector_id_map = vector_id_map or {}
+                        document_id_map = document_id_map or {}
+                        dataset_id_map = dataset_id_map or {}
+                        target_id = vector_id_map.get(str(point.id), str(uuid.uuid5(uuid.NAMESPACE_URL, f"legacy-qdrant|{name}|{point.id}|{target_company}|{target_user}")))
+                        target_payload = {**payload, "company_id": target_company, "user_id": target_user}
+                        if target_payload.get("document_id") in document_id_map:
+                            target_payload["document_id"] = document_id_map[target_payload["document_id"]]
+                        if target_payload.get("dataset_id") in dataset_id_map:
+                            target_payload["dataset_id"] = dataset_id_map[target_payload["dataset_id"]]
+                        existing = self.client.retrieve(name, ids=[target_id], with_payload=True, with_vectors=True)
+                        # Scroll may return the pre-normalized input for cosine
+                        # collections; retrieve is the canonical persisted value.
+                        source_read = self.client.retrieve(name, ids=[str(point.id)], with_payload=False, with_vectors=True)
+                        if len(source_read) != 1:
+                            raise ValueError("qdrant source point unavailable")
+                        vector = self._migration_canonical_vector(name, source_read[0].vector)
+                        if existing:
+                            candidate = existing[0]
+                            if dict(candidate.payload or {}) != target_payload or not self._migration_vectors_equal(candidate.vector, vector):
+                                raise ValueError("qdrant target conflict")
+                            create = False
+                        else:
+                            create = True
+                        out.append({"collection": name, "source_id": str(point.id), "target_id": target_id, "vector": vector, "payload": target_payload, "create": create})
+                    if offset is None:
+                        break
+            return out
+        except Exception:
+            raise
+
+    def _apply_scope_clone(self, points):
+        """Internal upgrade-only apply; source points remain untouched."""
+        for item in points:
+            if item["create"]:
+                self.client.upsert(item["collection"], points=[self._PointStruct(id=item["target_id"], vector=item["vector"], payload=item["payload"])], wait=True)
+                read = self.client.retrieve(item["collection"], ids=[item["target_id"]], with_payload=True, with_vectors=True)
+                if len(read) != 1:
+                    raise RuntimeError("qdrant migration verification missing point")
+                if dict(read[0].payload or {}) != item["payload"]:
+                    raise RuntimeError("qdrant migration verification payload mismatch")
+                actual = self._migration_canonical_vector(item["collection"], read[0].vector)
+                if not self._migration_vectors_equal(actual, item["vector"]):
+                    expected = self._migration_vector_values(item["vector"])
+                    delta = max((abs(float(a) - float(b)) for a, b in zip(actual, expected)), default=float("inf"))
+                    raise RuntimeError(f"qdrant migration verification vector mismatch dimensions={len(actual)}/{len(expected)} max_delta={delta:.8g}")
 
 
 def build_vector_store(cfg: Dict[str, Any]) -> VectorStore:

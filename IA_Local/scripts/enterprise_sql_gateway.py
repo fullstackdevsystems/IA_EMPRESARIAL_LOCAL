@@ -668,6 +668,21 @@ class EnterpriseSqlConnectionStore:
     def list(self, scope: Dict[str, Any]) -> List[Dict[str, Any]]:
         directory = self._dir(scope)
         return [] if not directory.exists() else [self._read(p) for p in sorted(directory.glob("*.json"))]
+    def _import_migrated_profile(self, record: Dict[str, Any], target_scope: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
+        """Import a verified SQL profile into an explicit scope without resolving secrets."""
+        if not isinstance(record, dict) or _fingerprint(record) != record.get("fingerprint_sha256"):
+            raise EnterpriseSqlError("SQL_CONNECTION_INTEGRITY_MISMATCH", "Profile SQL alterado")
+        connection_id = _safe(record.get("connection_id"), "SQL_CONNECTION_INVALID")
+        target = normalize_deliverable_scope(target_scope); assert_tenant_active(target, self.tenant_registry)
+        candidate = dict(record); candidate["scope"] = target; candidate["fingerprint_sha256"] = _fingerprint(candidate)
+        path = self._path(target, connection_id, True)
+        if path.exists():
+            existing = self._read(path)
+            if existing == candidate:
+                return dict(existing), False
+            raise EnterpriseSqlError("MIGRATION_TARGET_CONFLICT", "Ya existe un profile SQL distinto en el scope destino")
+        self._write(target, connection_id, candidate)
+        return dict(candidate), True
     def update(self, scope: Dict[str,Any], connection_id: str, **changes) -> Dict[str,Any]:
         record=self.get(scope,connection_id); allowed={"display_name","server","database","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","secret_reference","username"}
         if set(changes)-allowed: raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Campo administrativo no permitido")

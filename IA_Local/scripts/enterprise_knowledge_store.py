@@ -161,6 +161,23 @@ class EnterpriseKnowledgeStore:
                 matches.append({**record, "relevance": {"score": score}})
         return sorted(matches, key=lambda item: (-item["relevance"]["score"], item["knowledge_id"]))
 
+    def _import_migrated_record(self, record: Dict[str, Any], target_scope: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
+        """Import an integrity-verified legacy record under an explicit new scope."""
+        if not isinstance(record, dict) or _fingerprint(record) != str(record.get("fingerprint_sha256") or ""):
+            raise EnterpriseKnowledgeError("KNOWLEDGE_INTEGRITY_MISMATCH", "El record de conocimiento fue modificado")
+        knowledge_id = _safe_id(record.get("knowledge_id"))
+        target = normalize_deliverable_scope(target_scope)
+        assert_tenant_active(target, self.tenant_registry)
+        candidate = dict(record); candidate["scope"] = target
+        candidate["fingerprint_sha256"] = _fingerprint(candidate)
+        path = self._path(target, knowledge_id, create=True)
+        if path.exists():
+            existing = self._read(path)
+            if existing == candidate:
+                return dict(existing), False
+            raise EnterpriseKnowledgeError("MIGRATION_TARGET_CONFLICT", "Ya existe conocimiento distinto en el scope destino")
+        return self._write(path, candidate), True
+
     def invalidate(self, scope: Dict[str, Any], knowledge_id: str, *, reason: str, actor: str) -> Dict[str, Any]:
         path = self._path(scope, knowledge_id)
         record = self.get(scope, knowledge_id)

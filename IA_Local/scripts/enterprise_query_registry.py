@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -88,6 +90,129 @@ def _validate_query(query: Dict[str, Any], index: int) -> List[str]:
         errors.append(f"query_{index}:inline_credentials_forbidden:{query_id}:{','.join(present)}")
 
     return errors
+
+
+
+def _prepare_source_clones(
+    payload: Dict[str, Any],
+    source_id_map: Dict[str, str],
+    query_id_map: Dict[str, str],
+) -> Dict[str, Any]:
+    """Internal upgrade helper to keep approved-query source bindings intact.
+
+    Existing target query IDs are idempotent only when the full governed query
+    exactly matches the candidate clone; differing content remains a conflict.
+    """
+    if (
+        not isinstance(payload, dict)
+        or str(payload.get("schema_version") or "")
+        != ENTERPRISE_QUERY_REGISTRY_VERSION
+    ):
+        raise ValueError("invalid query registry payload")
+
+    queries = payload.get("queries")
+
+    if not isinstance(queries, list):
+        raise ValueError("invalid query registry payload")
+
+    out = [
+        dict(item)
+        for item in queries
+        if isinstance(item, dict)
+    ]
+
+    if len(out) != len(queries):
+        raise ValueError("invalid query registry entry")
+
+    by_id: Dict[str, Dict[str, Any]] = {}
+
+    for item in out:
+        query_id = str(
+            item.get("query_id")
+            or ""
+        ).strip()
+
+        if (
+            not query_id
+            or query_id in by_id
+        ):
+            raise ValueError("invalid query registry entry")
+
+        by_id[query_id] = item
+
+    for index, item in enumerate(
+        list(out)
+    ):
+        old_source = str(
+            item.get("source_id")
+            or ""
+        ).strip()
+
+        if old_source not in source_id_map:
+            continue
+
+        old_id = str(
+            item.get("query_id")
+            or ""
+        ).strip()
+
+        new_id = str(
+            query_id_map.get(old_id)
+            or ""
+        ).strip()
+
+        if not old_id or not new_id:
+            raise ValueError(
+                "query migration target conflict"
+            )
+
+        clone = dict(item)
+        clone["query_id"] = new_id
+        clone["source_id"] = source_id_map[
+            old_source
+        ]
+
+        if _validate_query(
+            clone,
+            index,
+        ):
+            raise ValueError(
+                "invalid migrated query"
+            )
+
+        existing = by_id.get(
+            new_id
+        )
+
+        if existing is not None:
+            if existing != clone:
+                raise ValueError(
+                    "query migration target conflict"
+                )
+
+            continue
+
+        out.append(clone)
+        by_id[new_id] = clone
+
+    result = dict(payload)
+    result["queries"] = out
+
+    return result
+
+
+def _write_migrated_registry(path: Path, payload: Dict[str, Any]) -> None:
+    handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=".queries-migration-", suffix=".tmp", delete=False)
+    try:
+        with handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        checked = load_governed_enterprise_query_registry(handle.name)
+        if checked.get("status") == "INVALID":
+            raise ValueError("invalid migrated query registry")
+        os.replace(handle.name, path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
 
 
 def load_governed_enterprise_query_registry(path: Optional[str] = None) -> Dict[str, Any]:
