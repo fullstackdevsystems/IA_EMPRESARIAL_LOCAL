@@ -4158,6 +4158,110 @@ def sql_query(
         _sql_http_error(exc)
 
 
+@app.post("/api/sql/query-safe")
+def sql_safe_query(
+    payload: Dict[str, Any],
+    tenant_id: Optional[str] = None,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    """
+    Execute a governed SQL query assembled from structured
+    schema/object/column input.
+
+    The client never supplies raw SQL. The canonical SQL gateway
+    builds and validates the SELECT statement against the persisted
+    read-only allowlist before execution.
+    """
+    actor = _sql_admin_actor(
+        authorization,
+        "sql:read",
+    )
+
+    scope = _sql_admin_scope(
+        actor,
+        tenant_id,
+    )
+
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "SQL_QUERY_INVALID",
+                "message":
+                    "Solicitud SQL inválida",
+            },
+        )
+
+    allowed = {
+        "connection_id",
+        "schema",
+        "object",
+        "columns",
+        "limit",
+    }
+
+    if set(payload) - allowed:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "SQL_QUERY_INVALID",
+                "message":
+                    "La consulta estructurada contiene campos no permitidos",
+            },
+        )
+
+    connection_id = str(
+        payload.get(
+            "connection_id"
+        )
+        or ""
+    ).strip()
+
+    if not connection_id:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    "SQL_CONNECTION_NOT_FOUND",
+                "message":
+                    "connection_id es obligatorio",
+            },
+        )
+
+    request = {
+        key:
+            payload[key]
+        for key in (
+            "schema",
+            "object",
+            "columns",
+            "limit",
+        )
+        if key in payload
+    }
+
+    try:
+        executor = _sql_executor()
+
+        return execute_smoke_query(
+            executor.store,
+            executor.provider,
+            scope,
+            connection_id,
+            request,
+        )
+
+    except EnterpriseSqlError as exc:
+        _sql_http_error(
+            exc
+        )
+
+
 @app.post("/api/ask")
 def ask_enterprise_question(
     payload: Dict[str, Any],
