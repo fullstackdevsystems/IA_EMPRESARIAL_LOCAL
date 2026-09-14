@@ -991,7 +991,7 @@ def _register_governed_deliverables(
     )
 
 
-def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None, register_dataset: bool = True) -> Dict[str, Any]:
     # R10.13C.2: request prompt is immutable authority for this execution.
     request_prompt = str(prompt or "").strip()
     if not request_prompt:
@@ -1216,36 +1216,36 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
     )
 
     # Registra el archivo tabular para consultas deterministicas futuras del ContextEngine.
-    try:
-        if ENTERPRISE_COMPONENTS is not None:
-            if isinstance(auth_actor, dict):
-                principal = Principal(
-                    str(auth_actor["tenant_id"]),
-                    str(auth_actor["user_id"]),
-                    (
-                        "admin"
-                        if "SYSTEM_ADMIN" in set(auth_actor.get("roles") or [])
-                        else "user"
-                    ),
-                )
-            else:
-                sec = ENTERPRISE_COMPONENTS.cfg.section("security")
-                principal = Principal(
-                    sec.get("default_company", "empresa-local"),
-                    sec.get("default_user", "admin-local"),
-                    "admin",
-                )
+    if register_dataset:
+        try:
+            if ENTERPRISE_COMPONENTS is not None:
+                if isinstance(auth_actor, dict):
+                    principal = Principal(
+                        str(auth_actor["tenant_id"]),
+                        str(auth_actor["user_id"]),
+                        (
+                            "admin"
+                            if "SYSTEM_ADMIN" in set(auth_actor.get("roles") or [])
+                            else "user"
+                        ),
+                    )
+                else:
+                    sec = ENTERPRISE_COMPONENTS.cfg.section("security")
+                    principal = Principal(
+                        sec.get("default_company", "empresa-local"),
+                        sec.get("default_user", "admin-local"),
+                        "admin",
+                    )
 
-            ENTERPRISE_COMPONENTS.datasets.register(
-                principal,
-                path,
-                name=path.name,
-                scope="company",
-                roles=roles,
-            )
-    except Exception as _dataset_exc:
-        notes.append(f"V8: no se pudo registrar el dataset para consultas futuras: {_dataset_exc}")
-
+                ENTERPRISE_COMPONENTS.datasets.register(
+                    principal,
+                    path,
+                    name=path.name,
+                    scope="company",
+                    roles=roles,
+                )
+        except Exception as _dataset_exc:
+            notes.append(f"V8: no se pudo registrar el dataset para consultas futuras: {_dataset_exc}")
     deliverable_run = _register_governed_deliverables(
         profile=profile,
         outputs=outputs,
@@ -2204,6 +2204,135 @@ def _authenticated_content_scope(
         "unreachable"
     )
 
+
+
+@app.post("/api/enterprise/datasets/{dataset_id}/analyze")
+def analyze_registered_enterprise_dataset(
+    dataset_id: str,
+    payload: Dict[str, Any],
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    """Generate governed deliverables from an already registered dataset."""
+    actor = _authorize_analysis(authorization)
+
+    _require_actor_permission(
+        actor,
+        "deliverable:read",
+        code="DATASET_READ_PERMISSION_DENIED",
+        message="Permiso para consultar datasets requerido",
+    )
+
+    if ENTERPRISE_COMPONENTS is None:
+        raise base.HTTPException(
+            status_code=503,
+            detail={
+                "code": "ENTERPRISE_COMPONENTS_UNAVAILABLE",
+                "message": "La capa empresarial no está disponible.",
+            },
+        )
+
+    requested_id = str(dataset_id or "").strip()
+    request_prompt = str(
+        (payload or {}).get("prompt") or ""
+    ).strip()
+
+    if not request_prompt:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": "PROMPT_REQUIRED",
+                "message": "La solicitud de análisis es obligatoria.",
+            },
+        )
+
+    principal = Principal(
+        str(actor["tenant_id"]),
+        str(actor["user_id"]),
+        (
+            "admin"
+            if "SYSTEM_ADMIN" in set(actor.get("roles") or [])
+            else "user"
+        ),
+    )
+
+    dataset = next(
+        (
+            item
+            for item in ENTERPRISE_COMPONENTS.datasets.list(principal)
+            if str(item.get("id") or "") == requested_id
+        ),
+        None,
+    )
+
+    if dataset is None:
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code": "DATASET_NOT_FOUND",
+                "message": "Dataset no encontrado.",
+            },
+        )
+
+    raw_path = str(dataset.get("path") or "").strip()
+
+    if not raw_path:
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code": "DATASET_SOURCE_NOT_FOUND",
+                "message": "La fuente del dataset no está disponible.",
+            },
+        )
+
+    source_path = Path(raw_path).resolve()
+    workspace_root = base.WORKSPACE.resolve()
+
+    if (
+        not source_path.is_file()
+        or (
+            source_path != workspace_root
+            and workspace_root not in source_path.parents
+        )
+    ):
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code": "DATASET_SOURCE_NOT_FOUND",
+                "message": "La fuente del dataset no está disponible.",
+            },
+        )
+
+    if source_path.suffix.lower() not in {
+        ".csv",
+        ".xlsx",
+        ".xls",
+        ".xlsm",
+        ".xlsb",
+    }:
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code": "DATASET_FORMAT_UNSUPPORTED",
+                "message": "El dataset no tiene un formato analizable.",
+            },
+        )
+
+    auth_context_token = base.ANALYZE_AUTH_CONTEXT.set(actor)
+
+    try:
+        result = analyze_file(
+            source_path,
+            request_prompt,
+            register_dataset=False,
+        )
+    finally:
+        base.ANALYZE_AUTH_CONTEXT.reset(auth_context_token)
+
+    if isinstance(result, dict):
+        result["dataset_id"] = requested_id
+        result["dataset_name"] = str(dataset.get("name") or "")
+
+    return result
 
 
 # analizador_app owns /api/analyze; the universal commercial runtime
