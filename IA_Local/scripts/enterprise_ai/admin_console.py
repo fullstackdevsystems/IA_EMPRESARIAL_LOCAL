@@ -9,7 +9,7 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Segoe UI,Arial,sans-serif}.layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;padding:20px 14px}.brand{font-weight:800;font-size:18px;margin:4px 8px 22px}.nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button.active,.nav button:hover{background:#1e293b;color:#fff}.main{padding:24px;min-width:0}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.links a{margin-left:12px;color:var(--blue);text-decoration:none}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.metric,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #2342a30c}.metric{padding:15px}.metric b{font-size:24px;display:block;margin-top:4px}.card{padding:18px;margin:14px 0}.panel{display:none}.panel.active{display:block}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}input,select,textarea{border:1px solid #cbd5e1;border-radius:8px;padding:8px;width:100%;font:inherit}textarea{min-height:75px}.btn{border:0;border-radius:8px;padding:8px 11px;background:var(--blue);color:#fff;cursor:pointer}.btn.ok{background:var(--green)}.btn.warn{background:var(--amber)}.btn.danger{background:var(--red)}.btn.muted{background:#64748b}.table{overflow:auto}.table table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:9px;border-bottom:1px solid #e5e7eb;vertical-align:top}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#e2e8f0;font-size:11px}.pill.VALIDADO{background:#dcfce7;color:#166534}.pill.PROPUESTO{background:#fef3c7;color:#92400e}.pill.RECHAZADO,.pill.OBSOLETO{background:#fee2e2;color:#991b1b}.pill.READY,.pill.TESTED{background:#dcfce7;color:#166534}.pill.CONFIGURED{background:#dbeafe;color:#1d4ed8}.pill.DEGRADED{background:#fef3c7;color:#92400e}.pill.BLOCKED{background:#fee2e2;color:#991b1b}.pill.NOT_REQUIRED{background:#e2e8f0;color:#475569}.mutedtxt{color:var(--muted);font-size:12px}.notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;margin:12px 0}.error{background:#fef2f2;border-color:#fecaca}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.actions{white-space:nowrap}.empty{padding:18px;color:var(--muted)}.guided-sql{border:1px solid #bfdbfe;background:#f8fbff}.guided-steps{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.guided-step{background:#e2e8f0;border-radius:999px;padding:5px 9px;font-size:12px}.guided-step.active{background:#dbeafe;color:#1d4ed8;font-weight:700}.guided-object-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:320px;overflow:auto;padding:8px;border:1px solid #dbe3ee;border-radius:10px;background:#fff}.guided-object-item{display:flex;align-items:center;gap:8px;padding:7px;border:1px solid #e5e7eb;border-radius:8px}.guided-object-item input{width:auto}.guided-success{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px}.advanced-sql-toggle{margin-top:12px}@media(max-width:950px){.guided-object-list{grid-template-columns:1fr}}pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;max-height:420px;overflow:auto}@media(max-width:950px){.layout{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:5;padding:10px}.brand{margin:0 8px 8px}.nav{display:flex;overflow:auto}.nav button{width:auto;white-space:nowrap}.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="layout"><aside class="side"><div class="brand">IA Empresarial Local<br><span style="font-size:11px;font-weight:400;color:#94a3b8">Administración</span></div><div class="nav" id="nav">
-<button data-p="resumen" class="active">Resumen</button><button data-p="controlplane">Plataforma</button><button data-p="memoria">Memoria</button><button data-p="documentos">Documentos / RAG</button><button data-p="semantica">Diccionario</button><button data-p="reglas">Reglas empresariales</button><button data-p="analiticas">Reglas analíticas</button><button data-p="feedback">Feedback</button><button data-p="trazas">Trazabilidad</button><button data-p="historial">Historial</button><button data-p="auditoria">Auditoría</button></div></aside>
+<button data-p="resumen" class="active">Resumen</button><button data-p="controlplane">Plataforma</button><button data-p="memoria">Memoria</button><button data-p="documentos">Documentos / RAG</button><button data-p="semantica">Diccionario</button><button data-p="reglas">Reglas empresariales</button><button data-p="analiticas">Reglas analíticas</button><button data-p="feedback">Feedback</button><button data-p="trazas">Trazabilidad</button><button data-p="historial">Historial</button><button data-p="auditoria">Auditoría</button><button data-p="recuperacion" data-cp-permission="backup:create" data-cp-system-admin="true">Recuperación</button></div></aside>
 <main class="main"><div class="top"><div><h2 style="margin:0">Administración empresarial</h2><div class="mutedtxt">Conocimiento, gobernanza, aprendizaje y trazabilidad en una sola consola.</div></div><div class="links"><a id="assistant" href="/assistant">Asistente</a><a href="/">Analizador</a><button class="btn muted" onclick="enterpriseLogout()">Cerrar sesión</button></div></div><div id="auth" class="notice error" style="display:none"></div><div id="msg"></div>
 <section id="resumen" class="panel active"><div class="grid" id="metrics"></div><div class="card"><h3>Estado de conocimiento</h3><div id="statusSummary"></div></div></section>
 <section id="controlplane" class="panel"><div class="card"><h3>Administración de plataforma</h3><div class="mutedtxt">Administración segura de empresa, usuarios, SQL Server e inteligencia artificial.</div><div id="controlSummary"></div></div><div class="card" id="cpReadinessCard"><h3>Preparación de empresa</h3><div class="mutedtxt">Estado de empresa, administrador, SQL Server, inteligencia artificial e identidad visual. Configurado no equivale a conexión validada.</div><div id="controlReadiness" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn muted" data-cp-permission="config:read" onclick="controlLoadReadiness(false)">Actualizar estado</button><button class="btn ok" data-cp-permission="config:read" onclick="controlValidateReadiness()">Validar preparación</button></div></div><div class="card table"><h3>Empresas</h3><div id="controlTenants"></div><div id="cpTenantCreate" data-cp-permission="tenant:update" data-cp-system-admin="true" class="settings" style="margin-top:12px"><label>ID empresa<input id="cpTenantId" autocomplete="off" placeholder="empresa-norte"></label><label>Nombre<input id="cpTenantName" autocomplete="off"></label><label>Unidad de negocio predeterminada<input id="cpTenantBusinessUnit" autocomplete="off"></label><label>Sucursal predeterminada<input id="cpTenantBranch" autocomplete="off"></label><label>Idioma<input id="cpTenantLocale" autocomplete="off" value="es-MX"></label><label>Zona horaria<input id="cpTenantTimezone" autocomplete="off" placeholder="America/Mazatlan"></label></div><button id="cpCreateTenantBtn" class="btn" data-cp-permission="tenant:update" data-cp-system-admin="true" onclick="controlCreateTenant()">Crear empresa</button></div><div class="card table"><h3>Usuarios y roles</h3><div id="controlUsers"></div><div id="cpUserCreate" data-cp-permission="user:create" class="settings" style="margin-top:12px"><label>ID usuario<input id="cpUserId" autocomplete="off"></label><label>Usuario<input id="cpUsername" autocomplete="off"></label><label>Nombre<input id="cpDisplayName" autocomplete="off"></label><label>Roles<input id="cpRoles" value="VIEWER" placeholder="VIEWER o ANALYST"></label><label>Contraseña<input id="cpUserPassword" type="password" autocomplete="new-password"></label></div><button id="cpCreateUserBtn" class="btn" data-cp-permission="user:create" onclick="controlCreateUser()">Crear usuario</button></div>
@@ -61,7 +61,55 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 <div id="controlSql"></div>
 <button id="cpSqlAdvancedToggle" class="btn muted advanced-sql-toggle" data-cp-permission="sql:configure" onclick="controlToggleSqlAdvanced()">Configuración avanzada</button>
 <div id="cpSqlCreate" data-cp-permission="sql:configure" data-cp-advanced-sql="true" class="settings" style="margin-top:12px;display:none"><label>ID conexión<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticación<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Autenticación integrada de Windows</option><option value="SQL_AUTH">Autenticación de SQL Server</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Credencial SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Esquemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Máximo de filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" data-cp-advanced-sql="true" style="display:none" onclick="controlCreateSql()">Crear conexión SQL</button></div><div class="card"><h3>Proveedor de inteligencia artificial</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo de proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">Compatible local con OpenAI</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Tiempo máximo de espera (segundos)<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Ventana de contexto<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Sí</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
-<section id="memoria" class="panel"><div class="card"><h3>Memoria permanente</h3><div class="formgrid"><input id="memText" placeholder="Conocimiento o preferencia"><select id="memCategory"><option>conocimiento_empresa</option><option>regla_negocio</option><option>definicion</option><option>preferencia</option><option>procedimiento</option></select></div><div style="margin-top:8px"><button class="btn" onclick="createMemory()">Guardar memoria</button></div></div><div class="card table" id="memoryTable"></div></section>
+<section id="recuperacion" class="panel">
+<div class="card">
+<h3>Respaldo y recuperación del sistema</h3>
+<div class="notice">
+Estas operaciones abarcan el estado persistente completo de IA Empresarial Local.
+El servicio local se detendrá brevemente para obtener una copia consistente o para restaurar el respaldo.
+Los secretos locales de ejecución no se incluyen en los respaldos.
+</div>
+<div class="row">
+<button class="btn ok"
+ data-cp-permission="backup:create"
+ data-cp-system-admin="true"
+ onclick="maintenanceCreateBackup()">
+Crear respaldo
+</button>
+<button class="btn muted"
+ data-cp-permission="backup:create"
+ data-cp-system-admin="true"
+ onclick="loadMaintenanceJobs()">
+Actualizar operaciones
+</button>
+</div>
+<div id="maintenanceStatus" class="mutedtxt" style="margin-top:10px"></div>
+</div>
+<div class="card">
+<h3>Restaurar respaldo</h3>
+<div class="notice error">
+La restauración reemplaza el estado persistente administrado.
+El archivo se valida antes de detener el servicio y se valida nuevamente durante la recuperación.
+</div>
+<input id="maintenanceRestoreFile" type="file" accept=".zip,application/zip">
+<label style="margin-top:10px">
+Escribe RESTAURAR para confirmar
+<input id="maintenanceRestoreConfirm"
+ autocomplete="off"
+ placeholder="RESTAURAR">
+</label>
+<button class="btn danger"
+ data-cp-permission="backup:restore"
+ data-cp-system-admin="true"
+ onclick="maintenanceRestore()">
+Restaurar respaldo
+</button>
+</div>
+<div class="card table">
+<h3>Operaciones recientes</h3>
+<div id="maintenanceJobs"></div>
+</div>
+</section><section id="memoria" class="panel"><div class="card"><h3>Memoria permanente</h3><div class="formgrid"><input id="memText" placeholder="Conocimiento o preferencia"><select id="memCategory"><option>conocimiento_empresa</option><option>regla_negocio</option><option>definicion</option><option>preferencia</option><option>procedimiento</option></select></div><div style="margin-top:8px"><button class="btn" onclick="createMemory()">Guardar memoria</button></div></div><div class="card table" id="memoryTable"></div></section>
 <section id="documentos" class="panel"><div class="card"><h3>Documentos / RAG</h3><input type="file" id="docFile"><div style="margin-top:8px"><button class="btn" onclick="uploadDoc()">Indexar documento</button></div></div><div class="card table" id="docsTable"></div></section>
 <section id="semantica" class="panel"><div class="card"><h3>Diccionario empresarial</h3><div class="formgrid"><input id="semPhysical" placeholder="Nombre físico: Cve_Clie"><input id="semName" placeholder="Concepto: customer_id"><input id="semArea" placeholder="Área (opcional)"><input id="semDesc" placeholder="Descripción"></div><div style="margin-top:8px"><button class="btn" onclick="proposeSemantic()">Crear propuesta</button></div></div><div class="card table" id="semanticTable"></div></section>
 <section id="reglas" class="panel"><div class="card"><h3>Reglas empresariales</h3><div class="formgrid"><input id="ruleName" placeholder="Nombre: UTILIDAD_REAL"><input id="ruleArea" placeholder="Área"><textarea id="ruleExpression" placeholder="Expresión: Venta - Costo - Flete"></textarea><textarea id="ruleDesc" placeholder="Descripción"></textarea></div><button class="btn" onclick="proposeRule()">Crear propuesta</button></div><div class="card table" id="rulesTable"></div></section>
@@ -2186,6 +2234,206 @@ async function controlSaveAi(){
     }
 }
 
+
+function maintenanceStatus(message){
+    const el=document.getElementById('maintenanceStatus');
+    if(el)el.textContent=String(message||'')
+}
+
+function maintenanceStatusLabel(value){
+    const map={
+        QUEUED:'En cola',
+        UPLOADING:'Recibiendo respaldo',
+        STOPPING:'Deteniendo servicio',
+        VALIDATING:'Validando respaldo',
+        BACKING_UP:'Creando respaldo',
+        RESTORING:'Restaurando',
+        STARTING:'Iniciando servicio',
+        VERIFYING:'Validando servicio',
+        COMPLETED:'Completado',
+        FAILED:'Falló'
+    };
+    return map[String(value||'')]||String(value||'N/D')
+}
+
+function renderMaintenanceJobs(items){
+    const host=document.getElementById('maintenanceJobs');
+    if(!host)return;
+    const rows=Array.isArray(items)?items:[];
+    if(!rows.length){
+        host.innerHTML='<div class="empty">Sin operaciones de mantenimiento.</div>';
+        return
+    }
+    host.innerHTML='<table><thead><tr><th>Operación</th><th>Estado</th><th>Fecha</th><th>Resultado</th><th>Acciones</th></tr></thead><tbody>'+
+        rows.map(job=>{
+            const operation=job.operation==='restore'?'Restauración':'Respaldo';
+            const status=maintenanceStatusLabel(job.status);
+            const result=job.error_code?esc(job.error_code):(job.status==='COMPLETED'?'OK':'');
+            const download=(
+                job.operation==='backup'&&
+                job.status==='COMPLETED'&&
+                job.download_ready
+            )?'<button class="btn" onclick="maintenanceDownload(\''+
+                esc(job.job_id)+'\')">Descargar</button>':'';
+            return '<tr><td>'+esc(operation)+'</td><td>'+esc(status)+'</td><td>'+
+                esc(job.updated_at||job.created_at||'')+'</td><td>'+result+
+                '</td><td>'+download+'</td></tr>'
+        }).join('')+'</tbody></table>'
+}
+
+async function loadMaintenanceJobs(){
+    if(!controlSystemAdmin()||!can('backup:create'))return;
+    maintenanceStatus('Consultando operaciones...');
+    try{
+        const response=await fetch(
+            '/api/admin/maintenance/jobs',
+            {headers:H()}
+        );
+        if(response.status===401){
+            showLogin('La sesión expiró o fue revocada.');
+            return
+        }
+        let payload={};
+        try{payload=await response.json()}catch{}
+        if(!response.ok){
+            throw new Error(
+                (payload.detail&&payload.detail.message)||
+                'No se pudieron consultar las operaciones.'
+            )
+        }
+        renderMaintenanceJobs(payload.items||[]);
+        maintenanceStatus('Operaciones actualizadas.')
+    }catch(e){
+        maintenanceStatus(
+            'El servicio puede estar reiniciándose. Usa Actualizar operaciones cuando vuelva a estar disponible.'
+        )
+    }
+}
+
+async function maintenanceCreateBackup(){
+    if(!controlSystemAdmin()||!can('backup:create'))return;
+    if(!confirm('El servicio local se reiniciará brevemente para crear un respaldo consistente. ¿Continuar?'))return;
+    maintenanceStatus('Programando respaldo...');
+    try{
+        const response=await fetch(
+            '/api/admin/maintenance/backup',
+            {
+                method:'POST',
+                headers:H()
+            }
+        );
+        let payload={};
+        try{payload=await response.json()}catch{}
+        if(response.status===401){
+            showLogin('La sesión expiró o fue revocada.');
+            return
+        }
+        if(!response.ok){
+            const detail=payload.detail||{};
+            throw new Error(
+                detail.message||
+                detail.code||
+                'No se pudo iniciar el respaldo.'
+            )
+        }
+        maintenanceStatus(
+            'Respaldo iniciado. El servicio se reiniciará brevemente. Después usa Actualizar operaciones.'
+        );
+        renderMaintenanceJobs([payload])
+    }catch(e){
+        toast(e.message||'No se pudo iniciar el respaldo.',true)
+    }
+}
+
+async function maintenanceRestore(){
+    if(!controlSystemAdmin()||!can('backup:restore'))return;
+    const input=document.getElementById('maintenanceRestoreFile');
+    const confirmValue=String(
+        document.getElementById('maintenanceRestoreConfirm').value||''
+    ).trim();
+    const file=input&&input.files?input.files[0]:null;
+    if(!file){
+        toast('Selecciona el archivo ZIP de respaldo.',true);
+        return
+    }
+    if(confirmValue!=='RESTAURAR'){
+        toast('Escribe RESTAURAR para confirmar la recuperación.',true);
+        return
+    }
+    if(!confirm('La restauración reemplazará el estado persistente administrado y reiniciará el servicio. ¿Continuar?'))return;
+    maintenanceStatus('Validando y programando restauración...');
+    const form=new FormData();
+    form.append('file',file);
+    try{
+        const response=await fetch(
+            '/api/admin/maintenance/restore',
+            {
+                method:'POST',
+                headers:H(),
+                body:form
+            }
+        );
+        let payload={};
+        try{payload=await response.json()}catch{}
+        if(response.status===401){
+            showLogin('La sesión expiró o fue revocada.');
+            return
+        }
+        if(!response.ok){
+            const detail=payload.detail||{};
+            throw new Error(
+                detail.message||
+                detail.code||
+                'No se pudo iniciar la restauración.'
+            )
+        }
+        input.value='';
+        document.getElementById('maintenanceRestoreConfirm').value='';
+        maintenanceStatus(
+            'Respaldo validado. La restauración comenzó y el servicio se reiniciará. Es posible que debas iniciar sesión nuevamente con las credenciales restauradas.'
+        );
+        renderMaintenanceJobs([payload])
+    }catch(e){
+        toast(e.message||'No se pudo iniciar la restauración.',true)
+    }
+}
+
+async function maintenanceDownload(jobId){
+    if(!controlSystemAdmin()||!can('backup:create'))return;
+    try{
+        const response=await fetch(
+            '/api/admin/maintenance/jobs/'+
+            encodeURIComponent(jobId)+
+            '/download',
+            {headers:H()}
+        );
+        if(response.status===401){
+            showLogin('La sesión expiró o fue revocada.');
+            return
+        }
+        if(!response.ok){
+            let payload={};
+            try{payload=await response.json()}catch{}
+            const detail=payload.detail||{};
+            throw new Error(
+                detail.message||
+                detail.code||
+                'El respaldo no está disponible.'
+            )
+        }
+        const blob=await response.blob();
+        if(!blob.size)throw new Error('El respaldo está vacío.');
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement('a');
+        link.href=url;
+        link.download='IA_EMPRESARIAL_LOCAL_backup_'+String(jobId)+'.zip';
+        link.click();
+        setTimeout(()=>URL.revokeObjectURL(url),0)
+    }catch(e){
+        toast(e.message||'No se pudo descargar el respaldo.',true)
+    }
+}
+
 async function loadControlPlane(){
     controlInitializeGuidedAi();
     const jobs=[];
@@ -2258,5 +2506,5 @@ async function validateFeedback(id){try{await api('/api/enterprise/feedback/'+id
 async function explainTrace(id){try{const d=await api('/api/enterprise/traces/'+id+'/explain',{headers:H()});document.getElementById('traceExplain').innerHTML='<pre>'+esc(d.explanation||JSON.stringify(d,null,2))+'</pre>'}catch(e){toast(e.message,true)}}
 async function loadHistory(){try{const d=await api('/api/enterprise/knowledge/'+encodeURIComponent(histType.value)+'/'+encodeURIComponent(histId.value)+'/history',{headers:H()});historyOut.innerHTML='<pre>'+esc(JSON.stringify(d,null,2))+'</pre>'}catch(e){toast(e.message,true)}}
 async function loadAudit(){try{const d=await api('/api/enterprise/audit?limit=100',{headers:H()});document.getElementById('auditTable').innerHTML=table(d.events,[['Evento','event_type'],['Objeto','object_type'],['Resultado','outcome'],['Fecha','created_at']])}catch(e){document.getElementById('auditTable').innerHTML='<div class="empty">Auditoría disponible solo para administrador.</div>'}}
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.p).classList.add('active');if(b.dataset.p==='controlplane')loadControlPlane()});if(token){establishSession().then(ok=>{if(ok)refreshAll()})}else showLogin();
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.p).classList.add('active');if(b.dataset.p==='controlplane')loadControlPlane();if(b.dataset.p==='recuperacion')loadMaintenanceJobs()});if(token){establishSession().then(ok=>{if(ok)refreshAll()})}else showLogin();
 </script></body></html>'''

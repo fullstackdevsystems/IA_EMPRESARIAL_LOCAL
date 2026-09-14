@@ -3697,6 +3697,635 @@ class _TransientSqlSecretProvider:
         self._values.clear()
 
 
+
+# ---------------------------------------------------------
+# R10.23-B.6 — governed out-of-process backup / recovery.
+# Runtime-wide maintenance is SYSTEM_ADMIN-only.
+# The browser never supplies or receives filesystem paths.
+# ---------------------------------------------------------
+
+import asyncio as _maintenance_asyncio
+
+from fastapi import File as _maintenance_file
+from fastapi import Request as _maintenance_request
+from fastapi import UploadFile as _maintenance_upload_file
+
+from enterprise_maintenance_worker import (
+    MaintenanceBusy as _MaintenanceBusy,
+    MaintenanceError as _MaintenanceError,
+    backup_artifact_path as _maintenance_backup_artifact_path,
+    create_job as _maintenance_create_job,
+    fail_job as _maintenance_fail_job,
+    get_public_job as _maintenance_get_public_job,
+    launch_worker as _launch_maintenance_worker,
+    list_public_jobs as _maintenance_list_public_jobs,
+    max_upload_bytes as _maintenance_max_upload_bytes,
+    new_job_id as _maintenance_new_job_id,
+    release_job_lock as _maintenance_release_job_lock,
+    restore_upload_path as _maintenance_restore_upload_path,
+    sha256_file as _maintenance_sha256_file,
+    strict_validate_archive as _maintenance_validate_archive,
+    update_job as _maintenance_update_job,
+)
+
+
+
+def _maintenance_actor(
+    authorization: str,
+    permission: str,
+) -> Dict[str, Any]:
+    actor = _bearer(
+        authorization
+    )
+
+    if (
+        "SYSTEM_ADMIN"
+        not in set(
+            actor.get(
+                "roles"
+            )
+            or []
+        )
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "MAINTENANCE_SYSTEM_ADMIN_REQUIRED",
+                "message":
+                    "La recuperación del sistema requiere SYSTEM_ADMIN",
+            },
+        )
+
+    if permission not in {
+        "backup:create",
+        "backup:restore",
+    }:
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "MAINTENANCE_PERMISSION_DENIED",
+                "message":
+                    "Permiso de mantenimiento denegado",
+            },
+        )
+
+    if not _identity_store().has_permission(
+        actor,
+        permission,
+    ):
+        raise base.HTTPException(
+            status_code=403,
+            detail={
+                "code":
+                    "MAINTENANCE_PERMISSION_DENIED",
+                "message":
+                    "Permiso de mantenimiento denegado",
+            },
+        )
+
+    return actor
+
+
+
+def _maintenance_product_root() -> Path:
+    return (
+        base.ROOT
+        .resolve()
+        .parent
+    )
+
+
+
+def _maintenance_runtime_port(
+    request: _maintenance_request,
+) -> int:
+    try:
+        server = (
+            request.scope.get(
+                "server"
+            )
+            or (
+                None,
+                8090,
+            )
+        )
+
+        port = int(
+            server[1]
+            or 8090
+        )
+
+    except Exception:
+        port = 8090
+
+    if not (
+        1
+        <= port
+        <= 65535
+    ):
+        return 8090
+
+    return port
+
+
+async def _maintenance_upload_heartbeat(
+    product_root: Path,
+    job_id: str,
+    *,
+    interval_seconds: float = 30.0,
+) -> None:
+    try:
+        interval = float(
+            interval_seconds
+        )
+    except Exception:
+        interval = 30.0
+
+    # stale_job_seconds() has a minimum of five minutes.
+    # Keep the normal heartbeat comfortably below that
+    # without allowing an excessively tight loop.
+    interval = max(
+        5.0,
+        min(
+            interval,
+            60.0,
+        ),
+    )
+
+    while True:
+        await _maintenance_asyncio.sleep(
+            interval
+        )
+
+        _maintenance_update_job(
+            product_root,
+            job_id,
+            status="UPLOADING",
+        )
+
+
+def _maintenance_http_error(
+    exc: Exception,
+):
+    if isinstance(
+        exc,
+        _MaintenanceBusy,
+    ):
+        raise base.HTTPException(
+            status_code=409,
+            detail={
+                "code":
+                    "MAINTENANCE_BUSY",
+                "message":
+                    "Ya existe una operación de mantenimiento en curso",
+            },
+        )
+
+    if isinstance(
+        exc,
+        _MaintenanceError,
+    ):
+        raise base.HTTPException(
+            status_code=400,
+            detail={
+                "code":
+                    exc.code,
+                "message":
+                    "El respaldo no cumple el contrato de recuperación",
+            },
+        )
+
+    raise exc
+
+
+@app.get("/api/admin/maintenance/jobs")
+def admin_maintenance_jobs(
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    _maintenance_actor(
+        authorization,
+        "backup:create",
+    )
+
+    return {
+        "items":
+            _maintenance_list_public_jobs(
+                _maintenance_product_root(),
+                30,
+            )
+    }
+
+
+@app.get("/api/admin/maintenance/jobs/{job_id}")
+def admin_maintenance_job(
+    job_id: str,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    _maintenance_actor(
+        authorization,
+        "backup:create",
+    )
+
+    try:
+        return _maintenance_get_public_job(
+            _maintenance_product_root(),
+            job_id,
+        )
+    except _MaintenanceError:
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code":
+                    "MAINTENANCE_JOB_NOT_FOUND",
+                "message":
+                    "Operación no encontrada",
+            },
+        )
+
+
+@app.post(
+    "/api/admin/maintenance/backup",
+    status_code=202,
+)
+
+def admin_maintenance_backup(
+    request: _maintenance_request,
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _maintenance_actor(
+        authorization,
+        "backup:create",
+    )
+
+    product_root = (
+        _maintenance_product_root()
+    )
+
+    job = None
+
+    try:
+        job = _maintenance_create_job(
+            product_root,
+            "backup",
+            actor.get(
+                "user_id"
+            ),
+            runtime_port=(
+                _maintenance_runtime_port(
+                    request
+                )
+            ),
+            restart_after=True,
+        )
+
+        _launch_maintenance_worker(
+            product_root,
+            job[
+                "job_id"
+            ],
+        )
+
+        return _maintenance_get_public_job(
+            product_root,
+            job[
+                "job_id"
+            ],
+        )
+
+    except Exception as exc:
+        if job:
+            _maintenance_fail_job(
+                product_root,
+                job[
+                    "job_id"
+                ],
+                (
+                    exc.code
+                    if isinstance(
+                        exc,
+                        _MaintenanceError,
+                    )
+                    else
+                    "MAINTENANCE_LAUNCH_FAILED"
+                ),
+            )
+
+        _maintenance_http_error(
+            exc
+        )
+
+
+@app.post(
+    "/api/admin/maintenance/restore",
+    status_code=202,
+)
+
+
+async def admin_maintenance_restore(
+    request: _maintenance_request,
+    file: _maintenance_upload_file = _maintenance_file(...),
+    authorization: str = Header(""),
+) -> Dict[str, Any]:
+    actor = _maintenance_actor(
+        authorization,
+        "backup:restore",
+    )
+
+    product_root = (
+        _maintenance_product_root()
+    )
+
+    job_id = (
+        _maintenance_new_job_id()
+    )
+
+    upload = (
+        _maintenance_restore_upload_path(
+            product_root,
+            job_id,
+        )
+    )
+
+    job = None
+    heartbeat_task = None
+    total = 0
+
+    limit = (
+        _maintenance_max_upload_bytes()
+    )
+
+    try:
+        # Reserve the global maintenance slot before reading
+        # the potentially large backup body.
+        job = _maintenance_create_job(
+            product_root,
+            "restore",
+            actor.get(
+                "user_id"
+            ),
+            job_id=job_id,
+            runtime_port=(
+                _maintenance_runtime_port(
+                    request
+                )
+            ),
+            restart_after=True,
+        )
+
+        _maintenance_update_job(
+            product_root,
+            job_id,
+            status="UPLOADING",
+        )
+
+        # Refresh the pre-worker lease by elapsed time rather
+        # than transferred bytes. This keeps a legitimately
+        # slow upload alive even when no 16 MiB boundary is
+        # crossed for several minutes.
+        heartbeat_task = (
+            _maintenance_asyncio.create_task(
+                _maintenance_upload_heartbeat(
+                    product_root,
+                    job_id,
+                )
+            )
+        )
+
+        try:
+            with upload.open(
+                "wb"
+            ) as stream:
+                while True:
+                    chunk = await file.read(
+                        1024 * 1024
+                    )
+
+                    if not chunk:
+                        break
+
+                    total += len(
+                        chunk
+                    )
+
+                    if total > limit:
+                        raise base.HTTPException(
+                            status_code=413,
+                            detail={
+                                "code":
+                                    "BACKUP_UPLOAD_TOO_LARGE",
+                                "message":
+                                    "El respaldo excede el límite configurado",
+                            },
+                        )
+
+                    stream.write(
+                        chunk
+                    )
+
+        finally:
+            if heartbeat_task is not None:
+                heartbeat_task.cancel()
+
+                try:
+                    await heartbeat_task
+
+                except _maintenance_asyncio.CancelledError:
+                    pass
+
+                heartbeat_task = None
+
+        if total <= 0:
+            raise base.HTTPException(
+                status_code=400,
+                detail={
+                    "code":
+                        "BACKUP_UPLOAD_EMPTY",
+                    "message":
+                        "Selecciona un respaldo válido",
+                },
+            )
+
+        validation = (
+            _maintenance_validate_archive(
+                upload
+            )
+        )
+
+        upload_hash = (
+            _maintenance_sha256_file(
+                upload
+            )
+        )
+
+        _maintenance_update_job(
+            product_root,
+            job_id,
+            status="QUEUED",
+            input_sha256=upload_hash,
+        )
+
+        _launch_maintenance_worker(
+            product_root,
+            job_id,
+        )
+
+        result = (
+            _maintenance_get_public_job(
+                product_root,
+                job_id,
+            )
+        )
+
+        result[
+            "validated_files"
+        ] = int(
+            validation[
+                "total_files"
+            ]
+        )
+
+        return result
+
+    except base.HTTPException as exc:
+        upload.unlink(
+            missing_ok=True
+        )
+
+        if job:
+            detail = (
+                exc.detail
+                if isinstance(
+                    exc.detail,
+                    dict,
+                )
+                else {}
+            )
+
+            _maintenance_fail_job(
+                product_root,
+                job_id,
+                str(
+                    detail.get(
+                        "code"
+                    )
+                    or "MAINTENANCE_REQUEST_FAILED"
+                ),
+            )
+
+        raise
+
+    except Exception as exc:
+        upload.unlink(
+            missing_ok=True
+        )
+
+        if job:
+            _maintenance_fail_job(
+                product_root,
+                job_id,
+                (
+                    exc.code
+                    if isinstance(
+                        exc,
+                        _MaintenanceError,
+                    )
+                    else
+                    "MAINTENANCE_REQUEST_FAILED"
+                ),
+            )
+
+        _maintenance_http_error(
+            exc
+        )
+
+
+@app.get(
+    "/api/admin/maintenance/jobs/{job_id}/download"
+)
+def admin_maintenance_download(
+    job_id: str,
+    authorization: str = Header(""),
+):
+    _maintenance_actor(
+        authorization,
+        "backup:create",
+    )
+
+    product_root = (
+        _maintenance_product_root()
+    )
+
+    try:
+        job = _maintenance_get_public_job(
+            product_root,
+            job_id,
+        )
+    except _MaintenanceError:
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code":
+                    "MAINTENANCE_JOB_NOT_FOUND",
+                "message":
+                    "Operación no encontrada",
+            },
+        )
+
+    if (
+        job.get(
+            "operation"
+        )
+        != "backup"
+        or job.get(
+            "status"
+        )
+        != "COMPLETED"
+        or not job.get(
+            "download_ready"
+        )
+    ):
+        raise base.HTTPException(
+            status_code=409,
+            detail={
+                "code":
+                    "BACKUP_NOT_READY",
+                "message":
+                    "El respaldo todavía no está disponible",
+            },
+        )
+
+    artifact = (
+        _maintenance_backup_artifact_path(
+            product_root,
+            job_id,
+        )
+    )
+
+    if not artifact.is_file():
+        raise base.HTTPException(
+            status_code=404,
+            detail={
+                "code":
+                    "BACKUP_ARTIFACT_NOT_FOUND",
+                "message":
+                    "El respaldo ya no está disponible",
+            },
+        )
+
+    return base.FileResponse(
+        artifact,
+        media_type="application/zip",
+        filename=(
+            "IA_EMPRESARIAL_LOCAL_"
+            "backup_"
+            + str(job_id)
+            + ".zip"
+        ),
+    )
+
+
 @app.post("/api/admin/sql/probe")
 def admin_sql_probe(
     payload: Dict[str, Any],
