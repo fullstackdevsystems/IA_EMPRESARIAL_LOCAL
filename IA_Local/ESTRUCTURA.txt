@@ -5,8 +5,8 @@ C:\IA_Local
 +-- DETENER_IA.bat              Detiene los servicios
 +-- DIAGNOSTICO_PRODUCTIVO.bat   Diagnostico tecnico
 +-- RESPALDAR_IA.bat             Respaldo de datos persistentes
-+-- ABRIR_ASISTENTE.bat          Abre puerto 8090 / assistant
-+-- ABRIR_ADMIN_MEMORIA_RAG.bat  Administracion de memoria/RAG
++-- ABRIR_ASISTENTE.bat          Abre el asistente con login empresarial
++-- ABRIR_ADMIN_MEMORIA_RAG.bat  Abre administracion con login empresarial
 +-- ABRIR_INTERFAZ.bat           Interfaz principal
 +-- ABRIR_REPORTES.bat           Carpeta de reportes
 +-- VERSION.txt                  Version instalada

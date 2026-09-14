@@ -220,9 +220,4 @@ Write-Host "Para Excel grandes (por ejemplo 40 MB o cientos de miles de filas), 
 Write-Host "No adjuntes esos Excel directamente al chat de Open WebUI: su cargador documental aplica limites de seguridad al XLSX descomprimido."
 Write-Host ""
 
-if (Test-Path $EnterpriseToken) {
-    $tok = (Get-Content $EnterpriseToken -Raw).Trim()
-    Start-Process ("http://127.0.0.1:8090/assistant#token=" + [uri]::EscapeDataString($tok))
-} else {
-    Start-Process "http://127.0.0.1:8090"
-}
+Start-Process "http://127.0.0.1:8090/assistant"

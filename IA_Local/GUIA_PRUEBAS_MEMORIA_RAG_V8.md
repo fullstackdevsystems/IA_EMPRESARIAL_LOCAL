@@ -35,8 +35,8 @@ Interfaces:
 
 - Open WebUI: `http://127.0.0.1:8080`
 - Analizador Excel/CSV: `http://127.0.0.1:8090`
-- Asistente V8: ejecutar `ABRIR_ASISTENTE.bat`
-- Administración: ejecutar `ABRIR_ADMIN_MEMORIA_RAG.bat`
+- Asistente V8: `http://127.0.0.1:8090/assistant` (o ejecutar `ABRIR_ASISTENTE.bat`); el acceso usa login empresarial.
+- Administración: `http://127.0.0.1:8090/admin` (o ejecutar `ABRIR_ADMIN_MEMORIA_RAG.bat`); el acceso usa login empresarial.
 
 ## Diagnóstico
 
