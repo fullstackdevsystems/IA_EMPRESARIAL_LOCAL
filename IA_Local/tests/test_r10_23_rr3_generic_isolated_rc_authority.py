@@ -42,6 +42,12 @@ R1022F_MANIFEST = (
     / "MANIFEST_SHA256.json"
 )
 
+R1023_RC1 = (
+    ROOT
+    / "release_candidates"
+    / "r10.23-rc1"
+)
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(
@@ -58,6 +64,27 @@ def check(
         "PASS",
         name,
     )
+
+
+def authority_state(
+    root: Path,
+):
+    if not root.exists():
+        return None
+
+    if not root.is_dir():
+        return {
+            "__INVALID_TYPE__": True,
+        }
+
+    return {
+        path.relative_to(root).as_posix():
+            sha256(path)
+        for path in sorted(
+            root.rglob("*")
+        )
+        if path.is_file()
+    }
 
 
 def run_tool(
@@ -134,6 +161,10 @@ before = {
     "R1022F_MANIFEST":
         sha256(R1022F_MANIFEST),
 }
+
+r1023_authority_before = authority_state(
+    R1023_RC1
+)
 
 with tempfile.TemporaryDirectory(
     prefix="r10_23_rr3_"
@@ -374,14 +405,31 @@ check(
     before == after,
 )
 
-check(
-    "R10_23_AUTHORITY_NOT_CREATED",
-    not (
-        ROOT
-        / "release_candidates"
-        / "r10.23-rc1"
-    ).exists(),
+r1023_authority_after = authority_state(
+    R1023_RC1
 )
+
+check(
+    "R10_23_AUTHORITY_STATE_UNCHANGED",
+    (
+        r1023_authority_after
+        == r1023_authority_before
+    ),
+)
+
+if r1023_authority_before is None:
+    check(
+        "R10_23_AUTHORITY_NOT_CREATED",
+        r1023_authority_after is None,
+    )
+else:
+    check(
+        "PREEXISTING_R10_23_AUTHORITY_PRESERVED",
+        (
+            r1023_authority_after
+            == r1023_authority_before
+        ),
+    )
 
 print(
     "PASS R10.23-RR.3 GENERIC ISOLATED RC AUTHORITY"
