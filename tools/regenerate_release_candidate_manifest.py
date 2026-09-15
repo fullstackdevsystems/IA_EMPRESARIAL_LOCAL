@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -108,7 +109,13 @@ def main() -> int:
             "unexpected RC product version"
         )
 
-    if metadata["release"] != "r10.22-rc1":
+    release = str(metadata["release"]).strip()
+
+    if re.fullmatch(
+        r"r[0-9]+[.][0-9]+-rc[1-9][0-9]*",
+        release,
+        re.IGNORECASE,
+    ) is None:
         raise SystemExit(
             "unexpected RC release"
         )
