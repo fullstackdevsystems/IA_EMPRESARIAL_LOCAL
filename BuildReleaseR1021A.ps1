@@ -106,27 +106,135 @@ if (Test-Path $zipPath) {
 
 New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
-foreach ($item in $manifest.files) {
-    $relative = [string]$item.path
-    if ($relative -eq "RELEASE_METADATA.json") {
-        $source = $ReleaseMetadataPath
-    }
-    else {
-        $source = Join-Path $Root $relative
-    }
-    $destination = Join-Path $stageRoot $relative
+function Write-GitHeadBlob {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
 
-    if (-not (Test-Path $source -PathType Leaf)) {
-        throw "PACKAGE_SOURCE_MISSING: $relative"
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    $normalized = $RelativePath.Replace('\', '/')
+    $spec = "HEAD:$normalized"
+
+    $destinationDir = Split-Path $Destination -Parent
+
+    if (-not (Test-Path $destinationDir)) {
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $destinationDir |
+            Out-Null
     }
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "git"
+    $startInfo.WorkingDirectory = $Root
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    $escapedSpec = $spec.Replace('"', '\"')
+    $startInfo.Arguments = "cat-file blob `"$escapedSpec`""
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+
+    if (-not $process.Start()) {
+        throw "GIT_BLOB_PROCESS_START_FAILED: $normalized"
+    }
+
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+
+    $output = [System.IO.File]::Open(
+        $Destination,
+        [System.IO.FileMode]::Create,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::None
+    )
+
+    try {
+        $process.StandardOutput.BaseStream.CopyTo(
+            $output
+        )
+    }
+    finally {
+        $output.Dispose()
+    }
+
+    $process.WaitForExit()
+    $stderr = $stderrTask.Result
+
+    if ($process.ExitCode -ne 0) {
+        Remove-Item `
+            -LiteralPath $Destination `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        $message = "GIT_HEAD_BLOB_READ_FAILED: $normalized | $($stderr.Trim())"
+        throw $message
+    }
+}
+
+$manifestPathSet = @{}
+
+foreach ($item in $manifest.files) {
+    $relative = ([string]$item.path).Replace('\', '/')
+    $destination = Join-Path $stageRoot $relative
+    $manifestPathSet[$relative] = $true
 
     $destinationDir = Split-Path $destination -Parent
 
     if (-not (Test-Path $destinationDir)) {
-        New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $destinationDir |
+            Out-Null
     }
 
-    Copy-Item $source $destination -Force
+    if ($relative -eq "RELEASE_METADATA.json") {
+        if (-not (Test-Path $ReleaseMetadataPath -PathType Leaf)) {
+            throw "PACKAGE_SOURCE_MISSING: $relative"
+        }
+
+        Copy-Item `
+            $ReleaseMetadataPath `
+            $destination `
+            -Force
+    }
+    else {
+        Write-GitHeadBlob `
+            -RelativePath $relative `
+            -Destination $destination
+    }
+
+    if (-not (Test-Path $destination -PathType Leaf)) {
+        throw "PACKAGE_MATERIALIZATION_MISSING: $relative"
+    }
+
+    $expectedHash = ([string]$item.sha256).ToLowerInvariant()
+    $actualHash = (
+        Get-FileHash `
+            -LiteralPath $destination `
+            -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+
+    if ($actualHash -ne $expectedHash) {
+        throw "PACKAGE_MATERIALIZED_HASH_MISMATCH: $relative"
+    }
+
+    $expectedSize = [long]$item.size
+    $actualSize = (
+        Get-Item `
+            -LiteralPath $destination
+    ).Length
+
+    if ($actualSize -ne $expectedSize) {
+        throw "PACKAGE_MATERIALIZED_SIZE_MISMATCH: $relative"
+    }
 }
 
 # El manifest mismo forma parte del paquete aunque no se liste a sí mismo.
@@ -146,14 +254,16 @@ $requiredRootFiles = @(
 )
 
 foreach ($relative in $requiredRootFiles) {
-    $source = Join-Path $Root $relative
+    $normalized = $relative.Replace('\', '/')
     $destination = Join-Path $stageRoot $relative
 
-    if (-not (Test-Path $source -PathType Leaf)) {
-        throw "REQUIRED_RELEASE_FILE_MISSING: $relative"
+    if (-not $manifestPathSet.ContainsKey($normalized)) {
+        throw "REQUIRED_RELEASE_FILE_NOT_MANIFESTED: $normalized"
     }
 
-    Copy-Item $source $destination -Force
+    if (-not (Test-Path $destination -PathType Leaf)) {
+        throw "REQUIRED_RELEASE_FILE_NOT_MATERIALIZED: $normalized"
+    }
 }
 
 # Exclusiones defensivas.

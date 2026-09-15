@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -38,6 +39,33 @@ def sha256(path: Path) -> str:
             digest.update(chunk)
 
     return digest.hexdigest()
+
+
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def git_head_blob(relative: str) -> bytes:
+    normalized = relative.replace("\\", "/")
+
+    result = subprocess.run(
+        [
+            "git",
+            "cat-file",
+            "blob",
+            "HEAD:" + normalized,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+    )
+
+    if result.returncode != 0:
+        raise SystemExit(
+            "missing canonical HEAD blob: "
+            + normalized
+        )
+
+    return result.stdout
 
 
 def load_json(path: Path) -> dict:
@@ -146,20 +174,27 @@ def main() -> int:
 
     for relative in sorted(paths):
         if relative == "RELEASE_METADATA.json":
-            source = metadata_path
-        else:
-            source = ROOT / relative
+            if not metadata_path.is_file():
+                raise SystemExit(
+                    "missing RC manifest source: "
+                    + relative
+                )
 
-        if not source.is_file():
-            raise SystemExit(
-                f"missing RC manifest source: {relative}"
+            payload_bytes = metadata_path.read_bytes()
+        else:
+            payload_bytes = git_head_blob(
+                relative
             )
 
         files.append(
             {
                 "path": relative,
-                "sha256": sha256(source),
-                "size": source.stat().st_size,
+                "sha256": sha256_bytes(
+                    payload_bytes
+                ),
+                "size": len(
+                    payload_bytes
+                ),
             }
         )
 
