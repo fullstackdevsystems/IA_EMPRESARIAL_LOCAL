@@ -3095,6 +3095,17 @@ class _EnterpriseAiHealthAdapter:
 
         return True
 
+    def discover_models(self, config: Dict[str, Any]):
+        provider_type = str(config.get("provider_type") or "").upper()
+        if provider_type != "OLLAMA":
+            return {"supported": False}
+        provider = OllamaProvider(
+            str(config.get("base_url") or ""),
+            str(config.get("model") or "discovery"),
+            timeout=int(config.get("timeout") or 30),
+        )
+        return provider.list_models()
+
 
 def _enterprise_onboarding() -> EnterpriseOnboarding:
     return EnterpriseOnboarding(
@@ -3214,6 +3225,29 @@ def test_ai_provider(
             "tenant_id": target,
         }
 
+    except PlatformConfigError as exc:
+        _config_http_error(exc)
+
+@app.post("/api/admin/ai/provider/models")
+def discover_ai_provider_models(
+    payload: Dict[str, Any],
+    authorization: str = Header(""),
+):
+    actor = _config_actor(authorization, "config:read")
+    target = _config_target(actor, payload.get("tenant_id"))
+    provider = (
+        payload.get("provider")
+        or _platform_config().resolve_effective_config(target).get("ai_provider")
+        or {}
+    )
+    try:
+        return {
+            **_platform_config().discover_models(
+                provider,
+                adapter=_EnterpriseAiHealthAdapter(),
+            ),
+            "tenant_id": target,
+        }
     except PlatformConfigError as exc:
         _config_http_error(exc)
 

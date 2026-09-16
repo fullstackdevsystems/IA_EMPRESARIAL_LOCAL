@@ -148,6 +148,27 @@ class OllamaProvider(LLMProvider):
         except Exception:
             return False
 
+    def list_models(self) -> List[Dict[str, str]]:
+        """Return only the public model identifiers reported by local Ollama."""
+        try:
+            with urllib.request.urlopen(
+                self.base_url + "/api/tags",
+                timeout=self.timeout,
+            ) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except TimeoutError:
+            raise
+        except Exception as exc:
+            raise ProviderError("Ollama no disponible") from exc
+        models = data.get("models")
+        if not isinstance(models, list):
+            raise ProviderError("Respuesta de modelos inválida")
+        return [
+            {"id": str(item.get("name") or "").strip(), "name": str(item.get("name") or "").strip()}
+            for item in models
+            if isinstance(item, dict)
+        ]
+
 
 class LMStudioProvider(LLMProvider):
     name = "lmstudio"

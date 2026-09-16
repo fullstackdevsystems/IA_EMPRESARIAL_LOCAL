@@ -106,3 +106,37 @@ class EnterprisePlatformConfigStore:
   except TimeoutError as e:raise PlatformConfigError("AI_PROVIDER_TIMEOUT","Tiempo de espera IA agotado") from e
   except PlatformConfigError:raise
   except Exception as e:raise PlatformConfigError("AI_PROVIDER_UNAVAILABLE","Provider IA no disponible") from e
+ def discover_models(self,config,adapter=None):
+  """Discover public local-model names without exposing endpoint details or errors."""
+  p=_provider(config)
+  result={"provider":p["provider_type"].lower(),"reachable":False,"models":[],"capability":"UNSUPPORTED","status":"UNSUPPORTED"}
+  if p["provider_type"]=="DISABLED":
+   result.update({"provider":"disabled","reachable":True,"status":"DISABLED"})
+   return result
+  if not adapter:
+   result.update({"capability":"SUPPORTED","status":"UNAVAILABLE"})
+   return result
+  try:
+   raw=adapter.discover_models(p)
+   if isinstance(raw,dict) and raw.get("supported") is False:
+    return result
+   if not isinstance(raw,list):
+    result.update({"capability":"SUPPORTED","status":"INVALID_RESPONSE"})
+    return result
+   models=[];seen=set()
+   for item in raw:
+    value=(item.get("id") or item.get("name")) if isinstance(item,dict) else item
+    try:value=_safe_model(value)
+    except PlatformConfigError:
+     result.update({"capability":"SUPPORTED","status":"INVALID_RESPONSE"})
+     return result
+    if value and value.lower() not in seen:
+     seen.add(value.lower());models.append({"id":value,"name":value})
+   result.update({"capability":"SUPPORTED","reachable":True,"models":models,"status":"PASS" if models else "EMPTY"})
+   return result
+  except TimeoutError:
+   result.update({"capability":"SUPPORTED","status":"TIMEOUT"})
+   return result
+  except Exception:
+   result.update({"capability":"SUPPORTED","status":"UNAVAILABLE"})
+   return result

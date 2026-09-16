@@ -60,7 +60,7 @@ UNIFIED_ADMIN_HTML = r'''<!doctype html>
 <div class="mutedtxt">Conexiones configuradas. Las opciones técnicas permanecen disponibles sólo en configuración avanzada.</div>
 <div id="controlSql"></div>
 <button id="cpSqlAdvancedToggle" class="btn muted advanced-sql-toggle" data-cp-permission="sql:configure" onclick="controlToggleSqlAdvanced()">Configuración avanzada</button>
-<div id="cpSqlCreate" data-cp-permission="sql:configure" data-cp-advanced-sql="true" class="settings" style="margin-top:12px;display:none"><label>ID conexión<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticación<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Autenticación integrada de Windows</option><option value="SQL_AUTH">Autenticación de SQL Server</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Credencial SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Esquemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Máximo de filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" data-cp-advanced-sql="true" style="display:none" onclick="controlCreateSql()">Crear conexión SQL</button></div><div class="card"><h3>Proveedor de inteligencia artificial</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo de proveedor<select id="cpAiType"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">Compatible local con OpenAI</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434"></label><label>Modelo<input id="cpAiModel" autocomplete="off"></label><label>Tiempo máximo de espera (segundos)<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Ventana de contexto<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Sí</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
+<div id="cpSqlCreate" data-cp-permission="sql:configure" data-cp-advanced-sql="true" class="settings" style="margin-top:12px;display:none"><label>ID conexión<input id="cpSqlId" autocomplete="off"></label><label>Nombre<input id="cpSqlDisplay" autocomplete="off"></label><label>Servidor<input id="cpSqlServer" autocomplete="off"></label><label>Base de datos<input id="cpSqlDatabase" autocomplete="off"></label><label>Autenticación<select id="cpSqlAuth"><option value="WINDOWS_INTEGRATED">Autenticación integrada de Windows</option><option value="SQL_AUTH">Autenticación de SQL Server</option></select></label><label>Usuario SQL<input id="cpSqlUsername" autocomplete="off"></label><label>Credencial SQL<input id="cpSqlSecret" type="password" autocomplete="new-password"></label><label>Esquemas permitidos<input id="cpSqlSchemas" value="dbo" placeholder="dbo"></label><label>Objetos permitidos<input id="cpSqlTables" placeholder="dbo.Tabla"></label><label>Máximo de filas<input id="cpSqlMaxRows" type="number" min="1" max="5000" value="500"></label></div><button id="cpCreateSqlBtn" class="btn" data-cp-permission="sql:configure" data-cp-advanced-sql="true" style="display:none" onclick="controlCreateSql()">Crear conexión SQL</button></div><div class="card"><h3>Proveedor de inteligencia artificial</h3><div id="controlAi"></div><div id="cpAiEditor" data-cp-permission="config:read" class="settings" style="margin-top:12px"><label>Tipo de proveedor<select id="cpAiType" onchange="controlAiProviderChanged()"><option value="DISABLED">Desactivado</option><option value="OLLAMA">Ollama</option><option value="OPENAI_COMPATIBLE_LOCAL">Compatible local con OpenAI</option></select></label><label>URL local<input id="cpAiUrl" autocomplete="off" placeholder="http://localhost:11434" onchange="controlAiProviderChanged()"></label><label>Modelo<select id="cpAiModel" onchange="guidedAiInvalidate()"><option value="">Cargando modelos…</option></select></label><label>Tiempo máximo de espera (segundos)<input id="cpAiTimeout" type="number" min="1" max="120" value="30"></label><label>Ventana de contexto<input id="cpAiContext" type="number" min="1"></label><label>Habilitado<select id="cpAiEnabled"><option value="true">Sí</option><option value="false">No</option></select></label></div><button class="btn" data-cp-permission="config:read" onclick="controlTestAi()">Probar proveedor</button> <button class="btn ok" data-cp-permission="config:write" onclick="controlSaveAi()">Guardar proveedor</button></div></section>
 <section id="recuperacion" class="panel">
 <div class="card">
 <h3>Respaldo y recuperación del sistema</h3>
@@ -1915,6 +1915,61 @@ function guidedAiInvalidate(){
     );
 }
 
+function aiModelOption(select,value,label,disabled=false){
+    const option=document.createElement('option');
+    option.value=value;option.textContent=label;option.disabled=disabled;
+    select.appendChild(option);
+    return option;
+}
+
+function aiModelSelectState(selectId,provider,result,configured){
+    const select=controlElement(selectId);
+    if(!select)return;
+    select.innerHTML='';
+    const status=String((result&&result.status)||'UNAVAILABLE').toUpperCase();
+    if(provider.provider_type==='DISABLED'){
+        aiModelOption(select,'','La IA está desactivada');select.disabled=true;return;
+    }
+    const models=Array.isArray(result&&result.models)?result.models:[];
+    if(status==='PASS'){
+        aiModelOption(select,'','Selecciona un modelo');
+        models.forEach(item=>aiModelOption(select,String(item.id),String(item.name||item.id)));
+        select.disabled=false;
+    }else if(status==='EMPTY'){
+        aiModelOption(select,'','No se encontraron modelos instalados');select.disabled=true;
+    }else if(status==='UNSUPPORTED'){
+        aiModelOption(select,'','Este proveedor no permite descubrimiento todavía');select.disabled=true;
+    }else{
+        aiModelOption(select,'','No fue posible conectar con el proveedor');select.disabled=true;
+    }
+    if(configured){
+        const present=[...select.options].some(option=>option.value===configured);
+        if(!present)aiModelOption(select,configured,configured+' — configurado, no disponible actualmente',true);
+        select.value=configured;
+    }
+}
+
+async function controlLoadAiModels(provider){
+    const configured=String(provider.model||'').trim();
+    const selects=['cpAiModel','gsAiModel'];
+    selects.forEach(id=>{const select=controlElement(id);if(select){select.innerHTML='';aiModelOption(select,'','Cargando modelos…');select.disabled=true}});
+    if(provider.provider_type==='DISABLED'){
+        selects.forEach(id=>aiModelSelectState(id,provider,{status:'DISABLED'},configured));return;
+    }
+    const tenant=controlTenantId();
+    if(!tenant){selects.forEach(id=>aiModelSelectState(id,provider,{status:'UNAVAILABLE'},configured));return;}
+    try{
+        const result=await api('/api/admin/ai/provider/models',{
+            method:'POST',headers:{...H(),'Content-Type':'application/json'},
+            body:JSON.stringify({tenant_id:tenant,provider})
+        });
+        selects.forEach(id=>aiModelSelectState(id,provider,result,configured));
+    }catch(e){
+        selects.forEach(id=>aiModelSelectState(id,provider,{status:'UNAVAILABLE'},configured));
+        guidedAiRenderStatus('No fue posible conectar con el proveedor de modelos.','BLOCKED');
+    }
+}
+
 function guidedAiProvider(){
     const type=guidedAiChoice();
     if(type==='DISABLED')return {
@@ -1944,7 +1999,9 @@ function guidedAiSelectionChanged(){
     const type=guidedAiChoice();
     controlElement('gsAiModelWrap').style.display=type==='DISABLED'?'none':'block';
     if(type==='DISABLED')controlElement('gsAiModel').value='';
-    guidedAiSyncAdvanced(guidedAiProvider());
+    const provider=guidedAiProvider();
+    guidedAiSyncAdvanced(provider);
+    controlLoadAiModels(provider);
     guidedAiInvalidate();
 }
 
@@ -1957,6 +2014,7 @@ function guidedAiApplyProvider(provider){
     guidedAiSyncAdvanced(provider||{provider_type:'DISABLED',enabled:false,timeout:30});
     controlElement('gsAiModelWrap').style.display=
         choice.value==='DISABLED'?'none':'block';
+    controlLoadAiModels(provider||{provider_type:'DISABLED',enabled:false,timeout:30});
 }
 
 async function guidedAiTest(){
@@ -2040,7 +2098,7 @@ function controlInitializeGuidedAi(){
     const guided=document.createElement('div');
     guided.id='guidedAiCard';guided.className='card guided-ai';
     guided.setAttribute('data-cp-permission','config:read');
-    guided.innerHTML='<h3>Configurar inteligencia artificial</h3><div class="mutedtxt">Elige cómo asistirá la IA local a esta empresa. Puedes continuar sin IA y activarla después.</div><div class="guided-ai-choice"><label><input type="radio" name="gsAiChoice" value="OLLAMA" onchange="guidedAiSelectionChanged()">Ollama local</label><label><input type="radio" name="gsAiChoice" value="OPENAI_COMPATIBLE_LOCAL" onchange="guidedAiSelectionChanged()">Servidor local compatible</label><label><input type="radio" name="gsAiChoice" value="DISABLED" checked onchange="guidedAiSelectionChanged()">Continuar sin IA</label></div><div class="formgrid"><label id="gsAiModelWrap" style="display:none">Modelo<input id="gsAiModel" autocomplete="off" placeholder="Modelo instalado localmente" oninput="guidedAiInvalidate()"></label></div><div class="row"><button id="gsAiTestBtn" class="btn" data-cp-permission="config:read" onclick="guidedAiTest()">Probar IA</button><button id="gsAiSaveBtn" class="btn ok" data-cp-permission="config:write" onclick="guidedAiSave()">Guardar y continuar</button><button id="gsAiValidateBtn" class="btn muted" data-cp-permission="config:read" onclick="guidedAiValidateReadiness()">Validar preparación</button></div><div id="gsAiStatus" class="guided-ai-status"></div>';
+    guided.innerHTML='<h3>Configurar inteligencia artificial</h3><div class="mutedtxt">Elige cómo asistirá la IA local a esta empresa. Puedes continuar sin IA y activarla después.</div><div class="guided-ai-choice"><label><input type="radio" name="gsAiChoice" value="OLLAMA" onchange="guidedAiSelectionChanged()">Ollama local</label><label><input type="radio" name="gsAiChoice" value="OPENAI_COMPATIBLE_LOCAL" onchange="guidedAiSelectionChanged()">Servidor local compatible</label><label><input type="radio" name="gsAiChoice" value="DISABLED" checked onchange="guidedAiSelectionChanged()">Continuar sin IA</label></div><div class="formgrid"><label id="gsAiModelWrap" style="display:none">Modelo<select id="gsAiModel" onchange="guidedAiInvalidate()"><option value="">Cargando modelos…</option></select></label></div><div class="row"><button id="gsAiTestBtn" class="btn" data-cp-permission="config:read" onclick="guidedAiTest()">Probar IA</button><button id="gsAiSaveBtn" class="btn ok" data-cp-permission="config:write" onclick="guidedAiSave()">Guardar y continuar</button><button id="gsAiValidateBtn" class="btn muted" data-cp-permission="config:read" onclick="guidedAiValidateReadiness()">Validar preparación</button></div><div id="gsAiStatus" class="guided-ai-status"></div>';
     advanced.parentNode.insertBefore(guided,advanced);
     controlApplyCapabilities();
 }
@@ -2068,6 +2126,12 @@ function controlAiFromForm(){
         timeout:Number(controlElement('cpAiTimeout').value||30),
         context_window:contextRaw?Number(contextRaw):null
     }
+}
+
+function controlAiProviderChanged(){
+    const provider=controlAiFromForm();
+    controlLoadAiModels(provider);
+    guidedAiInvalidate();
 }
 
 function controlRenderAi(provider){
