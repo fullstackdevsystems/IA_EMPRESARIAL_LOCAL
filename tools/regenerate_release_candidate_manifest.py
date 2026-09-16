@@ -31,6 +31,33 @@ REQUIRED_ROOT_FILES = {
 }
 
 
+FORBIDDEN_COMMERCIAL_PATTERNS = (
+    re.compile(r"^IA_Local/tests/"),
+    re.compile(
+        r"^IA_Local/scripts/"
+        r"(run_.*tests.*|prueba_regresion.*)\.py$"
+    ),
+    re.compile(r"^IA_Local/MOSTRAR_TOKEN_LOCAL\.bat$"),
+    re.compile(
+        r"^IA_Local/"
+        r"(LEEME_PRIMERO|README_INSTALACION|"
+        r"GUIA_PRUEBAS_MEMORIA_RAG_V8|"
+        r"ARQUITECTURA_MEMORIA_RAG_V8|PROMPT_).*"
+    ),
+)
+
+
+def is_forbidden_commercial_path(
+    relative: str,
+) -> bool:
+    normalized = relative.replace("\\", "/")
+
+    return any(
+        pattern.search(normalized)
+        for pattern in FORBIDDEN_COMMERCIAL_PATTERNS
+    )
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
 
@@ -169,6 +196,14 @@ def main() -> int:
             paths.add(
                 path.relative_to(ROOT).as_posix()
             )
+
+    paths = {
+        relative
+        for relative in paths
+        if not is_forbidden_commercial_path(
+            relative
+        )
+    }
 
     files = []
 

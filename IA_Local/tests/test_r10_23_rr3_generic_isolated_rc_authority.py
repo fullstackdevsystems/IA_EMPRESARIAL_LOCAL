@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,33 @@ R1023_RC1 = (
     / "release_candidates"
     / "r10.23-rc1"
 )
+
+
+FORBIDDEN_COMMERCIAL_PATTERNS = (
+    re.compile(r"^IA_Local/tests/"),
+    re.compile(
+        r"^IA_Local/scripts/"
+        r"(run_.*tests.*|prueba_regresion.*)\.py$"
+    ),
+    re.compile(r"^IA_Local/MOSTRAR_TOKEN_LOCAL\.bat$"),
+    re.compile(
+        r"^IA_Local/"
+        r"(LEEME_PRIMERO|README_INSTALACION|"
+        r"GUIA_PRUEBAS_MEMORIA_RAG_V8|"
+        r"ARQUITECTURA_MEMORIA_RAG_V8|PROMPT_).*"
+    ),
+)
+
+
+def is_forbidden_commercial_path(
+    relative: str,
+) -> bool:
+    normalized = relative.replace("\\", "/")
+
+    return any(
+        pattern.search(normalized)
+        for pattern in FORBIDDEN_COMMERCIAL_PATTERNS
+    )
 
 
 def sha256(path: Path) -> str:
@@ -274,29 +302,35 @@ with tempfile.TemporaryDirectory(
         not missing,
     )
 
-    current_runtime_scripts = {
-        path.relative_to(ROOT).as_posix()
+    current_commercial_runtime_scripts = {
+        relative
         for path in (
             ROOT
             / "IA_Local"
             / "scripts"
         ).rglob("*.py")
         if path.is_file()
+        for relative in [
+            path.relative_to(ROOT).as_posix()
+        ]
+        if not is_forbidden_commercial_path(
+            relative
+        )
     }
 
     missing_runtime_scripts = sorted(
-        current_runtime_scripts
+        current_commercial_runtime_scripts
         - paths
     )
 
     if missing_runtime_scripts:
         print(
-            "MISSING_CURRENT_RUNTIME_SCRIPTS="
+            "MISSING_CURRENT_COMMERCIAL_RUNTIME_SCRIPTS="
             + repr(missing_runtime_scripts)
         )
 
     check(
-        "R10_23_MANIFEST_COVERS_ALL_CURRENT_RUNTIME_SCRIPTS",
+        "R10_23_MANIFEST_COVERS_ALL_CURRENT_COMMERCIAL_RUNTIME_SCRIPTS",
         not missing_runtime_scripts,
     )
 
@@ -325,12 +359,8 @@ with tempfile.TemporaryDirectory(
     forbidden = sorted(
         path
         for path in paths
-        if (
-            path.startswith(
-                "IA_Local/tests/"
-            )
-            or path
-            == "IA_Local/MOSTRAR_TOKEN_LOCAL.bat"
+        if is_forbidden_commercial_path(
+            path
         )
     )
 
