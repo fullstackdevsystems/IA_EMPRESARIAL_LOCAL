@@ -218,13 +218,30 @@ class QdrantVectorStore(VectorStore):
             from qdrant_client.models import FieldCondition, Filter, MatchValue
 
             name = self._collection(kind)
-            qfilter = Filter(must=[FieldCondition(key="company_id", match=MatchValue(value=principal.company_id))])
+            qfilter = Filter(
+                must=[
+                    FieldCondition(
+                        key="company_id",
+                        match=MatchValue(value=principal.company_id),
+                    )
+                ],
+                should=[
+                    FieldCondition(
+                        key="scope",
+                        match=MatchValue(value="company"),
+                    ),
+                    FieldCondition(
+                        key="user_id",
+                        match=MatchValue(value=principal.user_id),
+                    ),
+                ],
+            )
             try:
                 points = self.client.query_points(
                     name,
                     query=list(map(float, query)),
                     query_filter=qfilter,
-                    limit=max(limit * 5, 20),
+                    limit=limit,
                     with_payload=True,
                 ).points
             except Exception:
@@ -232,7 +249,7 @@ class QdrantVectorStore(VectorStore):
                     name,
                     query_vector=list(map(float, query)),
                     query_filter=qfilter,
-                    limit=max(limit * 5, 20),
+                    limit=limit,
                     with_payload=True,
                 )
             out = []
