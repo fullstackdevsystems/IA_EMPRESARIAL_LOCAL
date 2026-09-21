@@ -242,6 +242,155 @@ def _cancellation_analysis(df, task, roles):
     return result
 
 
+
+def _anomaly_scan(df, task, roles):
+    """Detect statistical anomalies in governed monthly metric series.
+
+    IQR is a statistical detection rule only. It does not assign business
+    severity, risk, opportunity, or any other enterprise classification.
+    """
+    trend = _trend(df, task, roles)
+    rows = list(trend.get("rows") or [])
+
+    base_governance = {
+        "deterministic": True,
+        "method": "iqr",
+        "statistical_rule": "values outside Q1 - 1.5*IQR or Q3 + 1.5*IQR",
+        "statistical_multiplier": 1.5,
+        "business_thresholds_invented": False,
+        "business_classification_applied": False,
+        "llm_numeric_inference": False,
+        "llm_anomaly_detection_authority": False,
+        "uses_resolved_semantic_roles_only": True,
+    }
+
+    if not roles.get("date") or not rows:
+        return {
+            "kind": "anomaly_scan",
+            "evidence_available": False,
+            "reason": "Governed monthly time-series evidence unavailable.",
+            "grain": "month",
+            "metrics": [],
+            "anomalies": [],
+            "governance": base_governance,
+        }
+
+    metric_keys = []
+    seen = set()
+    excluded = {
+        "period",
+        "record_count",
+        "observed_min_date",
+        "observed_max_date",
+    }
+
+    for row in rows:
+        for key, value in row.items():
+            if key in excluded or key in seen:
+                continue
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if pd.isna(numeric):
+                continue
+            metric_keys.append(key)
+            seen.add(key)
+
+    metric_results = []
+    anomalies = []
+
+    for metric in metric_keys:
+        points = []
+        for row in rows:
+            value = row.get(metric)
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if pd.isna(numeric):
+                continue
+            points.append({
+                "period": row.get("period"),
+                "value": numeric,
+            })
+
+        # Four values are the minimum required to form two quartile halves
+        # without pretending that shorter series provide robust evidence.
+        if len(points) < 4:
+            continue
+
+        series = pd.Series(
+            [point["value"] for point in points],
+            dtype="float64",
+        )
+        q1 = float(series.quantile(0.25))
+        q3 = float(series.quantile(0.75))
+        iqr = q3 - q1
+        lower = q1 - (1.5 * iqr)
+        upper = q3 + (1.5 * iqr)
+
+        metric_anomalies = []
+        for point in points:
+            value = point["value"]
+            if value < lower:
+                direction = "below_lower_bound"
+            elif value > upper:
+                direction = "above_upper_bound"
+            else:
+                continue
+
+            evidence = {
+                "metric": metric,
+                "period": point["period"],
+                "value": value,
+                "direction": direction,
+                "q1": q1,
+                "q3": q3,
+                "iqr": iqr,
+                "lower_bound": lower,
+                "upper_bound": upper,
+            }
+            metric_anomalies.append(evidence)
+            anomalies.append(evidence)
+
+        metric_results.append({
+            "metric": metric,
+            "sample_count": len(points),
+            "q1": q1,
+            "q3": q3,
+            "iqr": iqr,
+            "lower_bound": lower,
+            "upper_bound": upper,
+            "anomaly_count": len(metric_anomalies),
+            "anomalies": metric_anomalies,
+        })
+
+    if not metric_results:
+        return {
+            "kind": "anomaly_scan",
+            "evidence_available": False,
+            "reason": "At least four governed monthly observations for a numeric metric are required.",
+            "grain": "month",
+            "period_count": len(rows),
+            "metrics": [],
+            "anomalies": [],
+            "governance": base_governance,
+        }
+
+    return {
+        "kind": "anomaly_scan",
+        "evidence_available": True,
+        "reason": None,
+        "grain": "month",
+        "period_count": len(rows),
+        "metrics": metric_results,
+        "anomaly_count": len(anomalies),
+        "anomalies": anomalies,
+        "governance": base_governance,
+    }
+
+
 def execute_governed_analytical_plan(df, *, analytical_plan: Dict[str, Any], roles: Dict[str, Any]) -> Dict[str, Any]:
     results = []
     grouped_ops = {
@@ -269,6 +418,16 @@ def execute_governed_analytical_plan(df, *, analytical_plan: Dict[str, Any], rol
             result = _trend(df, task, roles)
         elif op == "cancellation_analysis":
             result = _cancellation_analysis(df, task, roles)
+            if not result.get("evidence_available"):
+                results.append({
+                    **base,
+                    "execution_status": "NOT_EXECUTED",
+                    "reason": result.get("reason"),
+                    "result": result,
+                })
+                continue
+        elif op == "anomaly_scan":
+            result = _anomaly_scan(df, task, roles)
             if not result.get("evidence_available"):
                 results.append({
                     **base,

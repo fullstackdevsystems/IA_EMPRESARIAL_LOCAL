@@ -17,6 +17,7 @@ _ANALYSIS_REQUIREMENTS: Dict[str, Dict[str, Any]] = {
     "risks": {"operator":"risk_scan","dimensions":[],"metrics":[],"optional_metrics":["revenue","profit","margin_pct","quantity"]},
     "opportunities": {"operator":"opportunity_scan","dimensions":[],"metrics":[],"optional_metrics":["revenue","profit","margin_pct","quantity"]},
     "cancellations": {"operator":"cancellation_analysis","dimensions":[],"metrics":[],"optional_metrics":["revenue","quantity"]},
+    "anomalies": {"operator":"anomaly_scan","dimensions":["date"],"metrics":[],"optional_metrics":["revenue","profit","quantity","operations"]},
     "routes": {"operator":"route_analysis","dimensions":["origin_city","destination_city"],"metrics":[],"optional_metrics":["quantity","revenue","freight"]},
     "warehouse_movement": {"operator":"warehouse_movement","dimensions":["warehouse"],"metrics":["quantity"],"optional_metrics":["revenue","profit"]},
     "origin_share": {"operator":"origin_share","dimensions":["origin_city"],"metrics":["quantity"],"optional_metrics":["revenue"]},

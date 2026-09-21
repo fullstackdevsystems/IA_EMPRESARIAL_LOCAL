@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 INSIGHT_VERSION = "r10.14c"
 R10_25C2_CANCELLATION_VERSION = "r10.25c2"
+R10_25C3_ANOMALY_VERSION = "r10.25c3"
 
 
 def _num(value: Any) -> Optional[float]:
@@ -369,6 +370,83 @@ def _cancellation_insights(
     return insights, []
 
 
+
+def _anomaly_insights(
+    item: Dict[str, Any],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Promote deterministic statistical anomalies without classifying them."""
+    result = dict(item.get("result") or {})
+    governance = dict(result.get("governance") or {})
+
+    if not result.get("evidence_available"):
+        return [], [{
+            "id": f"observation:{item.get('analysis')}:anomaly_not_assessed",
+            "observation_type": "anomaly_not_assessed",
+            "analysis": item.get("analysis"),
+            "reason": result.get("reason") or "Statistical anomaly evidence unavailable.",
+            "evidence_source": item.get("task_id"),
+            "confidence": 1.0,
+            "provenance": {
+                "source": "r10.25c3_deterministic_anomaly_detection",
+                "execution_status": item.get("execution_status"),
+            },
+        }]
+
+    if governance.get("deterministic") is not True:
+        return [], [{
+            "id": f"observation:{item.get('analysis')}:anomaly_ungoverned",
+            "observation_type": "anomaly_not_assessed",
+            "analysis": item.get("analysis"),
+            "reason": "Anomaly evidence was not marked deterministic.",
+            "evidence_source": item.get("task_id"),
+            "confidence": 1.0,
+            "provenance": {
+                "source": "r10.25c3_deterministic_anomaly_detection",
+                "execution_status": item.get("execution_status"),
+            },
+        }]
+
+    out: List[Dict[str, Any]] = []
+
+    for anomaly in list(result.get("anomalies") or []):
+        metric = str(anomaly.get("metric") or "")
+        period = str(anomaly.get("period") or "")
+        direction = str(anomaly.get("direction") or "")
+
+        out.append({
+            "id": f"insight:{item.get('analysis')}:{metric}:{period}:statistical_anomaly",
+            "insight_type": "statistical_anomaly",
+            "metric": metric,
+            "period": period,
+            "value": anomaly.get("value"),
+            "direction": direction,
+            "q1": anomaly.get("q1"),
+            "q3": anomaly.get("q3"),
+            "iqr": anomaly.get("iqr"),
+            "lower_bound": anomaly.get("lower_bound"),
+            "upper_bound": anomaly.get("upper_bound"),
+            "severity": None,
+            "classification": None,
+            "evidence_source": item.get("task_id"),
+            "confidence": 1.0,
+            "provenance": {
+                "source": "r10.25c3_deterministic_anomaly_detection",
+                "execution_status": item.get("execution_status"),
+                "interpretation_policy": "NOT_APPLIED",
+            },
+            "governance": {
+                "calculated_fact": True,
+                "classification_applied": False,
+                "llm_numeric_inference": False,
+                "llm_anomaly_detection_authority": False,
+                "business_thresholds_invented": False,
+                "statistical_method": "iqr",
+            },
+        })
+
+    return out, []
+
+
 def build_governed_business_insights(*, analytical_results: Dict[str, Any]) -> Dict[str, Any]:
     """Create deterministic, auditable business insights from executed results only."""
     insights: List[Dict[str, Any]] = []
@@ -393,6 +471,10 @@ def build_governed_business_insights(*, analytical_results: Dict[str, Any]) -> D
             cancellation_insights, cancellation_observations = _cancellation_insights(item)
             insights.extend(cancellation_insights)
             observations.extend(cancellation_observations)
+        elif kind == "anomaly_scan":
+            anomaly_insights, anomaly_observations = _anomaly_insights(item)
+            insights.extend(anomaly_insights)
+            observations.extend(anomaly_observations)
         elif kind == "grouped_analysis":
             grouped_insights, grouped_observations = _grouped_concentration_insights(item)
             insights.extend(grouped_insights)
