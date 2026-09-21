@@ -16,6 +16,7 @@ _ANALYSIS_REQUIREMENTS: Dict[str, Dict[str, Any]] = {
     "profitability": {"operator":"profitability_analysis","dimensions":[],"metrics":["revenue"],"optional_metrics":["cost","profit","margin_pct","profit_per_unit"]},
     "risks": {"operator":"risk_scan","dimensions":[],"metrics":[],"optional_metrics":["revenue","profit","margin_pct","quantity"]},
     "opportunities": {"operator":"opportunity_scan","dimensions":[],"metrics":[],"optional_metrics":["revenue","profit","margin_pct","quantity"]},
+    "cancellations": {"operator":"cancellation_analysis","dimensions":[],"metrics":[],"optional_metrics":["revenue","quantity"]},
     "routes": {"operator":"route_analysis","dimensions":["origin_city","destination_city"],"metrics":[],"optional_metrics":["quantity","revenue","freight"]},
     "warehouse_movement": {"operator":"warehouse_movement","dimensions":["warehouse"],"metrics":["quantity"],"optional_metrics":["revenue","profit"]},
     "origin_share": {"operator":"origin_share","dimensions":["origin_city"],"metrics":["quantity"],"optional_metrics":["revenue"]},

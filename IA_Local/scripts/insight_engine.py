@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 INSIGHT_VERSION = "r10.14c"
+R10_25C2_CANCELLATION_VERSION = "r10.25c2"
 
 
 def _num(value: Any) -> Optional[float]:
@@ -288,6 +289,86 @@ def _blocked_observation(item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+
+def _cancellation_insights(
+    item: Dict[str, Any],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Promote deterministic cancellation facts; never classify them."""
+    result = dict(item.get("result") or [])
+
+    if not result.get("evidence_available"):
+        return [], [{
+            "id": f"observation:{item.get('analysis')}:cancellation_not_assessed",
+            "observation_type": "cancellation_not_assessed",
+            "reason": result.get("reason") or "Cancellation evidence unavailable.",
+            "evidence_source": item.get("task_id"),
+            "execution_status": item.get("execution_status"),
+            "provenance": {
+                "source": "r10.25c2_governed_cancellation_analysis",
+                "confidence": 1.0,
+            },
+        }]
+
+    governance = dict(result.get("governance") or {})
+    if governance.get("deterministic") is not True:
+        return [], []
+
+    evidence = {
+        "evidence_source": item.get("task_id"),
+        "execution_status": item.get("execution_status"),
+        "signals": list(result.get("signals") or []),
+        "row_count": result.get("row_count"),
+    }
+
+    insights = [{
+        "id": f"insight:{item.get('analysis')}:cancellation_rate",
+        "insight_type": "cancellation_rate",
+        "metric": "cancellation_row_pct",
+        "value": result.get("cancellation_row_pct"),
+        "cancellation_rows": result.get("cancellation_rows"),
+        "total_rows": result.get("row_count"),
+        **evidence,
+        "provenance": {
+            "source": "r10.25c2_governed_cancellation_analysis",
+            "confidence": 1.0,
+        },
+        "governance": {
+            "calculated_fact": True,
+            "classification_applied": False,
+            "llm_numeric_inference": False,
+            "uses_executed_results_only": True,
+            "business_thresholds_invented": False,
+        },
+    }]
+
+    if result.get("cancellation_revenue_impact_abs") is not None:
+        insights.append({
+            "id": f"insight:{item.get('analysis')}:cancellation_revenue_impact",
+            "insight_type": "cancellation_revenue_impact",
+            "metric": "cancellation_revenue_impact_abs",
+            "value": result.get("cancellation_revenue_impact_abs"),
+            "net_value": result.get("cancellation_revenue_net"),
+            "positive_revenue": result.get("positive_revenue"),
+            "impact_pct_of_positive_revenue": result.get(
+                "cancellation_impact_pct_of_positive_revenue"
+            ),
+            **evidence,
+            "provenance": {
+                "source": "r10.25c2_governed_cancellation_analysis",
+                "confidence": 1.0,
+            },
+            "governance": {
+                "calculated_fact": True,
+                "classification_applied": False,
+                "llm_numeric_inference": False,
+                "uses_executed_results_only": True,
+                "business_thresholds_invented": False,
+            },
+        })
+
+    return insights, []
+
+
 def build_governed_business_insights(*, analytical_results: Dict[str, Any]) -> Dict[str, Any]:
     """Create deterministic, auditable business insights from executed results only."""
     insights: List[Dict[str, Any]] = []
@@ -308,6 +389,10 @@ def build_governed_business_insights(*, analytical_results: Dict[str, Any]) -> D
             trend_insights, trend_observations = _trend_insights(item)
             insights.extend(trend_insights)
             observations.extend(trend_observations)
+        elif kind == "cancellation_analysis":
+            cancellation_insights, cancellation_observations = _cancellation_insights(item)
+            insights.extend(cancellation_insights)
+            observations.extend(cancellation_observations)
         elif kind == "grouped_analysis":
             grouped_insights, grouped_observations = _grouped_concentration_insights(item)
             insights.extend(grouped_insights)

@@ -122,6 +122,126 @@ def _grouped(df, task, roles):
     }
 
 
+
+def _cancellation_analysis(df, task, roles):
+    """Deterministic cancellation/return facts from governed roles only."""
+    quantity_col = roles.get("quantity")
+    revenue_col = roles.get("revenue")
+    reference_col = roles.get("invoice") or roles.get("reference")
+
+    mask = pd.Series(False, index=df.index, dtype=bool)
+    signals = []
+
+    if quantity_col and quantity_col in df.columns:
+        values = pd.to_numeric(df[quantity_col], errors="coerce")
+        matched = (values < 0).fillna(False)
+        mask = mask | matched
+        signals.append({
+            "signal": "negative_quantity",
+            "source_column": str(quantity_col),
+            "matched_rows": int(matched.sum()),
+        })
+
+    if revenue_col and revenue_col in df.columns:
+        values = pd.to_numeric(df[revenue_col], errors="coerce")
+        matched = (values < 0).fillna(False)
+        mask = mask | matched
+        signals.append({
+            "signal": "negative_revenue",
+            "source_column": str(revenue_col),
+            "matched_rows": int(matched.sum()),
+        })
+
+    if reference_col and reference_col in df.columns:
+        matched = (
+            df[reference_col]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .str.startswith("C", na=False)
+        )
+        matched = matched.fillna(False)
+        mask = mask | matched
+        signals.append({
+            "signal": "reference_prefix_c",
+            "source_column": str(reference_col),
+            "matched_rows": int(matched.sum()),
+        })
+
+    if not signals:
+        return {
+            "kind": "cancellation_analysis",
+            "evidence_available": False,
+            "row_count": int(len(df)),
+            "cancellation_rows": 0,
+            "signals": [],
+            "reason": (
+                "No governed quantity, revenue, or invoice/reference "
+                "role is available."
+            ),
+            "governance": {
+                "deterministic": True,
+                "uses_resolved_semantic_roles_only": True,
+                "llm_numeric_inference": False,
+                "llm_cancellation_detection": False,
+                "business_thresholds_invented": False,
+                "status_values_invented": False,
+            },
+        }
+
+    row_count = int(len(df))
+    cancellation_rows = int(mask.sum())
+
+    result = {
+        "kind": "cancellation_analysis",
+        "evidence_available": True,
+        "row_count": row_count,
+        "cancellation_rows": cancellation_rows,
+        "cancellation_row_pct": (
+            float(cancellation_rows / row_count * 100.0)
+            if row_count
+            else 0.0
+        ),
+        "signals": signals,
+        "governance": {
+            "deterministic": True,
+            "uses_resolved_semantic_roles_only": True,
+            "llm_numeric_inference": False,
+            "llm_cancellation_detection": False,
+            "business_thresholds_invented": False,
+            "status_values_invented": False,
+        },
+    }
+
+    if revenue_col and revenue_col in df.columns:
+        revenue = pd.to_numeric(df[revenue_col], errors="coerce")
+        cancellation_revenue = revenue.where(mask)
+
+        result["cancellation_revenue_net"] = float(
+            cancellation_revenue.sum(skipna=True)
+        )
+        result["cancellation_revenue_impact_abs"] = float(
+            cancellation_revenue.abs().sum(skipna=True)
+        )
+
+        positive_revenue = float(
+            revenue.where(revenue > 0).sum(skipna=True)
+        )
+        result["positive_revenue"] = positive_revenue
+
+        result["cancellation_impact_pct_of_positive_revenue"] = (
+            float(
+                result["cancellation_revenue_impact_abs"]
+                / positive_revenue
+                * 100.0
+            )
+            if positive_revenue > 0
+            else None
+        )
+
+    return result
+
+
 def execute_governed_analytical_plan(df, *, analytical_plan: Dict[str, Any], roles: Dict[str, Any]) -> Dict[str, Any]:
     results = []
     grouped_ops = {
@@ -147,6 +267,16 @@ def execute_governed_analytical_plan(df, *, analytical_plan: Dict[str, Any], rol
         op = str(task.get("operator") or "")
         if op in {"time_trend", "monthly_movement"}:
             result = _trend(df, task, roles)
+        elif op == "cancellation_analysis":
+            result = _cancellation_analysis(df, task, roles)
+            if not result.get("evidence_available"):
+                results.append({
+                    **base,
+                    "execution_status": "NOT_EXECUTED",
+                    "reason": result.get("reason"),
+                    "result": result,
+                })
+                continue
         elif op in grouped_ops:
             result = _grouped(df, task, roles)
         elif op in snapshot_ops:
