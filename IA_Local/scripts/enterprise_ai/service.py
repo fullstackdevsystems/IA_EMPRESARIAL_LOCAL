@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import math
@@ -183,6 +183,80 @@ class EnterpriseAIService:
             "estimated_input_tokens": fixed_tokens + used,
         }
 
+    def _build_internal_context_messages(
+        self,
+        question: str,
+        built: Any,
+        profile: Dict[str, Any],
+    ) -> tuple[list[Dict[str, str]], Dict[str, Any]]:
+        """Build governed RAG messages inside the selected model context window.
+
+        Deterministic evidence remains authoritative. This method only budgets
+        how much retrieved evidence can be presented to the LLM; it never
+        changes source calculations, retrieval ranking, or business authority.
+        """
+        system_prompt = str(built.system_prompt or "")
+        evidence = str(built.evidence_text or "")
+        num_ctx = int(profile["num_ctx"])
+        reserve = int(profile["reserve_output_tokens"])
+
+        fixed_tokens = (
+            self._estimate_tokens(system_prompt)
+            + self._estimate_tokens(question)
+            + 64
+        )
+        evidence_budget = max(0, num_ctx - reserve - fixed_tokens)
+
+        original_evidence_tokens = self._estimate_tokens(evidence) if evidence else 0
+        selected_evidence = evidence
+        evidence_truncated = False
+
+        if evidence and original_evidence_tokens > evidence_budget:
+            # _estimate_tokens() is deliberately conservative at ~3.5 chars/token.
+            # Slice below that ceiling, then tighten deterministically until the
+            # same estimator proves the evidence fits the governed token budget.
+            max_chars = max(0, int(evidence_budget * 3.5))
+            selected_evidence = evidence[:max_chars]
+
+            while (
+                selected_evidence
+                and self._estimate_tokens(selected_evidence) > evidence_budget
+            ):
+                selected_evidence = selected_evidence[:-1]
+
+            evidence_truncated = len(selected_evidence) < len(evidence)
+
+        messages: list[Dict[str, str]] = [
+            {"role": "system", "content": system_prompt}
+        ]
+        if selected_evidence:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": "CONTEXTO INTERNO RECUPERADO:\n" + selected_evidence,
+                }
+            )
+        messages.append({"role": "user", "content": question})
+
+        selected_evidence_tokens = (
+            self._estimate_tokens(selected_evidence) if selected_evidence else 0
+        )
+        estimated_input_tokens = fixed_tokens + selected_evidence_tokens
+
+        return messages, {
+            "contract": "r10.25d1",
+            "route": "internal_context",
+            "num_ctx": num_ctx,
+            "reserve_output_tokens": reserve,
+            "fixed_input_tokens": fixed_tokens,
+            "evidence_budget_tokens": evidence_budget,
+            "original_evidence_tokens": original_evidence_tokens,
+            "selected_evidence_tokens": selected_evidence_tokens,
+            "estimated_input_tokens": estimated_input_tokens,
+            "evidence_truncated": evidence_truncated,
+            "llm_calculation_authority": False,
+            "deterministic_evidence_authority_preserved": True,
+        }
     @staticmethod
     def _general_system_prompt(profile: Dict[str, Any]) -> str:
         style = profile.get("name", "normal")
@@ -555,12 +629,17 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                 answer = self._memory_answer(built.memories)
             else:
                 profile = self._response_profile(message, general=False)
-                messages = [{"role": "system", "content": built.system_prompt}]
-                if built.evidence_text:
-                    messages.append({"role": "system", "content": "CONTEXTO INTERNO RECUPERADO:\n" + built.evidence_text})
-                messages.append({"role": "user", "content": message})
+                messages, context_plan = self._build_internal_context_messages(
+                    message,
+                    built,
+                    profile,
+                )
                 try:
-                    answer, llm_ms, queue_ms = self._llm_chat_with_queue(messages, max_tokens=None)
+                    answer, llm_ms, queue_ms = self._llm_chat_with_queue(
+                        messages,
+                        max_tokens=None,
+                        num_ctx=profile["num_ctx"],
+                    )
                 except Exception:
                     # Degradación segura: si el LLM local tarda/no está disponible pero sí
                     # existe una memoria recuperada, devolvemos únicamente esa evidencia.
@@ -578,7 +657,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                 "sources": built.sources,
                 "memory_candidate": candidate,
                 "timings_ms": {**{k: round(v, 2) if isinstance(v, (int, float)) and not isinstance(v, bool) else v for k, v in built.timings.items()}, "llm_ms": round(llm_ms, 2), "queue_ms": round(queue_ms, 2), "total_ms": round(total_ms, 2)},
-                "retrieval": {"memories": len(built.memories), "document_chunks": len(built.document_chunks), "structured": bool(built.structured), **({"response_profile": profile["name"], "generation_mode": "natural"} if "profile" in locals() else {})},
+                "retrieval": {"memories": len(built.memories), "document_chunks": len(built.document_chunks), "structured": bool(built.structured), **({"response_profile": profile["name"], "generation_mode": "natural", "context_plan": context_plan} if "profile" in locals() else {})},
             }
         except Exception as exc:
             total_ms = (time.perf_counter() - started) * 1000
