@@ -1,6 +1,6 @@
 # R10.24 Professional Product Experience - Canonical Roadmap
 
-Status: ACTIVE
+Status: 100% - FORMALLY CLOSED AND RELEASED
 Canonicalized: 2026-09-19
 
 ## Governance
@@ -9,7 +9,9 @@ Canonicalized: 2026-09-19
 - Phase completion is gate-based, not calculated from arbitrary numeric weighting.
 - A phase is 100% only when every defined component is formally accepted.
 - No commit, push, tag, release, or main promotion is implied by phase acceptance.
-- Existing certified R10.23 RC4 remains frozen until an explicit release decision.
+- Historical R10.24 release authority is frozen at commit d6ee11a84f3644b42443d512f6b692465f9d560c.
+- Published release tag: r10.24.
+- Subsequent development proceeds on R10.25 without rewriting R10.24 history.
 
 ## R10.24A - Unified Product Experience
 
@@ -43,7 +45,7 @@ No percentage weighting is used inside C. All six required gates passed, therefo
 
 ## R10.24D - Production Operations and Deployment
 
-Status: 0% - NOT STARTED
+Status: 100% - FORMALLY CLOSED
 
 Goal: make IA Empresarial Local installable, operable, recoverable and maintainable on a real Windows business workstation or server without developer intervention.
 
@@ -86,7 +88,7 @@ Components:
 
 ## R10.24E - Commercial Certification and Release
 
-Status: 0% - NOT STARTED
+Status: 100% - FORMALLY CLOSED
 
 Goal: certify a reproducible, supportable and publishable commercial build after D is complete.
 
@@ -134,7 +136,7 @@ Components:
 - R10.24A = 100%
 - R10.24B = 100%
 - R10.24C = 100%
-- R10.24D = 0%
-- R10.24E = 0%
+- R10.24D = 100%
+- R10.24E = 100%
 
-Next component: D1 - Clean installation from zero.
+Final status: R10.24 completed, certified, published, and promoted to main.

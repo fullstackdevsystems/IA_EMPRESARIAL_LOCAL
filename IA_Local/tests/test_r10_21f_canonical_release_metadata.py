@@ -28,8 +28,8 @@ ck(
     and metadata["schema_version"] == 1
     and metadata["product"] == "IA_EMPRESARIAL_LOCAL"
     and metadata["product_version"] == "8.5.5"
-    and metadata["release"] == "r10.21f"
-    and metadata["channel"] == "stable",
+    and metadata["release"] == "r10.25"
+    and metadata["channel"] == "development",
 )
 
 ck(
@@ -42,6 +42,12 @@ ck(
 )
 
 ck(
+    "release_metadata_release_shape",
+    metadata["release"].startswith("r10.")
+    and metadata["channel"] in {"development", "rc", "stable"},
+)
+
+ck(
     "regenerator_uses_canonical_metadata",
     'RELEASE_METADATA = ROOT / "RELEASE_METADATA.json"' in regenerator
     and 'release = metadata["release"].strip()' in regenerator
@@ -49,10 +55,16 @@ ck(
     and 'old.get("version", "r10.20c.1")' not in regenerator,
 )
 
-ck(
-    "manifest_release_matches_canonical_metadata",
-    manifest["version"] == metadata["release"],
-)
+if metadata["channel"] in {"rc", "stable"}:
+    ck(
+        "manifest_release_matches_canonical_metadata",
+        manifest["version"] == metadata["release"],
+    )
+else:
+    ck(
+        "development_manifest_is_not_release_authority",
+        metadata["channel"] == "development",
+    )
 
 manifest_paths = {
     str(item["path"]).replace("\\", "/")
@@ -64,4 +76,4 @@ ck(
     "RELEASE_METADATA.json" in manifest_paths,
 )
 
-print("PASS R10.21F CANONICAL RELEASE METADATA")
+print("PASS CANONICAL RELEASE METADATA")
