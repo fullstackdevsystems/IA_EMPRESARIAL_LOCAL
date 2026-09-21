@@ -1,5 +1,5 @@
 ﻿from __future__ import annotations
-import copy
+from .evidence_governance import govern_large_evidence
 
 import hashlib
 import math
@@ -185,58 +185,10 @@ class EnterpriseAIService:
         }
 
     @staticmethod
-    def _govern_large_evidence(
-        evidence_rows,
-        *,
-        max_rows: int = 2000,
-    ):
-        """Deterministically bound large executed evidence before D1 context construction.
+    def _govern_large_evidence(evidence_rows, *, max_rows: int = 2000):
+        """Compatibility wrapper for the governed R10.25D evidence authority."""
+        return govern_large_evidence(evidence_rows, max_rows=max_rows)
 
-        This is an evidence-shaping boundary only:
-        - source rows are never mutated;
-        - no business metric is calculated here;
-        - no classification or ranking is performed;
-        - the LLM has no authority over truncation;
-        - ordering is preserved for the retained prefix;
-        - truncation is explicitly auditable.
-        """
-        try:
-            limit = int(max_rows)
-        except (TypeError, ValueError):
-            limit = 2000
-
-        if limit <= 0:
-            limit = 1
-
-        if evidence_rows is None:
-            return {
-                "rows": [],
-                "total_rows": 0,
-                "returned_rows": 0,
-                "truncated": False,
-                "source": "executed_results",
-                "authority": "governed_large_data_evidence",
-            }
-
-        if hasattr(evidence_rows, "to_dict"):
-            source_rows = evidence_rows.to_dict(orient="records")
-        else:
-            source_rows = list(evidence_rows)
-
-        total = len(source_rows)
-        truncated = total > limit
-
-        # Never mutate source objects.
-        retained = copy.deepcopy(source_rows[:limit])
-
-        return {
-            "rows": retained,
-            "total_rows": total,
-            "returned_rows": len(retained),
-            "truncated": truncated,
-            "source": "executed_results",
-            "authority": "governed_large_data_evidence",
-        }
     def _build_internal_context_messages(
         self,
         question: str,
