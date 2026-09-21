@@ -16,8 +16,7 @@ Baseline commit: d6ee11a84f3644b42443d512f6b692465f9d560c
 
 ## R10.25A - Baseline and Product Identity Governance
 
-Status: IN PROGRESS
-
+Status: COMPLETED
 Goal: establish a truthful and maintainable development authority after R10.24.
 
 Acceptance:
@@ -29,8 +28,7 @@ Acceptance:
 
 ## R10.25B - Governed Business Intelligence Orchestrator
 
-Status: NOT STARTED
-
+Status: COMPLETED
 Goal: coordinate existing governed capabilities from business intent instead of exposing isolated technical workflows.
 
 Scope:
@@ -93,10 +91,10 @@ Controlled fine-tuning remains optional. Existing dataset/run/export infrastruct
 
 ## Current canonical status
 
-- R10.25A = IN PROGRESS
-- R10.25B = NOT STARTED
+- R10.25A = COMPLETED
+- R10.25B = COMPLETED
 - R10.25C = NOT STARTED
 - R10.25D = NOT STARTED
 - R10.25E = NOT STARTED
 
-Next component: R10.25A baseline normalization validation.
+Next component: R10.25C - Deeper Business Intelligence.
