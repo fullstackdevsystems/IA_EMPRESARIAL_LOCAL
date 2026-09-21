@@ -179,15 +179,25 @@ class MemoryManager:
         output.sort(key=lambda x: (x["score"], x.get("importance", 0.0)), reverse=True)
         return output[:limit]
 
-    def search(self, principal: Principal, query: str, limit: int = 6, min_score: float = 0.20) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        principal: Principal,
+        query: str,
+        limit: int = 6,
+        min_score: float = 0.20,
+        *,
+        query_vector=None,
+        candidate_limit: int | None = None,
+    ) -> List[Dict[str, Any]]:
         if not query.strip():
             return []
         clause, args = scope_clause(principal)
         exists = self.db.one(f"SELECT 1 FROM memories WHERE active=1 AND status='active' AND {clause} LIMIT 1", args)
         if not exists:
             return []
-        qvector = self.embeddings.embed([query])[0]
-        candidates = self.vectors.search("memory", qvector, principal, max(limit * 4, 20))
+        qvector = query_vector if query_vector is not None else self.embeddings.embed([query])[0]
+        vector_limit = max(limit * 4, 20) if candidate_limit is None else max(1, int(candidate_limit))
+        candidates = self.vectors.search("memory", qvector, principal, vector_limit)
         qtokens = set(re.findall(r"\w+", query.lower()))
         now = datetime.now(timezone.utc)
         output = []

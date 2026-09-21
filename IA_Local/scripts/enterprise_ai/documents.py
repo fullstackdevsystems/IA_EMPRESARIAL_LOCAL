@@ -278,7 +278,16 @@ class DocumentService:
         sql = f"SELECT * FROM documents WHERE {clause}" + ("" if include_inactive else " AND active=1") + " ORDER BY updated_at DESC"
         return [dict(row) for row in self.db.query(sql, args)]
 
-    def search(self, principal: Principal, query: str, limit: int = 8, min_score: float = 0.18) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        principal: Principal,
+        query: str,
+        limit: int = 8,
+        min_score: float = 0.18,
+        *,
+        query_vector=None,
+        candidate_limit: int | None = None,
+    ) -> List[Dict[str, Any]]:
         if not query.strip():
             return []
         # Evita generar embeddings si todavía no hay documentos accesibles.
@@ -286,8 +295,9 @@ class DocumentService:
         exists = self.db.one(f"SELECT 1 FROM documents d WHERE d.active=1 AND {clause} LIMIT 1", args)
         if not exists:
             return []
-        query_vector = self.embeddings.embed([query])[0]
-        hits = self.vectors.search("document", query_vector, principal, max(limit * 4, 20))
+        effective_query_vector = query_vector if query_vector is not None else self.embeddings.embed([query])[0]
+        vector_limit = max(limit * 4, 20) if candidate_limit is None else max(1, int(candidate_limit))
+        hits = self.vectors.search("document", effective_query_vector, principal, vector_limit)
         output = []
         for hit in hits:
             row = self.db.one(

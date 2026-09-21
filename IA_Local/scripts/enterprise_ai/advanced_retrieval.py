@@ -218,14 +218,39 @@ class AdvancedRetrievalEngine:
         candidate_factor = max(2, min(int(self.cfg.get("candidate_factor", 4)), 10))
         now = datetime.now(timezone.utc)
 
+        memory_candidate_limit = mem_limit * candidate_factor
+        document_candidate_limit = doc_limit * candidate_factor
+
+        shared_query_vector = None
         try:
-            memories = self.memory.search(principal, question, mem_limit * candidate_factor, float(self.cfg.get("memory_candidate_min_score", 0.08)))
+            shared_query_vector = self.memory.embeddings.embed([question])[0]
+        except Exception:
+            shared_query_vector = None
+
+        try:
+            memories = self.memory.search(
+                principal,
+                question,
+                memory_candidate_limit,
+                float(self.cfg.get("memory_candidate_min_score", 0.08)),
+                query_vector=shared_query_vector,
+                candidate_limit=memory_candidate_limit,
+            )
         except Exception:
             memories = []
+
         try:
-            chunks = self.documents.search(principal, question, doc_limit * candidate_factor, float(self.cfg.get("document_candidate_min_score", 0.08)))
+            chunks = self.documents.search(
+                principal,
+                question,
+                document_candidate_limit,
+                float(self.cfg.get("document_candidate_min_score", 0.08)),
+                query_vector=shared_query_vector,
+                candidate_limit=document_candidate_limit,
+            )
         except Exception:
             chunks = []
+
         rules = self._rules(principal, areas)
 
         def rerank(items: Iterable[Dict[str, Any]], kind: str, text_key: str) -> List[Dict[str, Any]]:
