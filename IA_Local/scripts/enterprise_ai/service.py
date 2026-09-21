@@ -14,6 +14,7 @@ from .memory import MemoryManager
 from .providers import LLMProvider
 from .security import Principal
 from .traceability import current_trace_id
+from enterprise_agent_orchestrator import route_enterprise_question
 
 INTERNAL_TERMS = (
     "venta", "ventas", "compra", "compras", "proveedor", "cliente", "empresa", "inventario",
@@ -405,7 +406,15 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                 message,
             )
 
-            if connected_sql is not None:
+            route_decision = route_enterprise_question(
+                question=message,
+                governed_sql_available=connected_sql is not None,
+                direct_memory_question=self._direct_memory_question(message),
+                system_capabilities_question=self._looks_system_capabilities(message),
+                general_knowledge_question=self._looks_general_knowledge(message),
+            )
+
+            if route_decision.route == "governed_sql":
                 total_ms = (time.perf_counter() - started) * 1000
                 sources = list(connected_sql.get("sources") or [])
                 timings = dict(connected_sql.get("timings_ms") or {})
@@ -453,7 +462,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
 
             # FAST PATH 1: memoria empresarial directa, completamente local y sin
             # embeddings. Debe ejecutarse antes de ContextEngine.
-            if self._direct_memory_question(message):
+            if route_decision.route == "memory_lexical":
                 memory_started = time.perf_counter()
                 direct_memories = self.memory.search_lexical(
                     principal, message, limit=min(3, int(self.cfg.section("retrieval").get("max_memories", 6))), min_score=0.18
@@ -489,7 +498,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
             # FAST PATH 2 V8.5.5: preguntas sobre las capacidades de ESTA
             # instalación se responden desde configuración real, no desde la
             # autobiografía del LLM (que puede inventar proveedor, fecha de corte o memoria).
-            if self._looks_system_capabilities(message):
+            if route_decision.route == "system_capabilities":
                 answer = self._system_capabilities_answer(message)
                 total_ms = (time.perf_counter() - started) * 1000
                 sources = [{"type": "system_capabilities", "version": "8.5.5", "model": getattr(self.llm, "model", None)}]
@@ -505,7 +514,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
             # DocumentService.search, Qdrant ni al proveedor de embeddings. El modelo
             # local puede usar su conocimiento general, pero tiene prohibido inventar
             # hechos internos de la empresa.
-            if self._looks_general_knowledge(message):
+            if route_decision.route == "general_llm":
                 profile = self._response_profile(message, general=True)
                 messages, context_plan = self._build_general_messages(message, history, profile)
                 answer, llm_ms, queue_ms = self._llm_chat_with_queue(messages, max_tokens=None, num_ctx=profile["num_ctx"])
@@ -528,6 +537,9 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
 
             # Solo las consultas empresariales llegan al recuperador completo. Asimismo,
             # solo aquí evaluamos si el mensaje propone una memoria nueva.
+            if route_decision.route != "internal_context":
+                raise RuntimeError("ENTERPRISE_ROUTE_NOT_EXECUTABLE")
+
             candidate = self.memory.propose_from_message(principal, message)
             built = self.context.build(principal, message, history)
             structured_ok = bool(built.structured and not built.structured.get("insufficient"))
