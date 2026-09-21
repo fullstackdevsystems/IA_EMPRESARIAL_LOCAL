@@ -41,7 +41,7 @@ Scope:
 
 ## R10.25C - Deeper Business Intelligence
 
-Status: NOT STARTED
+Status: COMPLETED
 
 Goal: produce evidence-backed business findings beyond direct question answering.
 
@@ -53,6 +53,14 @@ Scope:
 - Business anomaly signals.
 - Ranked opportunities and risks backed by governed evidence.
 - Clear separation between calculated facts and AI interpretation.
+Closure:
+- C1 established governed business-finding classification with rule-supplied finding class and severity; generative AI has no classification authority.
+- C2 added deterministic cancellation and exception analysis without inventing status semantics or business thresholds.
+- C3 added deterministic statistical anomaly detection using governed executed evidence, without business classification authority.
+- C4 added governed risk/opportunity prioritization from explicit rule-supplied classification and severity; rule priority remains rule precedence and is not a finding score or ranking authority.
+- C5 certified the productive execution-plan -> dashboard-spec -> business-insights -> business-rule-engine -> governed-business-findings propagation path end to end.
+- No parallel BI authority was introduced in the enterprise orchestrator or API.
+- Deterministic calculations and governed evidence remain authoritative; LLM output cannot calculate, classify, score, or rank findings.
 
 ## R10.25D - Context, Performance and Large Data
 
@@ -93,8 +101,8 @@ Controlled fine-tuning remains optional. Existing dataset/run/export infrastruct
 
 - R10.25A = COMPLETED
 - R10.25B = COMPLETED
-- R10.25C = NOT STARTED
+- R10.25C = COMPLETED
 - R10.25D = NOT STARTED
 - R10.25E = NOT STARTED
 
-Next component: R10.25C - Deeper Business Intelligence.
+Next component: R10.25D - Context, Performance and Large Data.
