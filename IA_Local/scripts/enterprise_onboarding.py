@@ -555,31 +555,155 @@ class EnterpriseOnboarding:
             raise OnboardingError("CONFIGURATION_REQUIRED", "CONFIGURATION: REQUIRED")
         return result
 
-    def configure(self, *, tenant_id: str, tenant_name: str, admin_user_id: str, admin_username: str, admin_display_name: str, password: str) -> Dict[str, Any]:
+    def configure(
+        self,
+        *,
+        tenant_id: str,
+        tenant_name: str,
+        admin_user_id: str,
+        admin_username: str,
+        admin_display_name: str,
+        password: str,
+        business_type: str = "Otro",
+        accent_color: str = "#1d67d2",
+        theme: str = "professional-light",
+    ) -> Dict[str, Any]:
         try:
-            # Password policy remains centralized in enterprise_identity and is
-            # validated before this façade creates any persistent resource.
+            # Validate every user-controlled first-run field before
+            # creating persistent enterprise resources.
             validate_password(password)
+
+            business_type = str(
+                business_type or "Otro"
+            ).strip()
+            accent_color = str(
+                accent_color or "#1d67d2"
+            ).strip()
+            theme = str(
+                theme or "professional-light"
+            ).strip()
+
+            allowed_business_types = {
+                "Comercial",
+                "Distribución",
+                "Servicios",
+                "Manufactura",
+                "Logística",
+                "Agropecuario",
+                "Otro",
+            }
+
+            allowed_themes = {
+                "professional-light",
+                "professional-dark",
+            }
+
+            color_ok = (
+                len(accent_color) == 7
+                and accent_color.startswith("#")
+                and all(
+                    char.lower()
+                    in "0123456789abcdef"
+                    for char
+                    in accent_color[1:]
+                )
+            )
+
+            if (
+                business_type
+                not in allowed_business_types
+                or theme
+                not in allowed_themes
+                or not color_ok
+            ):
+                raise OnboardingError(
+                    "CONFIG_INVALID",
+                    "Configuración empresarial inválida",
+                )
+
             try:
-                tenant = self.tenants.get(tenant_id)
-                if tenant["name"] != str(tenant_name).strip():
-                    raise OnboardingError("CONFIGURATION_CONFLICT", "Tenant existente incompatible")
+                tenant = self.tenants.get(
+                    tenant_id
+                )
+
+                if (
+                    tenant["name"]
+                    != str(tenant_name).strip()
+                ):
+                    raise OnboardingError(
+                        "CONFIGURATION_CONFLICT",
+                        "Tenant existente incompatible",
+                    )
             except TenantRegistryError as exc:
                 if exc.code != "TENANT_NOT_FOUND":
                     raise
-                self.tenants.create(tenant_id=tenant_id, name=tenant_name)
+
+                self.tenants.create(
+                    tenant_id=tenant_id,
+                    name=tenant_name,
+                )
+
             admins = self._admins()
-            existing = next((u for u in admins if u["user_id"] == str(admin_user_id).strip().lower() and u["tenant_id"] == str(tenant_id).strip().lower()), None)
+
+            existing = next(
+                (
+                    user
+                    for user in admins
+                    if user["user_id"]
+                    == str(admin_user_id).strip().lower()
+                    and user["tenant_id"]
+                    == str(tenant_id).strip().lower()
+                ),
+                None,
+            )
+
             if not existing:
                 if admins:
-                    raise OnboardingError("CONFIGURATION_CONFLICT", "Ya existe un administrador empresarial")
-                self.identity.bootstrap_admin(user_id=admin_user_id, username=admin_username, display_name=admin_display_name, password=password, tenant_id=tenant_id)
-            self.platform.update_tenant(tenant_id, {"display_name": str(tenant_name).strip()})
+                    raise OnboardingError(
+                        "CONFIGURATION_CONFLICT",
+                        "Ya existe un administrador empresarial",
+                    )
+
+                self.identity.bootstrap_admin(
+                    user_id=admin_user_id,
+                    username=admin_username,
+                    display_name=admin_display_name,
+                    password=password,
+                    tenant_id=tenant_id,
+                )
+
+            self.platform.update_tenant(
+                tenant_id,
+                {
+                    "display_name":
+                        str(tenant_name).strip(),
+                    "business_type":
+                        business_type,
+                    "theme":
+                        theme,
+                    "branding": {
+                        "display_name":
+                            str(tenant_name).strip(),
+                        "accent_color":
+                            accent_color,
+                        "theme":
+                            theme,
+                    },
+                },
+            )
+
             return self.validate()
         except OnboardingError:
             raise
-        except (TenantRegistryError, IdentityError, PlatformConfigError) as exc:
-            raise OnboardingError(exc.code, "Configuración empresarial inválida") from exc
+        except (
+            TenantRegistryError,
+            IdentityError,
+            PlatformConfigError,
+        ) as exc:
+            raise OnboardingError(
+                exc.code,
+                "Configuración empresarial inválida",
+            ) from exc
 
     def configure_sql(
         self,

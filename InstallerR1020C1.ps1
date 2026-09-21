@@ -209,11 +209,28 @@ catch {
 
 ${existingInstall} = Test-Path (Join-Path $RuntimeRoot 'scripts')
 
+$retainedDataNotice = Join-Path `
+    $ProductRoot `
+    'UNINSTALL_RETAINED_DATA.txt'
+
+$retainedDataRecovery = (
+    $runtimeRootPreExisted -and
+    -not $existingInstall -and
+    (Test-Path `
+        -LiteralPath $retainedDataNotice `
+        -PathType Leaf)
+)
+
 if (
     $runtimeRootPreExisted -and
-    -not $existingInstall
+    -not $existingInstall -and
+    -not $retainedDataRecovery
 ) {
     Stop-Install 'RUNTIME_ROOT_CONFLICT'
+}
+
+if ($retainedDataRecovery) {
+    Note 'INSTALL RECOVERY: RETAINED_BUSINESS_DATA'
 }
 
 if (-not $existingInstall) {
@@ -305,6 +322,9 @@ $rootFiles = @(
     'InstallerR1020C1.ps1',
     'InstalarLimpio.ps1',
     'INSTALAR_IA_EMPRESARIAL_LOCAL.bat',
+    'DesinstalarIA.ps1',
+    'DESINSTALAR_IA_EMPRESARIAL_LOCAL.bat',
+    'LEEME_DESINSTALACION_Y_RECUPERACION.txt',
     'ValidarInstalador.ps1',
     'IA_Local\VERSION.txt',
     'IA_Local\requirements-local.txt'
@@ -569,4 +589,15 @@ Cleanup-ManagedScriptBackup
 
 if(-not $SkipSqlCheck){Note 'SQL driver checked through pyodbc; ODBC Driver 18 may be configured later.'};if(-not $SkipAiCheck){Note 'AI_PROVIDER: NOT CONFIGURED is valid; no model download occurs.'}
 if($TenantId -and $TenantName -and $AdminUsername){Note "Bootstrap requested for tenant $TenantId/admin $AdminUsername; password is never accepted or logged on command line."}else{Note 'No hardcoded tenant/admin/password. Bootstrap explicitly after install.'}
+if (
+    $retainedDataRecovery -and
+    (Test-Path `
+        -LiteralPath $retainedDataNotice `
+        -PathType Leaf)
+) {
+    Remove-Item `
+        -LiteralPath $retainedDataNotice `
+        -Force
+}
+
 Note 'INSTALL: PASS'

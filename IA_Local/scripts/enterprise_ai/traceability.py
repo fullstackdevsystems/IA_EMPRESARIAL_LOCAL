@@ -153,18 +153,45 @@ class TraceabilityManager:
         return {'trace_id': trace_id, 'status': trace['status'], 'explanation': '\n'.join(lines), 'trace': trace}
 
     @contextlib.contextmanager
-    def scope(self, principal: Principal, *, trace_type: str, target_ref: Optional[str] = None, prompt: Optional[str] = None) -> Iterator[str]:
-        trace_id=self.start(principal, trace_type=trace_type, target_ref=target_ref, prompt=prompt)
-        mt=_CURRENT_MANAGER.set(self); tt=_CURRENT_TRACE.set(trace_id)
+    def bind(self, trace_id: str) -> Iterator[str]:
+        """Enlaza una traza al contexto actual sin iniciar ni completar su ciclo de vida.
+
+        Es seguro para tramos síncronos cortos. No debe mantenerse abierto a través
+        de yields de StreamingResponse porque cada reanudación puede ocurrir bajo un
+        Context distinto.
+        """
+        mt = _CURRENT_MANAGER.set(self)
+        tt = _CURRENT_TRACE.set(trace_id)
         try:
             yield trace_id
+        finally:
+            _CURRENT_TRACE.reset(tt)
+            _CURRENT_MANAGER.reset(mt)
+
+    @contextlib.contextmanager
+    def scope(self, principal: Principal, *, trace_type: str, target_ref: Optional[str] = None, prompt: Optional[str] = None) -> Iterator[str]:
+        trace_id = self.start(
+            principal,
+            trace_type=trace_type,
+            target_ref=target_ref,
+            prompt=prompt,
+        )
+        try:
+            with self.bind(trace_id):
+                yield trace_id
             self.complete(trace_id)
         except Exception as exc:
-            self.add_step(trace_id, 'error', engine='runtime', details={'error_type': type(exc).__name__, 'error': str(exc)[:500]})
+            self.add_step(
+                trace_id,
+                'error',
+                engine='runtime',
+                details={
+                    'error_type': type(exc).__name__,
+                    'error': str(exc)[:500],
+                },
+            )
             self.complete(trace_id, status='error')
             raise
-        finally:
-            _CURRENT_TRACE.reset(tt); _CURRENT_MANAGER.reset(mt)
 
 
 def trace_step(stage: str, *, engine: Optional[str] = None, source_type: Optional[str] = None,

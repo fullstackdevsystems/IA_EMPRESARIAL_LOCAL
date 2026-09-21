@@ -53,7 +53,7 @@ check(
     "guided_ai_change_invalidates_test",
     "function guidedAiInvalidate()" in html
     and "GUIDED_AI_TEST=null;" in html
-    and "oninput=\"guidedAiInvalidate()\"" in html,
+    and ("oninput=\"guidedAiInvalidate()\"" in html or "onchange=\"guidedAiInvalidate()\"" in html),
 )
 check(
     "guided_ai_readiness_is_server_authoritative",

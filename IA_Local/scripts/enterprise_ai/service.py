@@ -76,6 +76,7 @@ class EnterpriseAIService:
         self.llm = llm
         self.memory = memory
         self.context = context
+        self.connected_sql_resolver = None
         runtime = cfg.section("runtime")
         self.max_concurrent_generations = max(1, int(runtime.get("max_concurrent_generations", 1)))
         self.queue_timeout_seconds = max(5, int(runtime.get("queue_timeout_seconds", 120)))
@@ -381,12 +382,75 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
         finally:
             self._generation_slots.release()
 
+    def _connected_sql_answer(
+        self,
+        principal: Principal,
+        message: str,
+    ) -> Optional[Dict[str, Any]]:
+        resolver = getattr(self, "connected_sql_resolver", None)
+
+        if not callable(resolver):
+            return None
+
+        return resolver(principal, message)
+
     def chat(self, principal: Principal, message: str, history: Optional[Sequence[Dict[str, str]]] = None) -> Dict[str, Any]:
         started = time.perf_counter()
         llm_ms = 0.0
         queue_ms = 0.0
         candidate = None
         try:
+            connected_sql = self._connected_sql_answer(
+                principal,
+                message,
+            )
+
+            if connected_sql is not None:
+                total_ms = (time.perf_counter() - started) * 1000
+                sources = list(connected_sql.get("sources") or [])
+                timings = dict(connected_sql.get("timings_ms") or {})
+                timings["total_ms"] = round(total_ms, 2)
+                connected_sql["timings_ms"] = timings
+
+                self._metric(
+                    principal,
+                    message,
+                    total_ms,
+                    {
+                        "memory_ms": 0.0,
+                        "rag_ms": 0.0,
+                        "structured_ms": float(
+                            timings.get("structured_ms", 0.0) or 0.0
+                        ),
+                    },
+                    0.0,
+                    0,
+                    0,
+                    len(sources),
+                    "ok",
+                    None,
+                    output_chars=len(str(connected_sql.get("answer") or "")),
+                    route="governed_sql",
+                )
+
+                self.db.audit(
+                    "chat.answer",
+                    principal.company_id,
+                    principal.user_id,
+                    "query",
+                    details={
+                        "sources": len(sources),
+                        "fast_path": "governed_sql",
+                        "structured": bool(
+                            (connected_sql.get("retrieval") or {}).get(
+                                "structured"
+                            )
+                        ),
+                    },
+                )
+
+                return connected_sql
+
             # FAST PATH 1: memoria empresarial directa, completamente local y sin
             # embeddings. Debe ejecutarse antes de ContextEngine.
             if self._direct_memory_question(message):
@@ -519,6 +583,94 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
         """
         request_id = uuid.uuid4().hex[:12]
         started = time.perf_counter()
+
+        connected_sql = self._connected_sql_answer(
+            principal,
+            message,
+        )
+
+        if connected_sql is not None:
+            answer = str(connected_sql.get("answer") or "")
+            sources = list(connected_sql.get("sources") or [])
+            retrieval = dict(connected_sql.get("retrieval") or {})
+            governance = dict(connected_sql.get("governance") or {})
+            timings = dict(connected_sql.get("timings_ms") or {})
+            total_ms = (time.perf_counter() - started) * 1000
+
+            timings["first_token_ms"] = 0.0
+            timings["queue_ms"] = 0.0
+            timings["total_ms"] = round(total_ms, 2)
+
+            self._metric(
+                principal,
+                message,
+                total_ms,
+                {
+                    "memory_ms": 0.0,
+                    "rag_ms": 0.0,
+                    "structured_ms": float(
+                        timings.get("structured_ms", 0.0) or 0.0
+                    ),
+                },
+                0.0,
+                0,
+                0,
+                len(sources),
+                "ok",
+                None,
+                first_token_ms=0.0,
+                queue_ms=0.0,
+                output_chars=len(answer),
+                route="governed_sql",
+            )
+
+            self.db.audit(
+                "chat.answer",
+                principal.company_id,
+                principal.user_id,
+                "query",
+                details={
+                    "request_id": request_id,
+                    "sources": len(sources),
+                    "fast_path": "governed_sql",
+                    "structured": bool(retrieval.get("structured")),
+                },
+            )
+
+            yield {
+                "type": "start",
+                "request_id": request_id,
+                "route": "governed_sql",
+                "generation_mode": "deterministic",
+            }
+
+            yield {
+                "type": "first_token",
+                "request_id": request_id,
+                "first_token_ms": 0.0,
+                "queue_ms": 0.0,
+            }
+
+            if answer:
+                yield {
+                    "type": "token",
+                    "request_id": request_id,
+                    "text": answer,
+                }
+
+            yield {
+                "type": "done",
+                "request_id": request_id,
+                "answer": answer,
+                "sources": sources,
+                "timings_ms": timings,
+                "retrieval": retrieval,
+                "memory_candidate": None,
+                "governance": governance,
+            }
+
+            return
+
         if self._looks_system_capabilities(message):
             answer = self._system_capabilities_answer(message)
             total_ms = (time.perf_counter() - started) * 1000

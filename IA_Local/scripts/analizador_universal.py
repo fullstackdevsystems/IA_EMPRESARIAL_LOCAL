@@ -1665,69 +1665,129 @@ base.INDEX_HTML = base.INDEX_HTML.replace(
 
 _ANALYZE_LOGIN_GATE = r"""
 <div id="ia-analyze-auth"
-     style="position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.94);
-            display:flex;align-items:center;justify-content:center;padding:20px">
-  <div style="width:min(470px,100%);background:#fff;border-radius:18px;padding:26px;
-              box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a">
+     style="position:fixed;inset:0;z-index:99999;background:#f4f7fb;
+            display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden">
+  <div style="width:min(760px,100%);max-height:calc(100vh - 40px);box-sizing:border-box;overflow:auto;background:#fff;border:1px solid #dbe4ef;border-radius:20px;padding:26px;
+              box-shadow:0 24px 70px rgba(15,23,42,.16);color:#0f172a">
 
     <div id="ia-first-run-panel" style="display:none">
-      <div style="font-size:13px;color:#2563eb;font-weight:700;margin-bottom:6px">
-        Primera configuración
-      </div>
-      <h2 style="margin:0 0 8px">Configura tu empresa</h2>
-      <p style="margin:0 0 18px;color:#475569;line-height:1.45">
-        Crea la empresa y la cuenta administradora.
-        Después podrás conectar SQL Server y elegir la inteligencia artificial.
+      <style>
+        #ia-first-run-panel{font-family:Inter,Segoe UI,Arial,sans-serif}
+        #ia-first-run-panel *{box-sizing:border-box}
+        #ia-login-panel{max-width:470px;margin:0 auto}
+        .ia-setup-kicker{font-size:13px;color:#2563eb;font-weight:800;margin-bottom:6px}
+        .ia-setup-title{margin:0 0 8px;font-size:27px;line-height:1.15;color:#0f172a}
+        .ia-setup-copy{margin:0 0 18px;color:#475569;line-height:1.5}
+        .ia-setup-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 22px}
+        .ia-setup-step{min-height:44px;border:1px solid #dbe4ef;border-radius:12px;padding:9px 10px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
+        .ia-setup-step strong{width:24px;height:24px;border-radius:999px;background:#e2e8f0;color:#334155;display:grid;place-items:center;flex:0 0 24px}
+        .ia-setup-step.active{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+        .ia-setup-step.active strong{background:#2563eb;color:white}
+        .ia-setup-section{border:1px solid #e2e8f0;border-radius:15px;padding:16px;margin:0 0 14px;background:#fff}
+        .ia-setup-section h3{margin:0 0 4px;color:#0f172a;font-size:16px}
+        .ia-setup-section p{margin:0 0 14px;color:#64748b;font-size:13px;line-height:1.45}
+        .ia-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+        .ia-setup-field label{display:block;color:#334155;font-size:13px;font-weight:700;margin-bottom:6px}
+        .ia-setup-field input,.ia-setup-field select{width:100%;min-height:46px;border:1px solid #cbd5e1;border-radius:10px;padding:10px 11px;background:#fff;color:#0f172a;font:inherit}
+        .ia-setup-field input[type="color"]{padding:5px;cursor:pointer}
+        .ia-setup-field input:focus,.ia-setup-field select:focus{outline:3px solid #dbeafe;border-color:#60a5fa}
+        .ia-setup-span-2{grid-column:1/-1}
+        .ia-setup-actions{display:flex;justify-content:flex-end;margin-top:16px}
+        .ia-setup-actions button{min-height:46px;border:0;border-radius:11px;padding:0 20px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}
+        .ia-setup-actions button:disabled{opacity:.6;cursor:wait}
+        #ia-setup-status{min-height:20px;margin-top:12px;font-size:13px;color:#b91c1c}
+        .ia-setup-security{margin-top:14px;padding:11px 12px;border-radius:10px;background:#f8fafc;color:#64748b;font-size:12px;line-height:1.5}
+        @media(max-width:640px){
+          .ia-setup-title{font-size:23px}
+          .ia-setup-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .ia-setup-grid{grid-template-columns:1fr}
+          .ia-setup-span-2{grid-column:auto}
+          .ia-setup-actions button{width:100%}
+        }
+      </style>
+
+      <div class="ia-setup-kicker">Primera configuración · Paso 1 de 4</div>
+      <h2 class="ia-setup-title">Configura tu empresa</h2>
+      <p class="ia-setup-copy">
+        Prepara la identidad de tu empresa y crea la cuenta administradora.
+        Después podrás conectar tus datos y elegir la inteligencia artificial.
       </p>
 
-      <label>Nombre de la empresa</label>
-      <input id="ia-setup-company"
-             autocomplete="organization"
-             placeholder="Mi Empresa"
-             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+      <div class="ia-setup-steps" aria-label="Progreso de configuración">
+        <div class="ia-setup-step active" aria-current="step"><strong>1</strong><span>Empresa</span></div>
+        <div class="ia-setup-step"><strong>2</strong><span>Datos</span></div>
+        <div class="ia-setup-step"><strong>3</strong><span>IA</span></div>
+        <div class="ia-setup-step"><strong>4</strong><span>Listo</span></div>
+      </div>
 
-      <label>Tu nombre</label>
-      <input id="ia-setup-display"
-             autocomplete="name"
-             placeholder="Administrador"
-             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+      <section class="ia-setup-section">
+        <h3>Identidad de la empresa</h3>
+        <p>Estos datos personalizan la experiencia desde el primer acceso.</p>
+        <div class="ia-setup-grid">
+          <div class="ia-setup-field ia-setup-span-2">
+            <label for="ia-setup-company">Nombre de la empresa</label>
+            <input id="ia-setup-company" autocomplete="organization" placeholder="Mi Empresa">
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-business-type">Tipo de empresa</label>
+            <select id="ia-setup-business-type">
+              <option value="Comercial">Comercial</option>
+              <option value="Distribución">Distribución</option>
+              <option value="Servicios">Servicios</option>
+              <option value="Manufactura">Manufactura</option>
+              <option value="Logística">Logística</option>
+              <option value="Agropecuario">Agropecuario</option>
+              <option value="Otro" selected>Otro</option>
+            </select>
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-theme">Tema visual</label>
+            <select id="ia-setup-theme">
+              <option value="professional-light" selected>Claro</option>
+              <option value="professional-dark">Oscuro</option>
+            </select>
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-accent">Color principal</label>
+            <input id="ia-setup-accent" type="color" value="#1d67d2">
+          </div>
+        </div>
+      </section>
 
-      <label>Usuario administrador</label>
-      <input id="ia-setup-user"
-             autocomplete="username"
-             placeholder="admin"
-             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+      <section class="ia-setup-section">
+        <h3>Cuenta administradora</h3>
+        <p>Usarás esta cuenta para administrar la configuración inicial.</p>
+        <div class="ia-setup-grid">
+          <div class="ia-setup-field">
+            <label for="ia-setup-display">Tu nombre</label>
+            <input id="ia-setup-display" autocomplete="name" placeholder="Administrador">
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-user">Usuario administrador</label>
+            <input id="ia-setup-user" autocomplete="username" placeholder="admin">
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-password">Contraseña</label>
+            <input id="ia-setup-password" type="password" autocomplete="new-password" placeholder="Mínimo 12 caracteres">
+          </div>
+          <div class="ia-setup-field">
+            <label for="ia-setup-confirm">Confirmar contraseña</label>
+            <input id="ia-setup-confirm" type="password" autocomplete="new-password">
+          </div>
+        </div>
+      </section>
 
-      <label>Contraseña</label>
-      <input id="ia-setup-password"
-             type="password"
-             autocomplete="new-password"
-             placeholder="Mínimo 12 caracteres"
-             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 12px">
+      <div class="ia-setup-actions">
+        <button id="ia-setup-submit" type="button">Crear empresa y continuar</button>
+      </div>
 
-      <label>Confirmar contraseña</label>
-      <input id="ia-setup-confirm"
-             type="password"
-             autocomplete="new-password"
-             style="width:100%;box-sizing:border-box;padding:10px;margin:5px 0 16px">
+      <div id="ia-setup-status" role="status" aria-live="polite"></div>
 
-      <button id="ia-setup-submit"
-              type="button"
-              style="width:100%;padding:12px;border:0;border-radius:8px;
-                     background:#2563eb;color:white;font-weight:700;cursor:pointer">
-        Crear empresa y continuar
-      </button>
-
-      <div id="ia-setup-status"
-           style="margin-top:12px;font-size:13px;color:#b91c1c"></div>
-
-      <div style="margin-top:16px;padding:10px;border-radius:8px;background:#f8fafc;
-                  color:#64748b;font-size:12px;line-height:1.45">
+      <div class="ia-setup-security">
         La configuración inicial sólo está disponible desde este equipo
         y se desactiva automáticamente después de crear el administrador.
       </div>
     </div>
-
     <div id="ia-login-panel">
       <h2 style="margin:0 0 8px">Acceso a IA Empresarial Local</h2>
       <p style="margin:0 0 16px;color:#475569">
@@ -1807,8 +1867,21 @@ window.__IA_ANALYZE_TOKEN__ = '';
 
   let bootstrapNonce = '';
 
+  function lockPageScroll(){
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function unlockPageScroll(){
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  }
+
+  lockPageScroll();
+
 
   function showLogin(){
+    lockPageScroll();
     setupPanel.style.display = 'none';
     loginPanel.style.display = '';
   }
@@ -1818,6 +1891,7 @@ window.__IA_ANALYZE_TOKEN__ = '';
     bootstrapNonce =
       String(data.bootstrap_nonce || '');
 
+    lockPageScroll();
     loginPanel.style.display = 'none';
     setupPanel.style.display = '';
   }
@@ -1860,6 +1934,15 @@ window.__IA_ANALYZE_TOKEN__ = '';
   async function bootstrap(){
     setupStatus.textContent = '';
 
+    const setupBusinessType =
+      document.getElementById('ia-setup-business-type');
+
+    const setupAccent =
+      document.getElementById('ia-setup-accent');
+
+    const setupTheme =
+      document.getElementById('ia-setup-theme');
+
     if(
       !setupCompany.value.trim()
       || !setupUser.value.trim()
@@ -1883,6 +1966,7 @@ window.__IA_ANALYZE_TOKEN__ = '';
     }
 
     setupButton.disabled = true;
+    setupButton.textContent = 'Creando empresa...';
 
     try{
       const response = await fetch(
@@ -1896,6 +1980,12 @@ window.__IA_ANALYZE_TOKEN__ = '';
           body:JSON.stringify({
             company_name:
               setupCompany.value.trim(),
+            business_type:
+              setupBusinessType.value,
+            accent_color:
+              setupAccent.value,
+            theme:
+              setupTheme.value,
             admin_display_name:
               setupDisplay.value.trim(),
             admin_username:
@@ -1935,7 +2025,7 @@ window.__IA_ANALYZE_TOKEN__ = '';
       );
 
       window.location.assign(
-        data.next || '/admin'
+        data.next || '/settings?setup=data'
       );
     }
     catch(error){
@@ -1950,9 +2040,9 @@ window.__IA_ANALYZE_TOKEN__ = '';
     }
     finally{
       setupButton.disabled = false;
+      setupButton.textContent = 'Crear empresa y continuar';
     }
   }
-
 
   async function login(){
     status.textContent = '';
@@ -2002,6 +2092,7 @@ window.__IA_ANALYZE_TOKEN__ = '';
 
       pass.value = '';
       gate.style.display = 'none';
+      unlockPageScroll();
     }
     catch(error){
       window.__IA_ANALYZE_TOKEN__ = '';
@@ -2563,6 +2654,21 @@ def onboarding_web_bootstrap(
         or ""
     ).strip()
 
+    business_type = str(
+        payload.get("business_type")
+        or "Otro"
+    ).strip()
+
+    accent_color = str(
+        payload.get("accent_color")
+        or "#1d67d2"
+    ).strip()
+
+    theme = str(
+        payload.get("theme")
+        or "professional-light"
+    ).strip()
+
     password = payload.get(
         "password"
     )
@@ -2659,6 +2765,9 @@ def onboarding_web_bootstrap(
                 admin_username=login_username,
                 admin_display_name=display_name,
                 password=password,
+                business_type=business_type,
+                accent_color=accent_color,
+                theme=theme,
             )
         except OnboardingError as exc:
             status_code = (
@@ -2679,6 +2788,9 @@ def onboarding_web_bootstrap(
                 "USER_INVALID_ID":
                     "El usuario administrador "
                     "no es válido.",
+                "CONFIG_INVALID":
+                    "Revisa el tipo de empresa "
+                    "y la apariencia seleccionada.",
             }.get(
                 exc.code,
                 "No se pudo completar "
@@ -2728,6 +2840,12 @@ def onboarding_web_bootstrap(
                     tenant_id,
                 "name":
                     company_name,
+                "business_type":
+                    business_type,
+                "accent_color":
+                    accent_color,
+                "theme":
+                    theme,
             },
             "user":
                 user,
@@ -2736,7 +2854,7 @@ def onboarding_web_bootstrap(
             "token":
                 token,
             "next":
-                "/admin",
+                "/settings?setup=data",
         }
 
 

@@ -1,0 +1,29 @@
+DESINSTALACION, REPARACION Y RECUPERACION
+
+La instalacion existente puede repararse o actualizarse ejecutando nuevamente el instalador con la misma ruta. El instalador entra en modo UPGRADE, reemplaza los archivos administrados y conserva el estado empresarial gobernado.
+
+Para desinstalar conservando datos empresariales (opcion recomendada):
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DesinstalarIA.ps1 -InstallPath "C:\RUTA\IA_Empresarial_Local"
+
+Este modo detiene el runtime, elimina el entorno y los componentes administrados, pero conserva los espacios persistentes existentes bajo IA_Local. La carpeta retenida incluye los datos que permiten una reinstalacion posterior en la misma ruta.
+
+Para volver a instalar despues de una desinstalacion con datos conservados, ejecuta el instalador y usa exactamente el mismo InstallPath. El instalador reutiliza el estado empresarial conservado.
+
+Para eliminar tambien los datos empresariales, primero crea un respaldo gobernado fuera de la carpeta de instalacion:
+
+    .\OperarIA.ps1 -Action backup -BackupPath "C:\Respaldos\IA_Empresarial_antes_de_desinstalar.zip"
+
+Despues ejecuta la eliminacion total indicando explicitamente el respaldo y la confirmacion:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DesinstalarIA.ps1 -InstallPath "C:\RUTA\IA_Empresarial_Local" -RemoveBusinessData -ConfirmRemoveBusinessData -BackupPath "C:\Respaldos\IA_Empresarial_antes_de_desinstalar.zip"
+
+La eliminacion total falla de forma segura si falta la confirmacion, si el respaldo no existe, si esta dentro de la propia instalacion o si no contiene un manifiesto de respaldo gobernado valido.
+
+RECUPERACION / ROLLBACK
+
+Si una actualizacion falla, el instalador restaura los archivos administrados anteriores. Para recuperar datos empresariales desde un respaldo gobernado, reinstala IA Empresarial Local y utiliza:
+
+    .\OperarIA.ps1 -Action restore -RestorePath "C:\Respaldos\IA_Empresarial_antes_de_desinstalar.zip"
+
+Nunca elimines manualmente la carpeta de datos empresariales si necesitas conservar la informacion.

@@ -7,7 +7,7 @@ from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryE
 
 CONFIG_VERSION="r10.20b.4"
 DEFAULTS={"product_name":"IA Empresarial Local","default_locale":"es-MX","default_timezone":"America/Chihuahua","default_theme":"professional-light","default_ai_provider":"DISABLED","default_ai_model":None,"max_upload_mb":100,"default_sql_timeout":30,"default_sql_max_rows":500,"session_ttl_minutes":60,"enabled_features":{"sql_enabled":True,"knowledge_enabled":True,"pdf_enabled":True,"excel_enabled":True,"dashboard_enabled":True,"ai_enabled":False},"ai_provider":{"provider_id":"disabled","provider_type":"DISABLED","base_url":None,"model":None,"enabled":False,"timeout":30,"context_window":None}}
-_GLOBAL=set(DEFAULTS); _TENANT={"display_name","locale","timezone","theme","ai_provider","ai_model","output_preferences","enabled_features","branding"}; _THEMES={"professional-light","professional-dark"}; _TYPES={"OLLAMA","OPENAI_COMPATIBLE_LOCAL","DISABLED"}; _MODEL=re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,159}$"); _COLOR=re.compile(r"^#[0-9A-Fa-f]{6}$")
+_GLOBAL=set(DEFAULTS); _TENANT={"display_name","business_type","locale","timezone","theme","ai_provider","ai_model","output_preferences","enabled_features","branding"}; _THEMES={"professional-light","professional-dark"}; _BUSINESS_TYPES={"Comercial","Distribución","Servicios","Manufactura","Logística","Agropecuario","Otro"}; _TYPES={"OLLAMA","OPENAI_COMPATIBLE_LOCAL","DISABLED"}; _MODEL=re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,159}$"); _COLOR=re.compile(r"^#[0-9A-Fa-f]{6}$")
 class PlatformConfigError(ValueError):
  def __init__(self,code,message):super().__init__(message);self.code=code
 def _canon(x):return json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()
@@ -16,6 +16,10 @@ def _now():return datetime.now(timezone.utc).isoformat()
 def _safe_model(v):
  if v is not None and (not isinstance(v,str) or not _MODEL.fullmatch(v)):raise PlatformConfigError("AI_MODEL_INVALID","Modelo IA inválido")
  return v
+def _public_model_name(value):
+ """Keep persisted model identifiers untouched while presenting a stable local alias."""
+ value=_safe_model(value)
+ return "nomic-embed-text" if value and value.lower()=="nomic-embed-text:latest" else value
 def _provider(value):
  if not isinstance(value,dict) or set(value)-{"provider_id","provider_type","base_url","model","enabled","timeout","context_window"}:raise PlatformConfigError("AI_PROVIDER_INVALID","Provider IA inválido")
  typ=str(value.get("provider_type") or "").upper()
@@ -77,6 +81,7 @@ class EnterprisePlatformConfigStore:
   current=dict(d["tenants"].pop(legacy[0],{}) if legacy else d["tenants"].get(key,{}))
   for k,v in changes.items():
    if k=="branding":v=_branding(v)
+   if k=="business_type" and v not in _BUSINESS_TYPES:raise PlatformConfigError("CONFIG_INVALID","Tipo de empresa inválido")
    if k=="theme" and v not in _THEMES:raise PlatformConfigError("CONFIG_INVALID","Theme inválido")
    if k=="ai_provider":v=_provider(v)
    if k=="ai_model":v=_safe_model(v)
@@ -91,7 +96,7 @@ class EnterprisePlatformConfigStore:
   if runtime_override:out.update({k:v for k,v in runtime_override.items() if k in {"locale","timezone","theme"}})
   return out
  def public_effective_config(self,tenant_id=None):
-  c=self.resolve_effective_config(tenant_id);return {"product_name":c["product_name"],"display_name":c["branding"]["display_name"] or "IA Empresarial Local","locale":c.get("locale",c["default_locale"]),"timezone":c.get("timezone",c["default_timezone"]),"theme":c["branding"].get("theme",c["default_theme"]),"accent_color":c["branding"].get("accent_color"),"logo_reference":c["branding"].get("logo_reference"),"enabled_features":c["enabled_features"],"ai_available":bool(c.get("ai_provider",g if False else {}).get("enabled",False)) if isinstance(c.get("ai_provider"),dict) else False}
+  c=self.resolve_effective_config(tenant_id);return {"product_name":c["product_name"],"display_name":c["branding"]["display_name"] or "IA Empresarial Local","business_type":c.get("business_type") or "Otro","locale":c.get("locale",c["default_locale"]),"timezone":c.get("timezone",c["default_timezone"]),"theme":c["branding"].get("theme",c["default_theme"]),"accent_color":c["branding"].get("accent_color"),"logo_reference":c["branding"].get("logo_reference"),"enabled_features":c["enabled_features"],"ai_available":bool(c.get("ai_provider",g if False else {}).get("enabled",False)) if isinstance(c.get("ai_provider"),dict) else False}
  def design_context(self,tenant_id=None):
   from enterprise_design_system import get_design_tokens
   public=self.public_effective_config(tenant_id);tokens=get_design_tokens(public["theme"])
@@ -130,6 +135,7 @@ class EnterprisePlatformConfigStore:
     except PlatformConfigError:
      result.update({"capability":"SUPPORTED","status":"INVALID_RESPONSE"})
      return result
+    value=_public_model_name(value)
     if value and value.lower() not in seen:
      seen.add(value.lower());models.append({"id":value,"name":value})
    result.update({"capability":"SUPPORTED","reachable":True,"models":models,"status":"PASS" if models else "EMPTY"})

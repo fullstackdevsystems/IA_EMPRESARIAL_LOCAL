@@ -2,20 +2,44 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
+import uuid
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
 from .factory import build_components
+from .governed_sql_assistant import GovernedSqlAssistantBridge
 from .observability import shutdown_logging
 from .security import Principal, safe_component
 from .admin_console import UNIFIED_ADMIN_HTML
+from .product_ui import PRODUCT_HOME_HTML
+from .product_assistant_ui import PRODUCT_ASSISTANT_HTML
+from .product_workspaces_ui import PRODUCT_ANALYZE_HTML, PRODUCT_DATA_HTML, PRODUCT_REPORTS_HTML
+from .product_settings_ui import PRODUCT_SETTINGS_HTML
+from .providers import LMStudioProvider, OllamaProvider
 from enterprise_control_plane import ControlPlaneError, EnterpriseControlPlane
 from enterprise_identity import EnterpriseIdentityStore, IdentityError
 from enterprise_tenant_registry import EnterpriseTenantRegistry, TenantRegistryError
+from enterprise_onboarding import EnterpriseOnboarding
+from enterprise_platform_config import EnterprisePlatformConfigStore, PlatformConfigError
+from enterprise_sql_gateway import (
+    EnterpriseSecretStore,
+    EnterpriseSqlError,
+    SqlServerPyodbcProvider,
+    WindowsCredentialSecretProvider,
+    discover_schema,
+    public_sql_profile,
+    test_connection,
+    build_transient_sql_probe_profile,
+    probe_sql_server_metadata,
+)
+from enterprise_backup_recovery import BackupError, backup as governed_backup, restore as governed_restore
 
 
 class ChatRequest(BaseModel):
@@ -133,6 +157,129 @@ class SettingsRequest(BaseModel):
     queue_timeout_seconds: Optional[int] = None
     open_terminal_enabled: Optional[bool] = None
     warmup_llm: Optional[bool] = None
+
+
+class CompanyProfileRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    business_type: str = Field(min_length=1, max_length=40)
+    accent_color: str = Field(min_length=7, max_length=7)
+    theme: str = Field(min_length=1, max_length=40)
+
+
+class EnterpriseUserCreateRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=12, max_length=256)
+    role: str = Field(default="viewer", min_length=1, max_length=32)
+
+
+class EnterpriseUserUpdateRequest(BaseModel):
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    role: Optional[str] = Field(default=None, min_length=1, max_length=32)
+
+
+class EnterpriseUserStatusRequest(BaseModel):
+    enabled: bool
+
+
+
+class DataConnectionProbeRequest(BaseModel):
+    server: str = Field(
+        min_length=1,
+        max_length=255,
+    )
+    database: str = Field(
+        min_length=1,
+        max_length=255,
+    )
+    authentication: str = Field(
+        default="windows",
+        min_length=1,
+        max_length=32,
+    )
+    username: Optional[str] = Field(
+        default=None,
+        max_length=160,
+    )
+    password: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+    )
+    trust_server_certificate: bool = False
+
+
+
+
+class DataConnectionCreateRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    server: str = Field(min_length=1, max_length=255)
+    database: str = Field(min_length=1, max_length=255)
+    authentication: str = Field(default="windows", min_length=1, max_length=32)
+    username: Optional[str] = Field(default=None, max_length=160)
+    password: Optional[str] = Field(default=None, min_length=1, max_length=256)
+    trust_server_certificate: bool = False
+    allowed_sources: List[str] = Field(min_length=1, max_length=200)
+
+
+class DataConnectionUpdateRequest(BaseModel):
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    server: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    database: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    allowed_sources: Optional[List[str]] = Field(default=None, min_length=1, max_length=200)
+
+
+class DataConnectionStatusRequest(BaseModel):
+    enabled: bool
+
+
+class AiConfigurationRequest(BaseModel):
+    engine: str = Field(min_length=1, max_length=40)
+    model: Optional[str] = Field(default=None, max_length=160)
+
+
+class AppearanceRequest(BaseModel):
+    theme: str = Field(min_length=1, max_length=40)
+    accent_color: str = Field(min_length=7, max_length=7)
+
+
+class RecoveryRequest(BaseModel):
+    confirmed: bool = False
+
+
+class AdvancedPreferencesRequest(BaseModel):
+    locale: str = Field(min_length=2, max_length=32)
+    timezone: str = Field(min_length=2, max_length=80)
+
+
+class _CommercialAiAdapter:
+    """Small bridge to existing local provider implementations.
+
+    It deliberately owns neither configuration nor credentials; the platform
+    configuration store remains the single authority for both.
+    """
+
+    def health(self, config: Dict[str, Any]) -> bool:
+        provider = self._provider(config)
+        if not provider.healthy():
+            raise PlatformConfigError("AI_PROVIDER_UNAVAILABLE", "Motor local no disponible")
+        return True
+
+    def discover_models(self, config: Dict[str, Any]):
+        if str(config.get("provider_type") or "").upper() != "OLLAMA":
+            return {"supported": False}
+        return self._provider(config).list_models()
+
+    @staticmethod
+    def _provider(config: Dict[str, Any]):
+        kind = str(config.get("provider_type") or "").upper()
+        model = str(config.get("model") or "discovery")
+        timeout = int(config.get("timeout") or 30)
+        if kind == "OLLAMA":
+            return OllamaProvider(str(config.get("base_url") or ""), model, timeout=timeout)
+        if kind == "OPENAI_COMPATIBLE_LOCAL":
+            return LMStudioProvider(str(config.get("base_url") or ""), model, timeout=timeout)
+        raise PlatformConfigError("AI_PROVIDER_INVALID", "Motor local inválido")
 
 
 ASSISTANT_HTML = r"""
@@ -253,9 +400,76 @@ def install_enterprise_routes(app, root: str | Path):
         _close_enterprise_components,
     )
 
-    control_plane = EnterpriseControlPlane(components.cfg.root)
-    enterprise_tenants = EnterpriseTenantRegistry(Path(components.cfg.root) / "workspace" / "Reportes" / ".tenants")
-    enterprise_identity = EnterpriseIdentityStore(Path(components.cfg.root) / "workspace" / "Reportes" / ".identity", enterprise_tenants)
+    def _build_commercial_stores(current_components):
+        current_root = Path(current_components.cfg.root)
+
+        current_control_plane = EnterpriseControlPlane(
+            current_components.cfg.root
+        )
+
+        current_tenants = EnterpriseTenantRegistry(
+            current_root
+            / "workspace"
+            / "Reportes"
+            / ".tenants"
+        )
+
+        current_identity = EnterpriseIdentityStore(
+            current_root
+            / "workspace"
+            / "Reportes"
+            / ".identity",
+            current_tenants,
+        )
+
+        current_platform = EnterprisePlatformConfigStore(
+            current_root
+            / "workspace"
+            / "Reportes"
+            / ".platform_config",
+            current_tenants,
+        )
+
+        current_onboarding = EnterpriseOnboarding(
+            current_root
+            / "workspace"
+            / "Reportes"
+        )
+
+        return (
+            current_control_plane,
+            current_tenants,
+            current_identity,
+            current_platform,
+            current_onboarding,
+        )
+
+    (
+        control_plane,
+        enterprise_tenants,
+        enterprise_identity,
+        enterprise_platform,
+        enterprise_onboarding,
+    ) = _build_commercial_stores(components)
+
+    def _reload_enterprise_components() -> None:
+        nonlocal components
+        nonlocal control_plane
+        nonlocal enterprise_tenants
+        nonlocal enterprise_identity
+        nonlocal enterprise_platform
+        nonlocal enterprise_onboarding
+
+        components = build_components(root)
+
+        (
+            control_plane,
+            enterprise_tenants,
+            enterprise_identity,
+            enterprise_platform,
+            enterprise_onboarding,
+        ) = _build_commercial_stores(components)
+
     router = APIRouter()
 
     def principal_dependency(authorization: Optional[str] = Header(default=None)) -> Principal:
@@ -299,11 +513,1354 @@ def install_enterprise_routes(app, root: str | Path):
 
     @router.get("/assistant", response_class=HTMLResponse)
     def assistant_page():
+        return PRODUCT_ASSISTANT_HTML
+
+    @router.get(
+        "/assistant/legacy",
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
+    def legacy_assistant_page():
         return ASSISTANT_HTML
 
     @router.get("/admin", response_class=HTMLResponse)
     def admin_page():
         return UNIFIED_ADMIN_HTML
+
+    @router.get("/app", response_class=HTMLResponse, include_in_schema=False)
+    def product_home_page():
+        return PRODUCT_HOME_HTML
+
+
+    @router.get("/analyze", include_in_schema=False)
+    def product_analyze_page():
+        return HTMLResponse(PRODUCT_ANALYZE_HTML)
+    @router.get("/data", include_in_schema=False)
+    def product_data_page():
+        return HTMLResponse(PRODUCT_DATA_HTML)
+    @router.get("/reports", include_in_schema=False)
+    def product_reports_page():
+        return HTMLResponse(PRODUCT_REPORTS_HTML)
+    @router.get("/settings", include_in_schema=False)
+    def product_settings_page():
+        return HTMLResponse(PRODUCT_SETTINGS_HTML)
+
+    def company_profile_payload(principal: Principal) -> Dict[str, Any]:
+        public = enterprise_platform.public_effective_config(principal.company_id)
+        return {
+            "display_name": public.get("display_name") or "IA Empresarial Local",
+            "business_type": public.get("business_type") or "Otro",
+            "accent_color": public.get("accent_color") or "#1d67d2",
+            "theme": public.get("theme") or "professional-light",
+            "logo_configured": bool(public.get("logo_reference")),
+        }
+
+    @router.get("/api/enterprise/company-profile")
+    def company_profile(principal: Principal = Depends(require_permission("config:read"))):
+        try:
+            user = enterprise_identity.get(principal.user_id)
+            return {
+                "company": company_profile_payload(principal),
+                "can_edit": enterprise_identity.has_permission(user, "config:write"),
+            }
+        except (IdentityError, TenantRegistryError, PlatformConfigError) as exc:
+            raise HTTPException(status_code=401, detail="Configuración empresarial no disponible") from exc
+
+    @router.put("/api/enterprise/company-profile")
+    def update_company_profile(
+        body: CompanyProfileRequest,
+        principal: Principal = Depends(require_permission("config:write")),
+    ):
+        display_name = body.display_name.strip()
+        if not display_name or any(ord(char) < 32 for char in display_name):
+            raise HTTPException(status_code=400, detail="El nombre de la empresa no es válido")
+        try:
+            current = enterprise_platform.tenant_config(principal.company_id)
+            branding = dict(current.get("branding") or {})
+            branding.update({
+                "display_name": display_name,
+                "accent_color": body.accent_color,
+                "theme": body.theme,
+            })
+            enterprise_platform.update_tenant(principal.company_id, {
+                "display_name": display_name,
+                "business_type": body.business_type,
+                "theme": body.theme,
+                "branding": branding,
+            })
+            components.db.audit(
+                "company.profile.updated",
+                principal.company_id,
+                principal.user_id,
+                "company_profile",
+                details={"fields": ["display_name", "business_type", "accent_color", "theme"]},
+            )
+            return {"ok": True, "company": company_profile_payload(principal)}
+        except (TenantRegistryError, PlatformConfigError) as exc:
+            raise HTTPException(status_code=400, detail="Los cambios de la empresa no son válidos") from exc
+
+
+    _COMMERCIAL_USER_ROLES = {
+        "administrator": "TENANT_ADMIN",
+        "analyst": "ANALYST",
+        "viewer": "VIEWER",
+    }
+
+    def enterprise_user_actor(principal: Principal) -> Dict[str, Any]:
+        try:
+            actor = enterprise_identity.get(principal.user_id)
+        except IdentityError as exc:
+            raise HTTPException(status_code=401, detail="Sesión empresarial inválida") from exc
+        if actor.get("tenant_id") != principal.company_id:
+            raise HTTPException(status_code=403, detail="Acceso empresarial no permitido")
+        return actor
+
+    def enterprise_user_target(principal: Principal, username: str) -> Dict[str, Any]:
+        wanted = str(username or "").strip().lower()
+        for item in enterprise_identity.list(principal.company_id):
+            if str(item.get("username") or "").lower() == wanted:
+                return item
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    def enterprise_user_role(item: Dict[str, Any]) -> tuple[str, str, bool]:
+        roles = set(item.get("roles") or [])
+        if "SYSTEM_ADMIN" in roles:
+            return "administrator", "Administrador", False
+        if roles == {"TENANT_ADMIN"}:
+            return "administrator", "Administrador", True
+        if roles == {"ANALYST"}:
+            return "analyst", "Analista", True
+        if roles == {"VIEWER"}:
+            return "viewer", "Consulta", True
+        return "custom", "Acceso personalizado", False
+
+    def enterprise_user_public(item: Dict[str, Any], principal: Principal) -> Dict[str, Any]:
+        role_key, role_label, role_editable = enterprise_user_role(item)
+        enabled = item.get("status") == "ACTIVE"
+        protected = "SYSTEM_ADMIN" in set(item.get("roles") or [])
+        current = item.get("user_id") == principal.user_id
+        return {
+            "username": item.get("username") or "",
+            "display_name": item.get("display_name") or item.get("username") or "",
+            "role": role_key,
+            "role_label": role_label,
+            "enabled": enabled,
+            "status_label": "Activo" if enabled else "Desactivado",
+            "is_current": current,
+            "role_editable": bool(role_editable and not current and not protected),
+            "status_editable": bool(not current and not protected),
+        }
+
+    def enterprise_user_capabilities(principal: Principal) -> Dict[str, bool]:
+        actor = enterprise_user_actor(principal)
+        return {
+            "can_create": enterprise_identity.has_permission(actor, "user:create"),
+            "can_update": enterprise_identity.has_permission(actor, "user:update"),
+            "can_disable": enterprise_identity.has_permission(actor, "user:disable"),
+            "can_assign_role": enterprise_identity.has_permission(actor, "user:role_assign"),
+        }
+
+    def enterprise_user_identity_error(exc: IdentityError) -> None:
+        status = {
+            "USER_NOT_FOUND": 404,
+            "USER_ALREADY_EXISTS": 409,
+            "LAST_SYSTEM_ADMIN": 409,
+            "ROLE_INVALID": 400,
+            "USER_INVALID_ID": 400,
+            "PASSWORD_INVALID": 400,
+        }.get(exc.code, 400)
+        message = {
+            "USER_NOT_FOUND": "Usuario no encontrado",
+            "USER_ALREADY_EXISTS": "Ya existe un usuario con ese acceso",
+            "LAST_SYSTEM_ADMIN": "Debe permanecer al menos un administrador activo",
+            "ROLE_INVALID": "El rol seleccionado no es válido",
+            "USER_INVALID_ID": "El nombre de acceso no es válido",
+            "PASSWORD_INVALID": "La contraseña temporal debe tener al menos 12 caracteres",
+        }.get(exc.code, "No se pudo completar la operación de usuarios")
+        raise HTTPException(status_code=status, detail=message) from exc
+
+    def enterprise_other_active_admin_exists(principal: Principal, target: Dict[str, Any]) -> bool:
+        for item in enterprise_identity.list(principal.company_id):
+            if item.get("user_id") == target.get("user_id"):
+                continue
+            if item.get("status") != "ACTIVE":
+                continue
+            roles = set(item.get("roles") or [])
+            if roles.intersection({"SYSTEM_ADMIN", "TENANT_ADMIN"}):
+                return True
+        return False
+
+    @router.get("/api/enterprise/users")
+    def enterprise_users(principal: Principal = Depends(require_permission("user:list"))):
+        users = [
+            enterprise_user_public(item, principal)
+            for item in enterprise_identity.list(principal.company_id)
+        ]
+        users.sort(key=lambda item: (
+            not item["enabled"],
+            str(item["display_name"]).lower(),
+            str(item["username"]).lower(),
+        ))
+        return {
+            "users": users,
+            "capabilities": enterprise_user_capabilities(principal),
+            "roles": [
+                {"key": "administrator", "label": "Administrador"},
+                {"key": "analyst", "label": "Analista"},
+                {"key": "viewer", "label": "Consulta"},
+            ],
+        }
+
+    @router.post("/api/enterprise/users")
+    def create_enterprise_user(
+        body: EnterpriseUserCreateRequest,
+        principal: Principal = Depends(require_permission("user:create")),
+    ):
+        role_key = body.role.strip().lower()
+        role = _COMMERCIAL_USER_ROLES.get(role_key)
+        if not role:
+            raise HTTPException(status_code=400, detail="El rol seleccionado no es válido")
+        username = body.username.strip().lower()
+        display_name = body.display_name.strip()
+        if not display_name or any(ord(char) < 32 for char in display_name):
+            raise HTTPException(status_code=400, detail="El nombre del usuario no es válido")
+        try:
+            created = enterprise_identity.create_user(
+                user_id=username,
+                username=username,
+                display_name=display_name,
+                password=body.password,
+                tenant_id=principal.company_id,
+                roles=[role],
+            )
+        except IdentityError as exc:
+            enterprise_user_identity_error(exc)
+        except TenantRegistryError as exc:
+            raise HTTPException(status_code=400, detail="La empresa no está disponible") from exc
+        components.db.audit(
+            "company.user.created",
+            principal.company_id,
+            principal.user_id,
+            "user",
+            details={"username": username, "role": role_key},
+        )
+        return {"ok": True, "user": enterprise_user_public(created, principal)}
+
+    @router.patch("/api/enterprise/users/{username}")
+    def update_enterprise_user(
+        username: str,
+        body: EnterpriseUserUpdateRequest,
+        principal: Principal = Depends(require_permission("user:update")),
+    ):
+        actor = enterprise_user_actor(principal)
+        target = enterprise_user_target(principal, username)
+        changes: Dict[str, Any] = {}
+        changed_fields: List[str] = []
+
+        if body.display_name is not None:
+            display_name = body.display_name.strip()
+            if not display_name or any(ord(char) < 32 for char in display_name):
+                raise HTTPException(status_code=400, detail="El nombre del usuario no es válido")
+            changes["display_name"] = display_name
+            changed_fields.append("display_name")
+
+        if body.role is not None:
+            if not enterprise_identity.has_permission(actor, "user:role_assign"):
+                raise HTTPException(status_code=403, detail="No tienes permiso para cambiar roles")
+            if target.get("user_id") == principal.user_id:
+                raise HTTPException(status_code=403, detail="No puedes cambiar tu propio rol")
+            if "SYSTEM_ADMIN" in set(target.get("roles") or []):
+                raise HTTPException(status_code=403, detail="Este administrador está protegido")
+            role_key = body.role.strip().lower()
+            role = _COMMERCIAL_USER_ROLES.get(role_key)
+            if not role:
+                raise HTTPException(status_code=400, detail="El rol seleccionado no es válido")
+            target_roles = set(target.get("roles") or [])
+            if (
+                "TENANT_ADMIN" in target_roles
+                and role != "TENANT_ADMIN"
+                and target.get("status") == "ACTIVE"
+                and not enterprise_other_active_admin_exists(principal, target)
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Debe existir al menos otro administrador activo",
+                )
+            changes["roles"] = [role]
+            changed_fields.append("role")
+
+        if not changes:
+            raise HTTPException(status_code=400, detail="No hay cambios para guardar")
+
+        try:
+            updated = enterprise_identity.update(target["user_id"], **changes)
+        except IdentityError as exc:
+            enterprise_user_identity_error(exc)
+
+        components.db.audit(
+            "company.user.updated",
+            principal.company_id,
+            principal.user_id,
+            "user",
+            details={"username": target.get("username"), "fields": changed_fields},
+        )
+        return {"ok": True, "user": enterprise_user_public(updated, principal)}
+
+    @router.put("/api/enterprise/users/{username}/status")
+    def set_enterprise_user_status(
+        username: str,
+        body: EnterpriseUserStatusRequest,
+        principal: Principal = Depends(require_permission("user:disable")),
+    ):
+        target = enterprise_user_target(principal, username)
+        if target.get("user_id") == principal.user_id:
+            raise HTTPException(status_code=403, detail="No puedes desactivar tu propio acceso")
+        if "SYSTEM_ADMIN" in set(target.get("roles") or []):
+            raise HTTPException(status_code=403, detail="Este administrador está protegido")
+        if (
+            not body.enabled
+            and target.get("status") == "ACTIVE"
+            and "TENANT_ADMIN" in set(target.get("roles") or [])
+            and not enterprise_other_active_admin_exists(principal, target)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Debe existir al menos otro administrador activo",
+            )
+        try:
+            updated = enterprise_identity.set_status(
+                target["user_id"],
+                "ACTIVE" if body.enabled else "DISABLED",
+            )
+        except IdentityError as exc:
+            enterprise_user_identity_error(exc)
+        components.db.audit(
+            "company.user.status_changed",
+            principal.company_id,
+            principal.user_id,
+            "user",
+            details={"username": target.get("username"), "enabled": body.enabled},
+        )
+        return {"ok": True, "user": enterprise_user_public(updated, principal)}
+
+    def data_connection_scope(principal: Principal) -> Dict[str, Any]:
+        """Resolve the company namespace solely from the authenticated user."""
+        actor = enterprise_user_actor(principal)
+        return enterprise_onboarding.sql.company_scope(enterprise_identity.scope(actor))
+
+    def public_data_connection(record: Dict[str, Any]) -> Dict[str, Any]:
+        tested = record.get("last_test_status") == "PASS"
+        enabled = bool(record.get("enabled"))
+        return {
+            "handle": record.get("connection_id"),
+            "name": record.get("display_name") or record.get("connection_id"),
+            "database": record.get("database"),
+            "authentication_label": "Usar acceso de Windows" if record.get("auth_mode") == "WINDOWS_INTEGRATED" else "Usar usuario y contraseña",
+            "enabled": enabled,
+            "status_label": "Verificado" if tested else ("Requiere atención" if enabled else "Desactivada"),
+            "verified": tested,
+            "last_verified_at": record.get("last_test_at"),
+            "tables_count": len(record.get("allowed_tables") or []),
+            "credential_configured": bool(record.get("secret_reference")) or record.get("auth_mode") == "WINDOWS_INTEGRATED",
+            "capabilities": {"read_only": bool(record.get("read_only")), "authorized_sources": len(record.get("allowed_tables") or [])},
+        }
+
+    def data_connection_error(exc: EnterpriseSqlError) -> None:
+        status = 404 if exc.code == "SQL_CONNECTION_NOT_FOUND" else 400
+        message = {
+            "SQL_CONNECTION_NOT_FOUND": "No se encontró la conexión solicitada",
+            "SQL_ALLOWLIST_REQUIRED": "Selecciona al menos una fuente autorizada",
+            "SQL_CONNECTION_ALREADY_EXISTS": "Ya existe una conexión con ese nombre",
+            "SQL_CONNECTION_DISABLED": "La conexión está desactivada",
+            "SQL_SECRET_UNAVAILABLE": "No se pudo guardar la credencial de forma segura",
+            "SQL_AUTH_FAILED": "No se pudo verificar el acceso a los datos",
+            "SQL_TIMEOUT": "La conexión tardó demasiado en responder",
+            "SQL_DATABASE_UNAVAILABLE": "No se pudo acceder a la base de datos",
+        }.get(exc.code, "No se pudo completar la operación con esta conexión")
+        raise HTTPException(status_code=status, detail=message) from exc
+
+    def data_connection_sources(values: List[str]) -> tuple[List[str], List[str]]:
+        tables = [str(value).strip() for value in values if str(value).strip()]
+        schemas = sorted({value.split(".", 1)[0] for value in tables if "." in value})
+        if not tables or not schemas:
+            raise HTTPException(status_code=400, detail="Selecciona fuentes autorizadas con el formato área.tabla")
+        return schemas, tables
+
+    def data_connection_provider() -> SqlServerPyodbcProvider:
+        # Password material remains in Windows Credential Manager; it is never
+        # persisted in the profile, response, audit record, or trace.
+        return SqlServerPyodbcProvider(EnterpriseSecretStore(WindowsCredentialSecretProvider()))
+
+
+
+    connected_sql_bridge = GovernedSqlAssistantBridge(
+        store=enterprise_onboarding.sql,
+        provider_factory=data_connection_provider,
+    )
+
+    def resolve_connected_sql(
+        principal: Principal,
+        question: str,
+    ):
+        actor = enterprise_user_actor(principal)
+
+        if not enterprise_identity.has_permission(
+            actor,
+            "sql:read",
+        ):
+            return None
+
+        return connected_sql_bridge.resolve(
+            scope=data_connection_scope(principal),
+            question=question,
+        )
+
+    components.service.connected_sql_resolver = resolve_connected_sql
+
+    @router.post(
+        "/api/enterprise/data-connections/probe"
+    )
+    def probe_data_connection(
+        body: DataConnectionProbeRequest,
+        principal: Principal = Depends(
+            require_permission(
+                "sql:configure"
+            )
+        ),
+    ):
+        scope = data_connection_scope(
+            principal
+        )
+
+        authentication = (
+            str(
+                body.authentication
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+
+        if authentication not in {
+            "windows",
+            "password",
+        }:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Selecciona una forma "
+                    "de acceso válida"
+                ),
+            )
+
+        username = str(
+            body.username
+            or ""
+        ).strip()
+
+        if (
+            authentication == "password"
+            and (
+                not username
+                or not body.password
+            )
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Indica el usuario y "
+                    "la contraseña para continuar"
+                ),
+            )
+
+        class _RequestLocalSecretProvider:
+            def __init__(self):
+                self.values: Dict[str, str] = {}
+
+            def set(
+                self,
+                reference: str,
+                value: str,
+            ) -> None:
+                self.values[
+                    str(reference)
+                ] = str(value)
+
+            def get(
+                self,
+                reference: str,
+            ) -> Optional[str]:
+                return self.values.get(
+                    str(reference)
+                )
+
+            def delete(
+                self,
+                reference: str,
+            ) -> None:
+                self.values.pop(
+                    str(reference),
+                    None,
+                )
+
+            def clear(self) -> None:
+                self.values.clear()
+
+        transient_backend = (
+            _RequestLocalSecretProvider()
+        )
+
+        transient_store = (
+            EnterpriseSecretStore(
+                transient_backend
+            )
+        )
+
+        transient_reference = ""
+
+        try:
+            if authentication == "password":
+                transient_reference = (
+                    "request-local"
+                )
+
+                transient_store.set(
+                    transient_reference,
+                    body.password or "",
+                )
+
+            profile = (
+                build_transient_sql_probe_profile(
+                    server=body.server,
+                    database=body.database,
+                    auth_mode=(
+                        "SQL_AUTH"
+                        if authentication
+                        == "password"
+                        else "WINDOWS_INTEGRATED"
+                    ),
+                    username=username,
+                    secret_reference=(
+                        transient_reference
+                    ),
+                        trust_server_certificate=(
+                            body.trust_server_certificate
+                        ),
+                )
+            )
+
+            provider = (
+                SqlServerPyodbcProvider(
+                    transient_store
+                )
+            )
+
+            result = (
+                probe_sql_server_metadata(
+                    provider,
+                    profile,
+                )
+            )
+
+        except EnterpriseSqlError as exc:
+            data_connection_error(
+                exc
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No se pudo verificar "
+                    "la conexión"
+                ),
+            ) from exc
+
+        finally:
+            if transient_reference:
+                try:
+                    transient_store.delete(
+                        transient_reference
+                    )
+                except EnterpriseSqlError:
+                    pass
+
+            transient_backend.clear()
+
+        components.db.audit(
+            "data_connection.probe",
+            scope["company_id"],
+            principal.user_id,
+            "data_connection",
+            details={
+                "status":
+                    result.get(
+                        "status"
+                    ),
+                "discovered_object_count":
+                    result.get(
+                        "discovered_object_count",
+                        0,
+                    ),
+                "authentication":
+                    authentication,
+            },
+        )
+
+        return {
+            "ok": True,
+            "status":
+                result.get(
+                    "status"
+                ),
+            "objects":
+                result.get(
+                    "objects",
+                    [],
+                ),
+            "discovered_object_count":
+                result.get(
+                    "discovered_object_count",
+                    0,
+                ),
+        }
+
+
+    @router.get("/api/enterprise/data-connections")
+    def list_data_connections(principal: Principal = Depends(require_permission("sql:read"))):
+        scope = data_connection_scope(principal)
+        profiles = enterprise_onboarding.sql.list(scope)
+        return {"connections": [public_data_connection(item) for item in profiles]}
+
+    @router.post("/api/enterprise/data-connections")
+    def create_data_connection(
+        body: DataConnectionCreateRequest,
+        principal: Principal = Depends(require_permission("sql:configure")),
+    ):
+        scope = data_connection_scope(principal)
+        auth = body.authentication.strip().lower()
+        if auth not in {"windows", "password"}:
+            raise HTTPException(status_code=400, detail="Selecciona una forma de acceso válida")
+        if auth == "password" and (not body.username or not body.password):
+            raise HTTPException(status_code=400, detail="Indica el usuario y la contraseña para continuar")
+        schemas, tables = data_connection_sources(body.allowed_sources)
+        reference = ""
+        secrets = None
+        try:
+            if auth == "password":
+                reference = "sql:" + uuid.uuid4().hex
+                secrets = EnterpriseSecretStore(WindowsCredentialSecretProvider())
+                secrets.set(reference, body.password or "")
+            record = enterprise_onboarding.sql.register(
+                scope=scope,
+                connection_id="connection-" + uuid.uuid4().hex,
+                display_name=body.display_name.strip(),
+                server=body.server.strip(), database=body.database.strip(),
+                auth_mode="WINDOWS_INTEGRATED" if auth == "windows" else "SQL_AUTH",
+                username=(body.username or "").strip(), secret_reference=reference,
+                allowed_schemas=schemas, allowed_tables=tables,
+                trust_server_certificate=body.trust_server_certificate,
+            )
+        except EnterpriseSqlError as exc:
+            if reference and secrets:
+                try: secrets.delete(reference)
+                except EnterpriseSqlError: pass
+            data_connection_error(exc)
+        components.db.audit("company.data_connection.created", principal.company_id, principal.user_id, "data_connection", details={"name": body.display_name.strip(), "authentication": auth})
+        return {"ok": True, "connection": public_data_connection(record)}
+
+    @router.patch("/api/enterprise/data-connections/{handle}")
+    def update_data_connection(
+        handle: str,
+        body: DataConnectionUpdateRequest,
+        principal: Principal = Depends(require_permission("sql:configure")),
+    ):
+        scope = data_connection_scope(principal)
+        changes = body.model_dump(exclude_none=True)
+        if "allowed_sources" in changes:
+            schemas, tables = data_connection_sources(changes.pop("allowed_sources"))
+            changes["allowed_schemas"], changes["allowed_tables"] = schemas, tables
+        if not changes:
+            raise HTTPException(status_code=400, detail="No hay cambios para guardar")
+        try:
+            record = enterprise_onboarding.sql.update(scope, handle, **changes)
+        except EnterpriseSqlError as exc:
+            data_connection_error(exc)
+        components.db.audit("company.data_connection.updated", principal.company_id, principal.user_id, "data_connection", details={"fields": sorted(changes)})
+        return {"ok": True, "connection": public_data_connection(record)}
+
+    @router.put("/api/enterprise/data-connections/{handle}/status")
+    def set_data_connection_status(
+        handle: str,
+        body: DataConnectionStatusRequest,
+        principal: Principal = Depends(require_permission("sql:configure")),
+    ):
+        scope = data_connection_scope(principal)
+        try:
+            record = enterprise_onboarding.sql.enable(scope, handle) if body.enabled else enterprise_onboarding.sql.disable(scope, handle)
+        except EnterpriseSqlError as exc:
+            data_connection_error(exc)
+        components.db.audit("company.data_connection.status_changed", principal.company_id, principal.user_id, "data_connection", details={"enabled": bool(body.enabled)})
+        return {"ok": True, "connection": public_data_connection(record)}
+
+    @router.post("/api/enterprise/data-connections/{handle}/test")
+    def test_data_connection(handle: str, principal: Principal = Depends(require_permission("sql:configure"))):
+        scope = data_connection_scope(principal)
+        try:
+            result = test_connection(enterprise_onboarding.sql, data_connection_provider(), scope, handle)
+            record = enterprise_onboarding.sql.get(scope, handle)
+        except EnterpriseSqlError as exc:
+            data_connection_error(exc)
+        return {"ok": True, "connection": public_data_connection(record), "verified": result.get("status") == "PASS"}
+
+    @router.post("/api/enterprise/data-connections/{handle}/discover")
+    def discover_data_connection(handle: str, principal: Principal = Depends(require_permission("sql:read"))):
+        scope = data_connection_scope(principal)
+        try:
+            result = discover_schema(enterprise_onboarding.sql, data_connection_provider(), scope, handle)
+        except EnterpriseSqlError as exc:
+            data_connection_error(exc)
+        return {"ok": True, "sources": result.get("objects", [])}
+
+    def commercial_ai_payload(principal: Principal, *, verification: Optional[str] = None) -> Dict[str, Any]:
+        """Return only commercial configuration fields, never transport internals."""
+        effective = enterprise_platform.resolve_effective_config(principal.company_id)
+        configured = dict(effective.get("ai_provider") or {})
+        kind = str(configured.get("provider_type") or "DISABLED").upper()
+        enabled = bool(configured.get("enabled")) and kind != "DISABLED"
+        model = configured.get("model") or None
+        if kind == "DISABLED":
+            state, label = "CONFIGURED", "Desactivada"
+        elif not model:
+            state, label = "BLOCKED", "Requiere configuración"
+        elif verification == "PASS":
+            state, label = "TESTED", "Verificada"
+        elif verification in {"UNAVAILABLE", "TIMEOUT"}:
+            state, label = "DEGRADED", "Requiere atención"
+        else:
+            state, label = "CONFIGURED", "Configurada"
+        engine = {"OLLAMA": "ollama", "OPENAI_COMPATIBLE_LOCAL": "local-compatible", "DISABLED": "disabled"}.get(kind, "disabled")
+        return {
+            "state": state,
+            "status_label": label,
+            "enabled": enabled,
+            "engine": engine,
+            "engine_label": {"ollama": "Ollama", "local-compatible": "Motor local compatible", "disabled": "Sin inteligencia artificial"}[engine],
+            "model": model,
+            "can_edit": enterprise_identity.has_permission(enterprise_identity.get(principal.user_id), "config:write"),
+        }
+
+    def commercial_ai_config(body: AiConfigurationRequest, require_model: bool = True) -> Dict[str, Any]:
+        engine = body.engine.strip().lower()
+        model = (body.model or "").strip() or None
+        presets = {
+            "ollama": ("OLLAMA", "http://127.0.0.1:11434"),
+            "local-compatible": ("OPENAI_COMPATIBLE_LOCAL", "http://127.0.0.1:1234/v1"),
+        }
+        if engine == "disabled":
+            return {"provider_id": "disabled", "provider_type": "DISABLED", "base_url": None, "model": None, "enabled": False, "timeout": 30, "context_window": None}
+        if engine not in presets:
+            raise HTTPException(status_code=400, detail="Selecciona un motor local y un modelo para continuar")
+        if require_model and not model:
+            raise HTTPException(status_code=400, detail="Selecciona un motor local y un modelo para continuar")
+        provider_type, base_url = presets[engine]
+        return {"provider_id": engine, "provider_type": provider_type, "base_url": base_url, "model": model, "enabled": True, "timeout": 30, "context_window": None}
+
+    @router.get("/api/enterprise/ai-configuration")
+    def get_commercial_ai_configuration(principal: Principal = Depends(require_permission("config:read"))):
+        return {"configuration": commercial_ai_payload(principal)}
+
+    @router.post("/api/enterprise/ai-configuration/detect")
+    def detect_commercial_ai_models(
+        body: Optional[AiConfigurationRequest] = None,
+        principal: Principal = Depends(require_permission("config:read")),
+    ):
+        if body is None:
+            effective = enterprise_platform.resolve_effective_config(principal.company_id)
+            provider = effective.get("ai_provider") or {}
+        else:
+            provider = commercial_ai_config(body, require_model=False)
+        result = enterprise_platform.discover_models(provider, _CommercialAiAdapter())
+        state = str(result.get("status") or "UNAVAILABLE")
+        return {
+            "status": state,
+            "status_label": {"PASS": "Opciones detectadas", "EMPTY": "No se encontraron modelos", "DISABLED": "La inteligencia artificial está desactivada", "TIMEOUT": "La búsqueda tardó demasiado", "UNAVAILABLE": "El motor local no está disponible", "UNSUPPORTED": "La detección no está disponible"}.get(state, "No se pudieron detectar opciones"),
+            "models": [{"id": item["id"], "name": item["name"]} for item in result.get("models", [])],
+        }
+
+    @router.put("/api/enterprise/ai-configuration")
+    def save_commercial_ai_configuration(
+        body: AiConfigurationRequest,
+        principal: Principal = Depends(require_permission("config:write")),
+    ):
+        provider = commercial_ai_config(body)
+        current = enterprise_platform.resolve_effective_config(principal.company_id)
+        features = dict(current.get("enabled_features") or {})
+        features["ai_enabled"] = bool(provider["enabled"])
+        enterprise_platform.update_tenant(principal.company_id, {"ai_provider": provider, "enabled_features": features})
+        components.db.audit("company.ai_configuration.saved", principal.company_id, principal.user_id, "ai_configuration", details={"engine": body.engine.strip().lower(), "enabled": bool(provider["enabled"])})
+        return {"ok": True, "configuration": commercial_ai_payload(principal)}
+
+    @router.post("/api/enterprise/ai-configuration/test")
+    def test_commercial_ai_configuration(
+        body: Optional[AiConfigurationRequest] = None,
+        principal: Principal = Depends(require_permission("config:read")),
+    ):
+        if body is None:
+            effective = enterprise_platform.resolve_effective_config(principal.company_id)
+            provider = effective.get("ai_provider") or {}
+        else:
+            provider = commercial_ai_config(body)
+        try:
+            result = enterprise_platform.test_provider(provider, _CommercialAiAdapter())
+            verification = "PASS" if result.get("status") == "PASS" else None
+            configuration = commercial_ai_payload(principal, verification=verification)
+            if body is not None:
+                configuration = {
+                    **configuration,
+                    "engine": body.engine.strip().lower(),
+                    "model": body.model.strip() if body.model else None,
+                }
+            return {"ok": True, "configuration": configuration}
+        except PlatformConfigError as exc:
+            status = "TIMEOUT" if exc.code == "AI_PROVIDER_TIMEOUT" else "UNAVAILABLE"
+            configuration = commercial_ai_payload(principal, verification=status)
+            if body is not None:
+                configuration = {
+                    **configuration,
+                    "engine": body.engine.strip().lower(),
+                    "model": body.model.strip() if body.model else None,
+                }
+            return {"ok": False, "configuration": configuration, "message": "No se pudo verificar el motor local"}
+
+    def commercial_appearance_payload(principal: Principal) -> Dict[str, Any]:
+        public = enterprise_platform.public_effective_config(principal.company_id)
+        user = enterprise_identity.get(principal.user_id)
+        return {
+            "theme": public.get("theme") or "professional-light",
+            "accent_color": public.get("accent_color") or "#1d67d2",
+            "can_edit": enterprise_identity.has_permission(user, "config:write"),
+        }
+
+    @router.get("/api/enterprise/appearance")
+    def get_commercial_appearance(principal: Principal = Depends(require_permission("config:read"))):
+        return {"appearance": commercial_appearance_payload(principal)}
+
+    @router.put("/api/enterprise/appearance")
+    def save_commercial_appearance(
+        body: AppearanceRequest,
+        principal: Principal = Depends(require_permission("config:write")),
+    ):
+        current = enterprise_platform.tenant_config(principal.company_id)
+        branding = dict(current.get("branding") or {})
+        branding.update({"theme": body.theme, "accent_color": body.accent_color})
+        try:
+            enterprise_platform.update_tenant(principal.company_id, {"theme": body.theme, "branding": branding})
+        except PlatformConfigError as exc:
+            raise HTTPException(status_code=400, detail="La apariencia seleccionada no es válida") from exc
+        components.db.audit("company.appearance.saved", principal.company_id, principal.user_id, "appearance", details={"theme": body.theme})
+        return {"ok": True, "appearance": commercial_appearance_payload(principal)}
+
+    @router.get("/api/enterprise/security-recovery")
+    def commercial_security_recovery(principal: Principal = Depends(principal_dependency)):
+        user = enterprise_identity.get(principal.user_id)
+        can_backup = enterprise_identity.has_permission(user, "backup:create")
+        can_restore = enterprise_identity.has_permission(user, "backup:restore")
+        return {"protection": "Configurada", "backup_available": can_backup, "recovery_available": can_restore}
+
+    @router.post("/api/enterprise/security-recovery/backup")
+    def create_commercial_backup(principal: Principal = Depends(require_permission("backup:create"))):
+        handle = tempfile.NamedTemporaryFile(prefix="ia-enterprise-backup-", suffix=".zip", delete=False)
+        handle.close()
+        output = Path(handle.name)
+        try:
+            governed_backup(components.cfg.root, output)
+        except BackupError as exc:
+            output.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail="No se pudo crear el respaldo") from exc
+        components.db.audit("company.backup.created", principal.company_id, principal.user_id, "backup", details={})
+        def stream_backup():
+            with output.open("rb") as backup_stream:
+                while chunk := backup_stream.read(1024 * 1024):
+                    yield chunk
+        return StreamingResponse(stream_backup(), media_type="application/zip", headers={"Content-Disposition": "attachment; filename=IA-Empresarial-Local-respaldo.zip"}, background=BackgroundTask(output.unlink, missing_ok=True))
+
+    @router.post("/api/enterprise/security-recovery/restore")
+    async def restore_commercial_backup(
+        body: RecoveryRequest = Depends(),
+        archive: UploadFile = File(...),
+        principal: Principal = Depends(require_permission("backup:restore")),
+    ):
+        if not body.confirmed:
+            raise HTTPException(
+                status_code=400,
+                detail="Confirma la recuperación para continuar",
+            )
+
+        temp = tempfile.NamedTemporaryFile(
+            prefix="ia-enterprise-restore-",
+            suffix=".zip",
+            delete=False,
+        )
+        source = Path(temp.name)
+        restore_error = None
+
+        try:
+            with temp:
+                shutil.copyfileobj(
+                    archive.file,
+                    temp,
+                )
+
+            _close_enterprise_components()
+
+            try:
+                governed_restore(
+                    components.cfg.root,
+                    source,
+                )
+            except (
+                BackupError,
+                OSError,
+                shutil.Error,
+                zipfile.BadZipFile,
+            ) as exc:
+                restore_error = exc
+            finally:
+                try:
+                    _reload_enterprise_components()
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="No se pudo reactivar el servicio después de la recuperación",
+                    ) from exc
+
+            if restore_error is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se pudo recuperar el respaldo",
+                ) from restore_error
+
+        finally:
+            source.unlink(missing_ok=True)
+
+        components.db.audit(
+            "company.backup.restored",
+            principal.company_id,
+            principal.user_id,
+            "backup",
+            details={},
+        )
+
+        return {
+            "ok": True,
+            "message": "La información se recuperó correctamente",
+        }
+    @router.get("/api/enterprise/advanced-preferences")
+    def get_advanced_preferences(principal: Principal = Depends(require_permission("config:read"))):
+        effective = enterprise_platform.resolve_effective_config(principal.company_id)
+        user = enterprise_identity.get(principal.user_id)
+        return {"preferences": {"locale": effective.get("locale") or effective.get("default_locale"), "timezone": effective.get("timezone") or effective.get("default_timezone"), "can_edit": enterprise_identity.has_permission(user, "config:write")}}
+
+    @router.put("/api/enterprise/advanced-preferences")
+    def save_advanced_preferences(body: AdvancedPreferencesRequest, principal: Principal = Depends(require_permission("config:write"))):
+        enterprise_platform.update_tenant(principal.company_id, {"locale": body.locale.strip(), "timezone": body.timezone.strip()})
+        components.db.audit("company.advanced_preferences.saved", principal.company_id, principal.user_id, "advanced_preferences", details={})
+        return get_advanced_preferences(principal)
+
+
+    @router.post("/api/enterprise/readiness/validate")
+    def validate_commercial_readiness(
+        principal: Principal = Depends(
+            require_permission("config:write")
+        ),
+    ):
+        initial = enterprise_onboarding.readiness(
+            principal.company_id
+        )
+
+        sql_step = (
+            initial.get("steps", {})
+            .get("sql", {})
+        )
+
+        sql_verification = {
+            "status": "NOT_REQUIRED",
+            "configured_count": 0,
+            "tested_count": 0,
+        }
+
+        if sql_step.get("required"):
+            user = enterprise_identity.get(
+                principal.user_id
+            )
+
+            if not (
+                enterprise_identity
+                .has_permission(
+                    user,
+                    "sql:configure",
+                )
+                and enterprise_identity
+                .has_permission(
+                    user,
+                    "sql:read",
+                )
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail=
+                        "No tienes permiso para validar los datos",
+                )
+
+            scope = data_connection_scope(
+                principal
+            )
+
+            profiles = [
+                profile
+                for profile
+                in enterprise_onboarding.sql.list(
+                    scope
+                )
+                if profile.get("enabled")
+                and profile.get("read_only")
+            ]
+
+            for profile in profiles:
+                handle = str(
+                    profile.get(
+                        "connection_id"
+                    )
+                    or ""
+                ).strip()
+
+                if not handle:
+                    continue
+
+                try:
+                    test_connection(
+                        enterprise_onboarding.sql,
+                        data_connection_provider(),
+                        scope,
+                        handle,
+                    )
+
+                    discover_schema(
+                        enterprise_onboarding.sql,
+                        data_connection_provider(),
+                        scope,
+                        handle,
+                    )
+
+                except EnterpriseSqlError:
+                    continue
+
+            after_sql = (
+                enterprise_onboarding
+                .readiness(
+                    principal.company_id
+                )
+            )
+
+            final_sql = (
+                after_sql.get(
+                    "steps", {}
+                )
+                .get("sql", {})
+            )
+
+            sql_verification = {
+                "status": (
+                    "PASS"
+                    if final_sql.get(
+                        "status"
+                    ) == "TESTED"
+                    else "FAIL"
+                ),
+                "configured_count": (
+                    final_sql.get(
+                        "configured_count"
+                    )
+                    or 0
+                ),
+                "tested_count": (
+                    final_sql.get(
+                        "tested_count"
+                    )
+                    or 0
+                ),
+            }
+        else:
+            after_sql = initial
+
+        ai_step = (
+            after_sql.get("steps", {})
+            .get("ai", {})
+        )
+
+        ai_test = {
+            "status": "NOT_REQUIRED",
+        }
+
+        if ai_step.get("required"):
+            effective = (
+                enterprise_platform
+                .resolve_effective_config(
+                    principal.company_id
+                )
+            )
+
+            provider = (
+                effective.get(
+                    "ai_provider"
+                )
+                or {}
+            )
+
+            try:
+                ai_test = (
+                    enterprise_platform
+                    .test_provider(
+                        provider,
+                        _CommercialAiAdapter(),
+                    )
+                )
+
+            except PlatformConfigError as exc:
+                ai_test = {
+                    "status": (
+                        "TIMEOUT"
+                        if exc.code
+                        == "AI_PROVIDER_TIMEOUT"
+                        else "UNAVAILABLE"
+                    ),
+                }
+
+        readiness = (
+            enterprise_onboarding
+            .readiness(
+                principal.company_id,
+                ai_test=ai_test,
+            )
+        )
+
+        components.db.audit(
+            "company.readiness.validated",
+            principal.company_id,
+            principal.user_id,
+            "readiness",
+            details={
+                "status":
+                    readiness.get("status"),
+                "verification_status":
+                    readiness.get(
+                        "verification_status"
+                    ),
+                "sql_status":
+                    sql_verification.get(
+                        "status"
+                    ),
+                "ai_status":
+                    ai_test.get("status"),
+            },
+        )
+
+        return {
+            "ok": (
+                readiness.get("status")
+                == "READY"
+            ),
+            "readiness": {
+                "status":
+                    readiness.get("status"),
+                "verification_status":
+                    readiness.get(
+                        "verification_status"
+                    ),
+                "steps":
+                    readiness.get("steps")
+                    or {},
+                "next_actions":
+                    readiness.get(
+                        "next_actions"
+                    )
+                    or [],
+            },
+            "verification": {
+                "sql":
+                    sql_verification,
+                "ai": {
+                    "status":
+                        ai_test.get(
+                            "status"
+                        ),
+                },
+            },
+        }
+
+    @router.get("/api/enterprise/app-context")
+    def product_app_context(
+        principal: Principal = Depends(
+            principal_dependency
+        ),
+    ):
+        try:
+            user = enterprise_identity.get(
+                principal.user_id
+            )
+        except IdentityError as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Sesión empresarial inválida",
+            ) from exc
+
+        if (
+            user["tenant_id"]
+            != principal.company_id
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Acceso empresarial no permitido",
+            )
+
+        public_config = (
+            enterprise_platform
+            .public_effective_config(
+                principal.company_id
+            )
+        )
+
+        readiness = (
+            enterprise_onboarding.readiness(
+                principal.company_id
+            )
+        )
+
+        permissions = set(
+            enterprise_identity
+            .effective_permissions(
+                user
+            )
+            or []
+        )
+
+        settings_permissions = {
+            "config:read",
+            "config:write",
+            "tenant:list",
+            "tenant:update",
+            "user:list",
+            "user:create",
+            "sql:read",
+            "sql:configure",
+            "backup:create",
+        }
+
+        settings_visible = (
+            "*" in permissions
+            or bool(
+                permissions
+                & settings_permissions
+            )
+        )
+
+        configure_data = (
+            "*" in permissions
+            or "sql:configure" in permissions
+            or "config:write" in permissions
+        )
+
+        roles = set(
+            user.get("roles")
+            or []
+        )
+
+        if roles & {
+            "SYSTEM_ADMIN",
+            "TENANT_ADMIN",
+        }:
+            role_label = "Administrador"
+        elif "ANALYST" in roles:
+            role_label = "Analista"
+        else:
+            role_label = "Consulta"
+
+        return {
+            "user": {
+                "user_id": user.get(
+                    "user_id"
+                ),
+                "username": user.get(
+                    "username"
+                ),
+                "display_name": user.get(
+                    "display_name"
+                ),
+                "role_label": role_label,
+            },
+            "company": {
+                "display_name": (
+                    public_config.get(
+                        "display_name"
+                    )
+                    or "IA Empresarial Local"
+                ),
+                "theme": (
+                    public_config.get(
+                        "theme"
+                    )
+                    or "professional-light"
+                ),
+                "accent_color": (
+                    public_config.get(
+                        "accent_color"
+                    )
+                ),
+                "logo_reference": (
+                    public_config.get(
+                        "logo_reference"
+                    )
+                ),
+                "business_type": (
+                    public_config.get(
+                        "business_type"
+                    )
+                    or "Otro"
+                ),
+            },
+            "readiness": {
+                "status": readiness.get(
+                    "status"
+                ),
+                "verification_status": (
+                    readiness.get(
+                        "verification_status"
+                    )
+                ),
+                "steps": (
+                    readiness.get(
+                        "steps"
+                    )
+                    or {}
+                ),
+                "next_actions": (
+                    readiness.get(
+                        "next_actions"
+                    )
+                    or []
+                ),
+            },
+            "capabilities": {
+                "settings": (
+                    settings_visible
+                ),
+                "configure_data": (
+                    configure_data
+                ),
+            },
+        }
+
+
 
     @router.get("/api/enterprise/health/live")
     def enterprise_live():
@@ -384,32 +1941,298 @@ def install_enterprise_routes(app, root: str | Path):
             return JSONResponse({"ok": False, "error": "No se pudo completar la solicitud con el servicio local."}, status_code=500)
 
     @router.post("/api/enterprise/chat/stream")
-    def enterprise_chat_stream(body: ChatRequest, principal: Principal = Depends(require_permission("analysis:run"))):
+    def enterprise_chat_stream(
+        body: ChatRequest,
+        principal: Principal = Depends(
+            require_permission("analysis:run")
+        ),
+    ):
         def events():
+            trace_id = components.traceability.start(
+                principal,
+                trace_type="chat_stream",
+                prompt=body.message,
+            )
+            trace_finished = False
+            stream_iter = None
+
+            def finish_trace(
+                status="completed",
+                *,
+                error_type=None,
+                error_message=None,
+            ):
+                nonlocal trace_finished
+
+                if trace_finished:
+                    return
+
+                if status == "error":
+                    components.traceability.add_step(
+                        trace_id,
+                        "error",
+                        engine="runtime",
+                        details={
+                            "error_type": error_type,
+                            "error": (
+                                error_message or ""
+                            )[:500],
+                        },
+                    )
+                elif status == "cancelled":
+                    components.traceability.add_step(
+                        trace_id,
+                        "cancelled",
+                        engine="runtime",
+                    )
+
+                components.traceability.complete(
+                    trace_id,
+                    status=status,
+                )
+                trace_finished = True
+
+            def close_stream():
+                nonlocal stream_iter
+
+                if stream_iter is None:
+                    return
+
+                closer = getattr(
+                    stream_iter,
+                    "close",
+                    None,
+                )
+
+                if closer is not None:
+                    with components.traceability.bind(
+                        trace_id
+                    ):
+                        closer()
+
+                stream_iter = None
+
             try:
-                with components.traceability.scope(principal, trace_type="chat_stream", prompt=body.message) as trace_id:
-                    streamed = False
-                    for event in components.service.stream_general(principal, body.message, body.history):
-                        if event.get("type") == "fallback":
-                            break
-                        streamed = True
-                        if event.get("type") == "done":
-                            event = {**event, "trace_id": trace_id}
-                            components.traceability.add_step(trace_id, "response_delivery", engine=getattr(components.llm, "name", "local"), details={"sources_count": len(event.get("sources") or [])})
-                        yield json.dumps(event, ensure_ascii=False) + "\n"
-                    if not streamed:
-                        yield json.dumps({"type": "status", "phase": "retrieval", "message": "Consultando evidencia empresarial..."}, ensure_ascii=False) + "\n"
-                        result = components.service.chat(principal, body.message, body.history)
-                        result = {**result, "type": "done", "trace_id": trace_id}
-                        components.traceability.add_step(trace_id, "response_delivery", engine=getattr(components.llm, "name", "local"), details={"sources_count": len(result.get("sources") or [])})
-                        yield json.dumps(result, ensure_ascii=False) + "\n"
+                stream_iter = iter(
+                    components.service.stream_general(
+                        principal,
+                        body.message,
+                        body.history,
+                    )
+                )
+
+                streamed = False
+                fallback = False
+
+                while True:
+                    try:
+                        # Cada reanudación del generador recibe el contexto
+                        # de trazabilidad únicamente durante este tramo
+                        # síncrono. El token se libera antes del yield HTTP.
+                        with components.traceability.bind(
+                            trace_id
+                        ):
+                            event = next(stream_iter)
+                    except StopIteration:
+                        break
+
+                    event_type = event.get("type")
+
+                    if event_type == "fallback":
+                        fallback = True
+                        close_stream()
+                        break
+
+                    streamed = True
+
+                    if event_type == "error":
+                        event = {
+                            **event,
+                            "trace_id": trace_id,
+                        }
+
+                        finish_trace(
+                            "error",
+                            error_type=str(
+                                event.get("error_type")
+                                or "StreamError"
+                            ),
+                            error_message=str(
+                                event.get("message")
+                                or ""
+                            ),
+                        )
+
+                        yield json.dumps(
+                            event,
+                            ensure_ascii=False,
+                        ) + "\n"
+                        return
+
+                    if event_type == "done":
+                        event = {
+                            **event,
+                            "trace_id": trace_id,
+                        }
+
+                        components.traceability.add_step(
+                            trace_id,
+                            "response_delivery",
+                            engine=getattr(
+                                components.llm,
+                                "name",
+                                "local",
+                            ),
+                            details={
+                                "sources_count": len(
+                                    event.get("sources")
+                                    or []
+                                )
+                            },
+                        )
+
+                        close_stream()
+                        finish_trace("completed")
+
+                        yield json.dumps(
+                            event,
+                            ensure_ascii=False,
+                        ) + "\n"
+                        return
+
+                    # Este yield ocurre sin un ContextVar token abierto.
+                    yield json.dumps(
+                        event,
+                        ensure_ascii=False,
+                    ) + "\n"
+
+                if fallback or not streamed:
+                    yield json.dumps(
+                        {
+                            "type": "status",
+                            "phase": "retrieval",
+                            "message": (
+                                "Consultando evidencia empresarial..."
+                            ),
+                        },
+                        ensure_ascii=False,
+                    ) + "\n"
+
+                    # ContextEngine, reglas analíticas y structured_data
+                    # conservan trace_step() gracias a bind(), pero este
+                    # contexto termina antes de entregar el done.
+                    with components.traceability.bind(
+                        trace_id
+                    ):
+                        result = components.service.chat(
+                            principal,
+                            body.message,
+                            body.history,
+                        )
+
+                    result = {
+                        **result,
+                        "type": "done",
+                        "trace_id": trace_id,
+                    }
+
+                    components.traceability.add_step(
+                        trace_id,
+                        "response_delivery",
+                        engine=getattr(
+                            components.llm,
+                            "name",
+                            "local",
+                        ),
+                        details={
+                            "sources_count": len(
+                                result.get("sources")
+                                or []
+                            )
+                        },
+                    )
+
+                    finish_trace("completed")
+
+                    yield json.dumps(
+                        result,
+                        ensure_ascii=False,
+                    ) + "\n"
+                    return
+
+                raise RuntimeError(
+                    "stream ended without terminal event"
+                )
+
             except GeneratorExit:
+                try:
+                    close_stream()
+                finally:
+                    if not trace_finished:
+                        try:
+                            finish_trace("cancelled")
+                        except Exception:
+                            pass
                 raise
+
             except Exception as exc:
-                components.db.audit("chat.stream_error", principal.company_id, principal.user_id, "query", outcome="error", details={"error_type": type(exc).__name__})
-                components.logger.exception("chat stream error", extra={"event": "chat.stream_error", "company_id": principal.company_id, "user_id": principal.user_id, "error_type": type(exc).__name__})
-                yield json.dumps({"type": "error", "message": "No se pudo completar la respuesta con el servicio local."}, ensure_ascii=False) + "\n"
-        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                try:
+                    close_stream()
+                except Exception:
+                    pass
+
+                if not trace_finished:
+                    try:
+                        finish_trace(
+                            "error",
+                            error_type=type(exc).__name__,
+                            error_message=str(exc),
+                        )
+                    except Exception:
+                        pass
+
+                components.db.audit(
+                    "chat.stream_error",
+                    principal.company_id,
+                    principal.user_id,
+                    "query",
+                    outcome="error",
+                    details={
+                        "error_type": type(exc).__name__
+                    },
+                )
+
+                components.logger.exception(
+                    "chat stream error",
+                    extra={
+                        "event": "chat.stream_error",
+                        "company_id": principal.company_id,
+                        "user_id": principal.user_id,
+                        "error_type": type(exc).__name__,
+                    },
+                )
+
+                yield json.dumps(
+                    {
+                        "type": "error",
+                        "trace_id": trace_id,
+                        "message": (
+                            "No se pudo completar la respuesta "
+                            "con el servicio local."
+                        ),
+                    },
+                    ensure_ascii=False,
+                ) + "\n"
+
+        return StreamingResponse(
+            events(),
+            media_type="application/x-ndjson",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
 
     @router.get("/api/enterprise/memories")
     def list_memories(include_inactive: bool = False, principal: Principal = Depends(require_permission("knowledge:read"))):

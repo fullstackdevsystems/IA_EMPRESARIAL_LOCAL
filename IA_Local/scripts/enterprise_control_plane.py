@@ -69,7 +69,7 @@ class EnterpriseControlPlane:
         actor = self._permit(principal, "config:read")
         tenant = self.tenants.get(actor["tenant_id"])
         effective = self.platform.public_effective_config(actor["tenant_id"])
-        profiles = [public_sql_profile(item) for item in self.sql.list(self.identity.scope(actor))]
+        profiles = [public_sql_profile(item) for item in self.sql.list(self.sql.company_scope(self.identity.scope(actor)))]
         provider = effective.get("ai_provider")
         return {"release": self._release(), "active_tenant": self._public_tenant(tenant, effective),
                 "active_user": {key: actor.get(key) for key in ("user_id", "username", "display_name", "roles", "business_units", "branches", "status")},
@@ -89,7 +89,7 @@ class EnterpriseControlPlane:
 
     def sql_sources_for(self, principal: Any) -> List[Dict[str, Any]]:
         actor = self._permit(principal, "sql:read")
-        return [public_sql_profile(item) for item in self.sql.list(self.identity.scope(actor))]
+        return [public_sql_profile(item) for item in self.sql.list(self.sql.company_scope(self.identity.scope(actor)))]
 
     def ai_for(self, principal: Any) -> Dict[str, Any]:
         actor = self._permit(principal, "config:read")

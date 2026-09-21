@@ -80,7 +80,7 @@ def _sha256_file(path: Path) -> str:
 def _is_volatile(path: Path) -> bool:
     name = path.name.lower()
 
-    if name in {".ds_store", "thumbs.db"}:
+    if name in {".ds_store", "thumbs.db", ".lock"}:
         return True
 
     if path.suffix.lower() in VOLATILE_SUFFIXES:

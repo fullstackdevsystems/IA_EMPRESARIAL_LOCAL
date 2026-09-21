@@ -626,6 +626,31 @@ def _safe(value: Any, code: str) -> str:
 
 class EnterpriseSqlConnectionStore:
     def __init__(self, root: Path, tenant_registry: Optional[EnterpriseTenantRegistry] = None): self.root = Path(root); self.tenant_registry = tenant_registry
+    @staticmethod
+    def company_scope(scope: Dict[str, Any]) -> Dict[str, Any]:
+        """Return the canonical company-owned SQL resource scope.
+
+        SQL connections are configured by an administrator but consumed by
+        authorised users of the same company.  The synthetic ``sql-admin``
+        segment is therefore a resource namespace, not an identity.
+        """
+        normalized = normalize_deliverable_scope(scope)
+        return {
+            "company_id": normalized["company_id"],
+            "user_id": "sql-admin",
+            "business_unit": normalized.get("business_unit"),
+            "branch": normalized.get("branch"),
+        }
+
+    def _legacy_dir(self, scope: Dict[str, Any]) -> Path:
+        """Locate an historic user-owned directory without making it runtime-visible."""
+        s = normalize_deliverable_scope(scope); assert_tenant_active(s, self.tenant_registry)
+        root = self.root.resolve()
+        target = root / s["company_id"] / s["user_id"] / (s.get("business_unit") or "_") / (s.get("branch") or "_")
+        try: target.resolve().relative_to(root)
+        except ValueError as exc: raise EnterpriseSqlError("SQL_SCOPE_DENIED", "Scope fuera del store SQL") from exc
+        return target.resolve()
+
     def _dir(self, scope: Dict[str, Any], create: bool = False) -> Path:
         s = normalize_deliverable_scope(scope); assert_tenant_active(s, self.tenant_registry)
         if create: self.root.mkdir(parents=True, exist_ok=True)
@@ -683,6 +708,43 @@ class EnterpriseSqlConnectionStore:
             raise EnterpriseSqlError("MIGRATION_TARGET_CONFLICT", "Ya existe un profile SQL distinto en el scope destino")
         self._write(target, connection_id, candidate)
         return dict(candidate), True
+    def migrate_legacy_scope(self, source_scope: Dict[str, Any]) -> Dict[str, Any]:
+        """Copy verified legacy user-scoped profiles into the company scope.
+
+        This is an explicit upgrade operation.  Reads never fall back to a
+        legacy directory, and source profiles remain untouched after a
+        successful copy.  All target conflicts are detected before writing.
+        """
+        source = normalize_deliverable_scope(source_scope)
+        target = self.company_scope(source)
+        assert_tenant_active(source, self.tenant_registry)
+        if source == target:
+            return {"source_scope": source, "target_scope": target, "migrated": [], "skipped": [], "source_preserved": True}
+        source_dir = self._legacy_dir(source)
+        records = [] if not source_dir.exists() else [self._read(path) for path in sorted(source_dir.glob("*.json"))]
+        candidates = []
+        for record in records:
+            candidate = dict(record); candidate["scope"] = target; candidate["fingerprint_sha256"] = _fingerprint(candidate)
+            candidates.append(candidate)
+        # Preflight every possible destination before a single write.
+        for candidate in candidates:
+            path = self._path(target, candidate["connection_id"])
+            if path.exists() and self._read(path) != candidate:
+                raise EnterpriseSqlError("MIGRATION_TARGET_CONFLICT", "Ya existe un profile SQL distinto en el scope destino")
+        created = []
+        skipped = []
+        try:
+            for candidate in candidates:
+                profile, did_create = self._import_migrated_profile(candidate, target)
+                (created if did_create else skipped).append(profile["connection_id"])
+        except Exception:
+            # The source was never changed.  Remove only destinations created
+            # by this invocation, preserving a pre-existing target state.
+            for connection_id in created:
+                path = self._path(target, connection_id)
+                if path.exists(): path.unlink()
+            raise
+        return {"source_scope": source, "target_scope": target, "migrated": created, "skipped": skipped, "source_preserved": True}
     def update(self, scope: Dict[str,Any], connection_id: str, **changes) -> Dict[str,Any]:
         record=self.get(scope,connection_id); allowed={"display_name","server","database","driver","timeout_seconds","max_rows","trust_server_certificate","allowed_schemas","allowed_tables","secret_reference","username"}
         if set(changes)-allowed: raise EnterpriseSqlError("SQL_CONNECTION_PROFILE_INVALID","Campo administrativo no permitido")
