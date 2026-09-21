@@ -601,7 +601,15 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
             message,
         )
 
-        if connected_sql is not None:
+        route_decision = route_enterprise_question(
+            question=message,
+            governed_sql_available=connected_sql is not None,
+            direct_memory_question=self._direct_memory_question(message),
+            system_capabilities_question=self._looks_system_capabilities(message),
+            general_knowledge_question=self._looks_general_knowledge(message),
+        )
+
+        if route_decision.route == "governed_sql":
             answer = str(connected_sql.get("answer") or "")
             sources = list(connected_sql.get("sources") or [])
             retrieval = dict(connected_sql.get("retrieval") or {})
@@ -683,7 +691,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
 
             return
 
-        if self._looks_system_capabilities(message):
+        if route_decision.route == "system_capabilities":
             answer = self._system_capabilities_answer(message)
             total_ms = (time.perf_counter() - started) * 1000
             profile_name = "detallada" if any(cue in message.lower() for cue in DETAIL_CUES) else "normal"
@@ -698,8 +706,12 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                    "retrieval": {"memories": 0, "document_chunks": 0, "structured": False, "fast_path": "system_capabilities", "response_profile": profile_name, "generation_mode": "deterministic", "completion_reason": "complete", "continuations": 0},
                    "memory_candidate": None}
             return
-        if not self._looks_general_knowledge(message):
-            yield {"type": "fallback", "request_id": request_id}
+        if route_decision.route != "general_llm":
+            yield {
+                "type": "fallback",
+                "request_id": request_id,
+                "route": route_decision.route,
+            }
             return
 
         profile = self._response_profile(message, general=True)
