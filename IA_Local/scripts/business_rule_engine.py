@@ -6,6 +6,25 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 BUSINESS_RULE_ENGINE_VERSION = "r10.15a"
 
+# R10.25C1 is an additive contract layered on top of the certified R10.15A
+# interpreter. It does not change the R10.15A schema version.
+R10_25C1_FINDING_CLASSIFICATION_VERSION = "r10.25c1"
+
+_ALLOWED_FINDING_CLASSES = {
+    "risk",
+    "opportunity",
+    "attention",
+    "informational",
+}
+
+_ALLOWED_FINDING_SEVERITIES = {
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "informational",
+}
+
 _ALLOWED_OPERATORS = {"gte", "lte"}
 _ALLOWED_FIELDS = {"change_pct", "share_pct"}
 _FORBIDDEN_RULE_KEYS = {"expression", "formula", "python", "code", "eval"}
@@ -67,6 +86,22 @@ def _validate_rule(rule: Dict[str, Any]) -> Tuple[bool, str]:
     classification = dict(rule.get("classification") or {})
     if not classification:
         return False, "missing_classification"
+
+    # R10.25C1: finding classification remains explicit and governed.
+    # Absence is backward compatible with R10.15A. If supplied, values must
+    # come from the approved whitelist; the engine never invents them.
+    finding_class = classification.get("finding_class")
+    if finding_class is not None:
+        finding_class = str(finding_class).strip().lower()
+        if finding_class not in _ALLOWED_FINDING_CLASSES:
+            return False, "unsupported_finding_class"
+
+    severity = classification.get("severity")
+    if severity is not None:
+        severity = str(severity).strip().lower()
+        if severity not in _ALLOWED_FINDING_SEVERITIES:
+            return False, "unsupported_finding_severity"
+
     return True, ""
 
 
@@ -198,5 +233,11 @@ def apply_governed_business_rules(
             "scope_guard": True,
             "priority_resolution": "highest_priority_first_match",
             "source_business_insights_are_not_mutated": True,
+            "finding_classification_contract": R10_25C1_FINDING_CLASSIFICATION_VERSION,
+            "finding_classification_is_rule_supplied_only": True,
+            "finding_classification_defaults_are_not_invented": True,
+            "finding_severity_is_rule_supplied_only": True,
+            "finding_ranking_is_not_rule_priority": True,
+            "llm_finding_classification_authority": False,
         },
     }
