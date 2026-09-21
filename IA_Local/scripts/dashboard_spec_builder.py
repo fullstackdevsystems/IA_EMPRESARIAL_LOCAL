@@ -17,6 +17,7 @@ from analysis_planner import build_governed_analytical_plan
 from analysis_executor import execute_governed_analytical_plan
 from insight_engine import build_governed_business_insights
 from business_rule_engine import apply_governed_business_rules
+from business_finding_prioritizer import build_governed_business_findings
 from business_rule_registry import load_governed_business_rule_registry
 from business_rule_context import load_governed_business_context
 from enterprise_metric_rules import (
@@ -2233,6 +2234,10 @@ def build_dashboard_spec(
         as_of=resolved_rule_as_of,
     )
 
+    governed_business_findings = build_governed_business_findings(
+        business_rule_interpretation=business_rule_interpretation,
+    )
+
     business_rule_interpretation["context_governance"] = {
         "schema_version": business_rule_context.get("schema_version"),
         "status": business_rule_context.get("status"),
@@ -2295,6 +2300,9 @@ def build_dashboard_spec(
 
         "business_rule_interpretation":
             business_rule_interpretation,
+
+        "governed_business_findings":
+            governed_business_findings,
 
         "enterprise_rule_governance":
             enterprise_rule_governance,
