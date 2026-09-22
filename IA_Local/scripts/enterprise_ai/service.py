@@ -380,6 +380,55 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
         top = memories[0]
         return "Según la memoria empresarial registrada: " + str(top.get("content", "")).strip()
 
+    def _llm_capabilities(self) -> Dict[str, Any]:
+        """Read provider capabilities fail-closed without changing legacy providers."""
+        method = getattr(self.llm, "capabilities", None)
+        if not callable(method):
+            return {
+                "contract": None,
+                "provider": getattr(self.llm, "name", "unknown"),
+                "model": getattr(self.llm, "model", None),
+                "native_streaming": False,
+                "json_mode": False,
+                "request_num_ctx": False,
+                "completion_metadata": False,
+            }
+        try:
+            value = method()
+        except Exception:
+            value = {}
+        value = value if isinstance(value, dict) else {}
+        return {
+            "contract": value.get("contract"),
+            "provider": value.get("provider", getattr(self.llm, "name", "unknown")),
+            "model": value.get("model", getattr(self.llm, "model", None)),
+            "native_streaming": bool(value.get("native_streaming", False)),
+            "json_mode": bool(value.get("json_mode", False)),
+            "request_num_ctx": bool(value.get("request_num_ctx", False)),
+            "completion_metadata": bool(value.get("completion_metadata", False)),
+        }
+
+    def _provider_num_ctx(self, requested: Optional[int]) -> Optional[int]:
+        """Send num_ctx only when the provider explicitly declares request support."""
+        if not self._llm_capabilities()["request_num_ctx"]:
+            return None
+        return requested
+
+    def _provider_done_reason(self) -> Any:
+        """Read governed completion metadata while preserving legacy provider behavior."""
+        capabilities_method = getattr(type(self.llm), "capabilities", None)
+        base_capabilities_method = getattr(LLMProvider, "capabilities", None)
+
+        # Concrete providers that override the capability contract are authoritative.
+        # Legacy LLMProvider subclasses predate R10.25D4; preserve their historical
+        # last_completion behavior instead of treating the inherited base default as
+        # an explicit denial of completion metadata support.
+        if capabilities_method is not base_capabilities_method:
+            if not self._llm_capabilities()["completion_metadata"]:
+                return None
+
+        return (getattr(self.llm, "last_completion", {}) or {}).get("done_reason")
+
     @staticmethod
     def _is_context_stop(reason: Any) -> bool:
         return str(reason or "").lower() in {"length", "max_tokens", "context_length", "context_window"}
@@ -440,7 +489,11 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
             parts: list[str] = []
             continuations = 0
             while True:
-                text = self.llm.chat(current, max_tokens=max_tokens, num_ctx=num_ctx)
+                text = self.llm.chat(
+                    current,
+                    max_tokens=max_tokens,
+                    num_ctx=self._provider_num_ctx(num_ctx),
+                )
                 if text:
                     if continuations == 0:
                         parts.append(text)
@@ -450,7 +503,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                             parts.append(fresh)
                         if repeated:
                             break
-                reason = (getattr(self.llm, "last_completion", {}) or {}).get("done_reason")
+                reason = self._provider_done_reason()
                 elapsed = time.perf_counter() - llm_started
                 if not self._is_context_stop(reason):
                     break
@@ -823,7 +876,11 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
             while True:
                 continuation_buffer: list[str] = []
                 is_continuation = continuations > 0
-                for piece in self.llm.stream_chat(current_messages, max_tokens=None, num_ctx=profile["num_ctx"]):
+                for piece in self.llm.stream_chat(
+                    current_messages,
+                    max_tokens=None,
+                    num_ctx=self._provider_num_ctx(profile["num_ctx"]),
+                ):
                     if not piece:
                         continue
                     if first_token_ms is None:
@@ -848,8 +905,7 @@ En resumen, soy un **asistente local orquestado**: el LLM aporta lenguaje y cono
                         yield {"type": "status", "request_id": request_id, "phase": "safety", "message": "Se detectó repetición en una continuación y se detuvo para no duplicar contenido."}
                         break
 
-                completion = getattr(self.llm, "last_completion", {}) or {}
-                provider_done_reason = completion.get("done_reason")
+                provider_done_reason = self._provider_done_reason()
                 if not self._is_context_stop(provider_done_reason):
                     completion_reason = "natural" if continuations == 0 else "continued_to_eos"
                     break

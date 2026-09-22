@@ -27,6 +27,18 @@ class LLMProvider(ABC):
         if text:
             yield text
 
+    def capabilities(self) -> Dict[str, Any]:
+        """Return the governed execution capabilities declared by this provider."""
+        return {
+            "contract": "r10.25d4",
+            "provider": self.name,
+            "model": getattr(self, "model", None),
+            "native_streaming": False,
+            "json_mode": False,
+            "request_num_ctx": False,
+            "completion_metadata": False,
+        }
+
     def healthy(self) -> bool:
         return True
 
@@ -51,6 +63,17 @@ class OllamaProvider(LLMProvider):
         self.max_tokens = max_tokens
         self.num_ctx = num_ctx
         self.last_completion: Dict[str, Any] = {}
+
+    def capabilities(self) -> Dict[str, Any]:
+        return {
+            "contract": "r10.25d4",
+            "provider": self.name,
+            "model": self.model,
+            "native_streaming": True,
+            "json_mode": True,
+            "request_num_ctx": True,
+            "completion_metadata": True,
+        }
 
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         self.last_completion = {}
@@ -179,6 +202,17 @@ class LMStudioProvider(LLMProvider):
         self.timeout = timeout
         self.temperature = temperature
         self.max_tokens = max_tokens
+
+    def capabilities(self) -> Dict[str, Any]:
+        return {
+            "contract": "r10.25d4",
+            "provider": self.name,
+            "model": self.model,
+            "native_streaming": True,
+            "json_mode": True,
+            "request_num_ctx": False,
+            "completion_metadata": False,
+        }
 
     def chat(self, messages, *, json_mode=False, max_tokens=None, temperature=None, num_ctx=None) -> str:
         payload: Dict[str, Any] = {
