@@ -791,6 +791,14 @@ function renderSourceSummary(event){
     || 'Respuesta generada con la información disponible.';
 }
 
+function renderAnswerKind(event){
+  const retrieval = event && event.retrieval || {};
+  if(retrieval.structured || retrieval.fast_path === 'governed_sql'){
+    return 'Hecho calculado · basado en información verificada';
+  }
+  return 'Interpretación asistida · revisa las fuentes indicadas';
+}
+
 function addFeedback(bubble,event,answer){
   const container = document.createElement('div');
   container.className = 'feedback';
@@ -987,6 +995,11 @@ async function send(){
           meta.textContent = renderSourceSummary(event);
           bubble.appendChild(meta);
 
+          const kind = document.createElement('div');
+          kind.className = 'answer-meta';
+          kind.textContent = renderAnswerKind(event);
+          bubble.appendChild(kind);
+
           addFeedback(
             bubble,
             event,
@@ -1042,6 +1055,16 @@ function stopGeneration(){
 }
 
 function usePrompt(value){
+  question.value = value;
+  question.focus();
+}
+
+function loadPromptFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const value = (params.get('prompt') || '').trim();
+
+  if(!value) return;
+
   question.value = value;
   question.focus();
 }
@@ -1326,6 +1349,7 @@ question.addEventListener(
   }
 );
 
+loadPromptFromUrl();
 establishSession();
 </script>
 </body>

@@ -363,6 +363,45 @@ h1{font-size:clamp(30px,4vw,46px);letter-spacing:-.035em;margin:0 0 8px}
       </section>
 
       <div class="section-head">
+        <h2>Preguntas para tu negocio</h2>
+        <span>Empieza con una pregunta ejecutiva</span>
+      </div>
+
+      <section class="actions executive-questions">
+        <a class="action executive-question"
+           href="/assistant?prompt=What%20products%20are%20declining%3F">
+          <div class="action-icon">↘</div>
+          <h2>Productos en caída</h2>
+          <p>Identifica productos con disminución y revisa la evidencia disponible.</p>
+          <div class="action-go">Revisar productos →</div>
+        </a>
+
+        <a class="action executive-question"
+           href="/assistant?prompt=Which%20customers%20stopped%20buying%3F">
+          <div class="action-icon">◎</div>
+          <h2>Clientes que dejaron de comprar</h2>
+          <p>Busca clientes con pérdida de actividad respecto de periodos anteriores.</p>
+          <div class="action-go">Revisar clientes →</div>
+        </a>
+
+        <a class="action executive-question"
+           href="/assistant?prompt=Why%20did%20sales%20decrease%3F">
+          <div class="action-icon">?</div>
+          <h2>¿Por qué bajaron las ventas?</h2>
+          <p>Investiga cambios relevantes usando la información empresarial disponible.</p>
+          <div class="action-go">Analizar ventas →</div>
+        </a>
+
+        <a class="action executive-question"
+           href="/assistant?prompt=What%20requires%20management%20attention%20today%3F">
+          <div class="action-icon">!</div>
+          <h2>Atención de dirección</h2>
+          <p>Revisa hallazgos, cambios o anomalías que puedan requerir seguimiento.</p>
+          <div class="action-go">Revisar prioridades →</div>
+        </a>
+      </section>
+
+      <div class="section-head">
         <h2>Estado de tu empresa</h2>
         <span>Resumen de preparación</span>
       </div>
