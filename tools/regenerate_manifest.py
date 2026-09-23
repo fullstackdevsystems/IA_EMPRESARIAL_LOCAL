@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -58,6 +59,9 @@ paths = {
     "OperarIA.ps1",
     "ValidarInstalador.ps1",
     "LEEME_INSTALACION_LIMPIA.txt",
+    "DesinstalarIA.ps1",
+    "DESINSTALAR_IA_EMPRESARIAL_LOCAL.bat",
+    "LEEME_DESINSTALACION_Y_RECUPERACION.txt",
     "IA_Local/VERSION.txt",
     "IA_Local/requirements-local.txt",
     "IA_Local/requirements-optional.txt",
@@ -93,17 +97,110 @@ for file in templates_dir.rglob("*.html"):
 
 files = []
 
+# Build one isolated Git index representing the exact controlled R10.27
+# snapshot.  This does not modify HEAD, the canonical index, refs, or branch.
+_temp_index = tempfile.NamedTemporaryFile(
+    prefix=".manifest_index_",
+    delete=False,
+    dir=str(ROOT),
+)
+_temp_index_path = Path(_temp_index.name)
+_temp_index.close()
+_temp_index_path.unlink(missing_ok=True)
+
+git_env = os.environ.copy()
+git_env["GIT_INDEX_FILE"] = str(_temp_index_path)
+
+_read_tree = subprocess.run(
+    ["git", "read-tree", "HEAD"],
+    cwd=ROOT,
+    env=git_env,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+if _read_tree.returncode != 0:
+    raise SystemExit(
+        "unable to initialize isolated manifest index: "
+        + _read_tree.stderr.strip()
+    )
+
+_stage = subprocess.run(
+    ["git", "add", "--all"],
+    cwd=ROOT,
+    env=git_env,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+if _stage.returncode != 0:
+    raise SystemExit(
+        "unable to stage controlled manifest snapshot: "
+        + _stage.stderr.strip()
+    )
+
 for rel in sorted(paths):
     path = ROOT / rel
 
     if not path.is_file():
         raise SystemExit(f"missing manifest file: {rel}")
 
-    raw = path.read_bytes()
+    normalized = rel.replace("\\", "/")
+
+    # R10.27: every manifested file, including RELEASE_METADATA.json,
+    # is hashed from the current controlled Git snapshot exactly as
+    # .gitattributes will materialize it in the release checkout.
+    # R10.27 release authority is the current controlled snapshot as
+    # Git will materialize it in a clean release checkout.  Stage the
+    # controlled snapshot in an isolated index before this loop, then
+    # use checkout-index --temp so .gitattributes (including eol=crlf
+    # and eol=lf) are applied exactly as they will be for the package.
+    result = subprocess.run(
+        [
+            "git",
+            "checkout-index",
+            "--temp",
+            "--",
+            normalized,
+        ],
+        cwd=ROOT,
+        env=git_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            "unable to materialize manifest file: "
+            + normalized
+            + ": "
+            + result.stderr.strip()
+        )
+
+    checkout_line = result.stdout.strip()
+    if not checkout_line:
+        raise SystemExit(
+            "empty checkout-index result for manifest file: "
+            + normalized
+        )
+
+    temp_name = checkout_line.split("\t", 1)[0].strip()
+    temp_path = ROOT / temp_name
+
+    if not temp_path.is_file():
+        raise SystemExit(
+            "materialized manifest file not found: "
+            + normalized
+        )
+
+    try:
+        raw = temp_path.read_bytes()
+    finally:
+        temp_path.unlink(missing_ok=True)
 
     files.append(
         {
-            "path": rel.replace("\\", "/"),
+            "path": normalized,
             "sha256": hashlib.sha256(raw).hexdigest(),
             "size": len(raw),
         }
@@ -122,6 +219,9 @@ payload = (
     )
     + "\n"
 )
+
+# The manifest entries are now fully materialized and hashed.
+_temp_index_path.unlink(missing_ok=True)
 
 fd, temp_name = tempfile.mkstemp(
     prefix=".manifest_",

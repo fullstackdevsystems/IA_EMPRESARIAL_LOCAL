@@ -991,6 +991,51 @@ def _register_governed_deliverables(
     )
 
 
+def _r10_27_authenticated_analytic_principal() -> Optional[Principal]:
+    """Resolve the authenticated tenant principal for governed analytics."""
+    if ENTERPRISE_COMPONENTS is None:
+        return None
+
+    actor = base.ANALYZE_AUTH_CONTEXT.get()
+    if not isinstance(actor, dict):
+        return None
+
+    company_id = str(actor.get("tenant_id") or "").strip()
+    user_id = str(actor.get("user_id") or "").strip()
+    actor_roles = actor.get("roles") or []
+
+    if not company_id or not user_id:
+        return None
+
+    if isinstance(actor_roles, str):
+        actor_roles = [actor_roles]
+
+    role = (
+        "admin"
+        if "SYSTEM_ADMIN" in set(actor_roles)
+        else "user"
+    )
+
+    return Principal(
+        company_id=company_id,
+        user_id=user_id,
+        role=role,
+    )
+
+
+def _r10_27_authenticated_analytic_context(
+    roles: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Build validated tenant-scoped analytic context for authenticated analysis."""
+    principal = _r10_27_authenticated_analytic_principal()
+    if principal is None:
+        return None
+
+    return ENTERPRISE_COMPONENTS.analytics.build_context(
+        principal,
+        roles or {},
+    )
+
 def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, Any]] = None, analytic_context: Optional[Dict[str, Any]] = None, register_dataset: bool = True) -> Dict[str, Any]:
     # R10.13C.2: request prompt is immutable authority for this execution.
     request_prompt = str(prompt or "").strip()
@@ -1083,6 +1128,10 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         domain = "comercial-clientes"
 
     elif is_commercial_bi:
+        if analytic_context is None:
+            analytic_context = _r10_27_authenticated_analytic_context(
+                roles_bi,
+            )
         work, derived_bi, bi_notes = bi.prepare_business(original, roles_bi, analytic_context)
         # Compatibilidad con las capas existentes (perfil, registro de dataset y RAG).
         roles = {
@@ -1113,12 +1162,21 @@ def analyze_file(path: Path, prompt: str, semantic_context: Optional[Dict[str, A
         stamp = base.datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = re.sub(r"[^A-Za-z0-9_-]+", "_", path.stem)[:60]
         outputs: Dict[str, Optional[str]] = {"html": None, "pdf": None, "excel": None}
-        dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
+        analytic_principal = _r10_27_authenticated_analytic_principal()
+        if analytic_principal is not None:
+            with ENTERPRISE_COMPONENTS.analytics.bind(analytic_principal, roles_bi):
+                dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
+        else:
+            dynamic_plan = _prepare_governed_deliverable_plan(original, prompt, path, meta.get("hoja_analizada") or "", semantic_context, prompt_sha256, prompt_preview)
         profile["dynamic_dashboard_plan"] = dynamic_plan
         _attach_governed_deliverable_manifest(profile, dynamic_plan, path, meta.get("hoja_analizada") or "", len(original), prompt_sha256, _source_fingerprint_from_meta(meta), spec.get("output_intent"))
         if spec["outputs"].get("html"):
             html_path = base.REPORTES / f"Dashboard_Dinamico_{stem}_{stamp}.html"
-            dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
+            if analytic_principal is not None:
+                with ENTERPRISE_COMPONENTS.analytics.bind(analytic_principal, roles_bi):
+                    dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
+            else:
+                dynamic_plan = dd.generate_dynamic_dashboard(html_path, original, prompt, path.name, meta.get("hoja_analizada") or "", semantic_context, prepared_plan=dynamic_plan)
             profile["dynamic_dashboard_plan"] = dynamic_plan
             outputs["html"] = html_path.name
         if spec["outputs"].get("pdf"):

@@ -126,6 +126,60 @@ catch {
     Fail-Validation "MANIFEST_SHA256.json invalido"
 }
 
+# INSTALLER_ROOT_CONTRACT_VALIDATION_R1027
+# The commercial validator must enforce the same managed-root
+# contract that InstallerR1020C1.ps1 will consume after validation.
+$installerContractText = Get-Content $installerPath -Raw
+
+$installerRootMatch = [regex]::Match(
+    $installerContractText,
+    '(?ms)\$rootFiles\s*=\s*@\((.*?)\)'
+)
+
+if (-not $installerRootMatch.Success) {
+    Fail-Validation "Contrato rootFiles del instalador no encontrado"
+}
+
+$installerRootFiles = @(
+    [regex]::Matches(
+        $installerRootMatch.Groups[1].Value,
+        "['""]([^'""]+)['""]"
+    ) |
+    ForEach-Object {
+        $_.Groups[1].Value.Replace('\','/')
+    }
+)
+
+if ($installerRootFiles.Count -lt 1) {
+    Fail-Validation "Contrato rootFiles del instalador vacio"
+}
+
+$manifestContractPaths = @{}
+
+foreach ($manifestContractEntry in $manifest.files) {
+    $manifestContractPath = ([string]$manifestContractEntry.path).Replace('\','/')
+    $manifestContractPaths[$manifestContractPath] = $true
+}
+
+foreach ($installerRootFile in $installerRootFiles) {
+
+    $installerRootNormalized = $installerRootFile.Replace('\','/')
+    $installerRootSource = Join-Path $root $installerRootFile
+
+    if (-not (Test-Path $installerRootSource -PathType Leaf)) {
+        Fail-Validation "Archivo requerido por instalador ausente: $installerRootNormalized"
+    }
+
+    # MANIFEST_SHA256.json cannot contain its own hash.
+    if ($installerRootNormalized -eq 'MANIFEST_SHA256.json') {
+        continue
+    }
+
+    if (-not $manifestContractPaths.ContainsKey($installerRootNormalized)) {
+        Fail-Validation "Archivo requerido por instalador fuera del manifest: $installerRootNormalized"
+    }
+}
+# END_INSTALLER_ROOT_CONTRACT_VALIDATION_R1027
 if (
     [string]$manifest.version -ne
     [string]$metadata.release

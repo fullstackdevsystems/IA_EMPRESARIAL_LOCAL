@@ -196,20 +196,24 @@ foreach ($item in $manifest.files) {
     }
 
     if ($relative -eq "RELEASE_METADATA.json") {
-        if (-not (Test-Path $ReleaseMetadataPath -PathType Leaf)) {
-            throw "PACKAGE_SOURCE_MISSING: $relative"
-        }
-
-        Copy-Item `
-            $ReleaseMetadataPath `
-            $destination `
-            -Force
+        $source = $ReleaseMetadataPath
     }
     else {
-        Write-GitHeadBlob `
-            -RelativePath $relative `
-            -Destination $destination
+        $source = Join-Path $Root $relative
     }
+
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "PACKAGE_SOURCE_MISSING: $relative"
+    }
+
+    # R10.27 release authority is the exact byte representation from the
+    # controlled clean checkout. This preserves .gitattributes materialization
+    # such as eol=crlf/eol=lf instead of reverting to normalized Git blobs.
+    [System.IO.File]::Copy(
+        [System.IO.Path]::GetFullPath($source),
+        [System.IO.Path]::GetFullPath($destination),
+        $true
+    )
 
     if (-not (Test-Path $destination -PathType Leaf)) {
         throw "PACKAGE_MATERIALIZATION_MISSING: $relative"
@@ -250,7 +254,13 @@ $requiredRootFiles = @(
     "InstallerR1020C1.ps1",
     "OperarIA.ps1",
     "LEEME_INSTALACION_LIMPIA.txt",
-    "ValidarInstalador.ps1"
+    "ValidarInstalador.ps1",
+    "RELEASE_METADATA.json",
+    "DesinstalarIA.ps1",
+    "DESINSTALAR_IA_EMPRESARIAL_LOCAL.bat",
+    "LEEME_DESINSTALACION_Y_RECUPERACION.txt",
+    "IA_Local/VERSION.txt",
+    "IA_Local/requirements-local.txt"
 )
 
 foreach ($relative in $requiredRootFiles) {

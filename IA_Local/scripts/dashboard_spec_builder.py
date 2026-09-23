@@ -566,11 +566,29 @@ def _authorized_freight(
             or b.get("name")
         )
 
+        nested_rule = b.get("rule")
+
+        nested_expression = (
+            nested_rule.get("expression")
+            if isinstance(
+                nested_rule,
+                dict,
+            )
+            else None
+        )
+
         expr = str(
             b.get("expression")
             or b.get("formula")
-            or b.get("rule")
-            or ""
+            or nested_expression
+            or (
+                nested_rule
+                if isinstance(
+                    nested_rule,
+                    str,
+                )
+                else ""
+            )
         ).strip()
 
         if (
@@ -618,6 +636,16 @@ def resolve_metric(
 
     if direct:
         return direct
+
+    # R10.27: a validated tenant analytic rule is the highest governed
+    # derived authority for freight. Without that rule, preserve the
+    # existing fail-closed enterprise/derived resolution path.
+    if key == "freight":
+        authorized_freight = _authorized_freight(
+            analytic_context=analytic_context,
+        )
+        if authorized_freight:
+            return authorized_freight
 
     enterprise = _enterprise_derived_metric(
         key,
@@ -1744,20 +1772,60 @@ def build_dashboard_spec(
     # METRICS
     # ------------------------------------------------------------------
 
+    # R10.27:
+    # Metrics resolved earlier in this same governed specification may
+    # satisfy dependencies of later metrics/analyses. Keep these separate
+    # from physical semantic roles so a derived metric is never presented
+    # as a source column.
+    resolved_metric_roles = dict(roles)
+    resolved_metric_sources = dict(sources)
+
     for k in (
         intent.get("metrics")
         or []
     ):
 
-        caps.append(
-            resolve_metric(
-                k,
-                roles,
-                sources,
-                analytic_context,
-                df.columns,
-            )
+        metric_cap = resolve_metric(
+            k,
+            resolved_metric_roles,
+            resolved_metric_sources,
+            analytic_context,
+            df.columns,
         )
+
+        caps.append(metric_cap)
+
+        if (
+            isinstance(metric_cap, dict)
+            and metric_cap.get("status")
+            in {
+                SUPPORTED,
+                DERIVABLE,
+            }
+        ):
+            metric_role = (
+                metric_cap.get("semantic_role")
+                or k
+            )
+
+            if metric_role:
+                resolved_metric_roles[
+                    metric_role
+                ] = (
+                    metric_cap.get("source_columns")
+                    or metric_cap.get("formula")
+                    or metric_role
+                )
+
+                resolved_metric_sources[
+                    metric_role
+                ] = (
+                    (
+                        metric_cap.get("provenance")
+                        or {}
+                    ).get("source")
+                    or "resolved_metric_capability"
+                )
 
 
     # ------------------------------------------------------------------
@@ -1790,7 +1858,7 @@ def build_dashboard_spec(
         caps.append(
             resolve_analysis(
                 k,
-                roles,
+                resolved_metric_roles,
             )
         )
 
