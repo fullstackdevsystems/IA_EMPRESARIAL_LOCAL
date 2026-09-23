@@ -98,3 +98,25 @@ SEGURIDAD
 
 No comparta contraseñas, tokens, archivos de configuración ni respaldos fuera de
 los procedimientos autorizados de su organización.
+ANALISIS Y REPORTES
+
+Despues de completar la configuracion inicial y entrar al producto:
+
+1. Carga o selecciona los datos empresariales que deseas analizar. Si utilizas
+   SQL Server, trabaja unicamente con las fuentes y tablas autorizadas durante
+   la configuracion.
+2. En Analisis, selecciona los datos disponibles y ejecuta el analisis
+   gobernado. El sistema conserva el contexto de la ejecucion y genera los
+   resultados permitidos por la configuracion activa.
+3. Consulta los resultados desde la interfaz local. Los dashboards y
+   entregables disponibles pueden incluir HTML, Excel y PDF segun el resultado
+   generado.
+4. En Reportes, consulta los entregables generados y descarga solamente los
+   archivos correspondientes a la empresa y sesion activas.
+5. La inteligencia artificial es opcional. El analisis gobernado y los
+   entregables soportados no requieren habilitar un proveedor de IA cuando la
+   operacion seleccionada puede resolverse sin el.
+
+No copies manualmente datos, reportes ni archivos de configuracion entre
+instalaciones. Utiliza los mecanismos gobernados de carga, respaldo,
+restauracion y actualizacion incluidos con el producto.

@@ -1,5 +1,5 @@
 {
-  "version": "r10.27",
+  "version": "r10.28",
   "files": [
     {
       "path": "DESINSTALAR_IA_EMPRESARIAL_LOCAL.bat",
@@ -548,8 +548,8 @@
     },
     {
       "path": "LEEME_INSTALACION_LIMPIA.txt",
-      "sha256": "6021994f7ffba2bdc78f061dd685182e45a085a2b2bb1d7bac7f3cb467da0f66",
-      "size": 4443
+      "sha256": "3eed0ca5833a938a0f80493111c08c3653f1eb5ca596d7ab6348c913b0972486",
+      "size": 5608
     },
     {
       "path": "OperarIA.ps1",
@@ -558,7 +558,7 @@
     },
     {
       "path": "RELEASE_METADATA.json",
-      "sha256": "4a6d8cc99dba411144ce27d36a2cabb84a1fa3af831040b4bf22f1a4a778d07e",
+      "sha256": "9871cd2f3ba9ea32e771b3836a88b9892606d3263e393e95559a2de1a10aa4c5",
       "size": 154
     },
     {
