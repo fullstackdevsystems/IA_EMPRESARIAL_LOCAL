@@ -106,7 +106,51 @@ if (Test-Path $zipPath) {
 
 New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
-function Write-GitHeadBlob {
+function Invoke-ReleaseGit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$IndexPath
+    )
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "git"
+    $startInfo.WorkingDirectory = $Root
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Arguments = $Arguments
+    $startInfo.EnvironmentVariables["GIT_INDEX_FILE"] = $IndexPath
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+
+    if (-not $process.Start()) {
+        throw "RELEASE_GIT_PROCESS_START_FAILED"
+    }
+
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+
+    $process.WaitForExit()
+
+    $exitCode = $process.ExitCode
+    $stdout = [string]$stdoutTask.Result
+    $stderr = [string]$stderrTask.Result
+
+    $process.Dispose()
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Stdout = $stdout
+        Stderr = $stderr
+    }
+}
+
+function Write-GitCheckoutMaterialized {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RelativePath,
@@ -116,65 +160,111 @@ function Write-GitHeadBlob {
     )
 
     $normalized = $RelativePath.Replace('\', '/')
-    $spec = "HEAD:$normalized"
 
-    $destinationDir = Split-Path $Destination -Parent
+    $tempIndex = Join-Path `
+        $env:TEMP `
+        (".ia_release_index_" + [Guid]::NewGuid().ToString("N"))
 
-    if (-not (Test-Path $destinationDir)) {
-        New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path $destinationDir |
-            Out-Null
-    }
-
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = "git"
-    $startInfo.WorkingDirectory = $Root
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-
-    $escapedSpec = $spec.Replace('"', '\"')
-    $startInfo.Arguments = "cat-file blob `"$escapedSpec`""
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
-
-    if (-not $process.Start()) {
-        throw "GIT_BLOB_PROCESS_START_FAILED: $normalized"
-    }
-
-    $stderrTask = $process.StandardError.ReadToEndAsync()
-
-    $output = [System.IO.File]::Open(
-        $Destination,
-        [System.IO.FileMode]::Create,
-        [System.IO.FileAccess]::Write,
-        [System.IO.FileShare]::None
-    )
+    $tempCheckoutPath = $null
 
     try {
-        $process.StandardOutput.BaseStream.CopyTo(
-            $output
+        $quotedRoot = '"' + $Root.Replace('"', '\"') + '"'
+        $quotedPath = '"' + $normalized.Replace('"', '\"') + '"'
+
+        $readTree = Invoke-ReleaseGit `
+            -Arguments ("-C {0} read-tree HEAD" -f $quotedRoot) `
+            -IndexPath $tempIndex
+
+        if ($readTree.ExitCode -ne 0) {
+            throw (
+                "ISOLATED_INDEX_READ_TREE_FAILED: " +
+                $normalized +
+                " | " +
+                $readTree.Stderr.Trim()
+            )
+        }
+
+        $stage = Invoke-ReleaseGit `
+            -Arguments ("-C {0} add --all" -f $quotedRoot) `
+            -IndexPath $tempIndex
+
+        if ($stage.ExitCode -ne 0) {
+            throw (
+                "ISOLATED_INDEX_STAGE_FAILED: " +
+                $normalized +
+                " | " +
+                $stage.Stderr.Trim()
+            )
+        }
+
+        $checkout = Invoke-ReleaseGit `
+            -Arguments (
+                "-C {0} checkout-index --temp -- {1}" -f
+                $quotedRoot,
+                $quotedPath
+            ) `
+            -IndexPath $tempIndex
+
+        if ($checkout.ExitCode -ne 0) {
+            throw (
+                "ISOLATED_INDEX_CHECKOUT_FAILED: " +
+                $normalized +
+                " | " +
+                $checkout.Stderr.Trim()
+            )
+        }
+
+        $checkoutLines = @(
+            $checkout.Stdout -split "`r?`n" |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace([string]$_)
+            }
+        )
+
+        if ($checkoutLines.Count -lt 1) {
+            throw "ISOLATED_INDEX_CHECKOUT_EMPTY: $normalized"
+        }
+
+        $checkoutLine = [string]$checkoutLines[0]
+        $tempName = ($checkoutLine -split "`t", 2)[0].Trim()
+
+        if ([string]::IsNullOrWhiteSpace($tempName)) {
+            throw "ISOLATED_INDEX_TEMP_NAME_EMPTY: $normalized"
+        }
+
+        $tempCheckoutPath = Join-Path $Root $tempName
+
+        if (-not (
+            Test-Path `
+                -LiteralPath $tempCheckoutPath `
+                -PathType Leaf
+        )) {
+            throw "ISOLATED_INDEX_TEMP_FILE_MISSING: $normalized"
+        }
+
+        [System.IO.File]::Copy(
+            [System.IO.Path]::GetFullPath($tempCheckoutPath),
+            [System.IO.Path]::GetFullPath($Destination),
+            $true
         )
     }
     finally {
-        $output.Dispose()
-    }
+        if (
+            -not [string]::IsNullOrWhiteSpace(
+                [string]$tempCheckoutPath
+            ) -and
+            (Test-Path -LiteralPath $tempCheckoutPath)
+        ) {
+            Remove-Item `
+                -LiteralPath $tempCheckoutPath `
+                -ErrorAction SilentlyContinue
+        }
 
-    $process.WaitForExit()
-    $stderr = $stderrTask.Result
-
-    if ($process.ExitCode -ne 0) {
-        Remove-Item `
-            -LiteralPath $Destination `
-            -Force `
-            -ErrorAction SilentlyContinue
-
-        $message = "GIT_HEAD_BLOB_READ_FAILED: $normalized | $($stderr.Trim())"
-        throw $message
+        if (Test-Path -LiteralPath $tempIndex) {
+            Remove-Item `
+                -LiteralPath $tempIndex `
+                -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -206,14 +296,21 @@ foreach ($item in $manifest.files) {
         throw "PACKAGE_SOURCE_MISSING: $relative"
     }
 
-    # R10.27 release authority is the exact byte representation from the
-    # controlled clean checkout. This preserves .gitattributes materialization
-    # such as eol=crlf/eol=lf instead of reverting to normalized Git blobs.
-    [System.IO.File]::Copy(
-        [System.IO.Path]::GetFullPath($source),
-        [System.IO.Path]::GetFullPath($destination),
-        $true
-    )
+    # RELEASE_METADATA.json is supplied explicitly by the release authority.
+    # Every other manifested file uses the same isolated Git-index +
+    # checkout-index materialization model as tools/regenerate_manifest.py.
+    if ($relative -eq "RELEASE_METADATA.json") {
+        [System.IO.File]::Copy(
+            [System.IO.Path]::GetFullPath($source),
+            [System.IO.Path]::GetFullPath($destination),
+            $true
+        )
+    }
+    else {
+        Write-GitCheckoutMaterialized `
+            -RelativePath $relative `
+            -Destination $destination
+    }
 
     if (-not (Test-Path $destination -PathType Leaf)) {
         throw "PACKAGE_MATERIALIZATION_MISSING: $relative"
@@ -241,13 +338,13 @@ foreach ($item in $manifest.files) {
     }
 }
 
-# El manifest mismo forma parte del paquete aunque no se liste a sí mismo.
+# El manifest mismo forma parte del paquete aunque no se liste a sÃ­ mismo.
 Copy-Item `
     $ManifestPath `
     (Join-Path $stageRoot "MANIFEST_SHA256.json") `
     -Force
 
-# Archivos de entrada necesarios para instalación/operación.
+# Archivos de entrada necesarios para instalaciÃ³n/operaciÃ³n.
 $requiredRootFiles = @(
     "INSTALAR_IA_EMPRESARIAL_LOCAL.bat",
     "InstalarLimpio.ps1",
