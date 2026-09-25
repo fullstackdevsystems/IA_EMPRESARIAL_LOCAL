@@ -1,5 +1,5 @@
 {
-  "version": "r10.28",
+  "version": "r10.29",
   "files": [
     {
       "path": "DESINSTALAR_IA_EMPRESARIAL_LOCAL.bat",
@@ -558,7 +558,7 @@
     },
     {
       "path": "RELEASE_METADATA.json",
-      "sha256": "9871cd2f3ba9ea32e771b3836a88b9892606d3263e393e95559a2de1a10aa4c5",
+      "sha256": "6c1424c5d92bbff0e23a2624bdbec80a0bf56367e8bfa660e84bf6d8babe97f1",
       "size": 154
     },
     {
