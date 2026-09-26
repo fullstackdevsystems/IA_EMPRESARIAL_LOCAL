@@ -910,9 +910,32 @@ def install_enterprise_routes(app, root: str | Path):
         ):
             return None
 
+        analytics = (
+            getattr(
+                components,
+                "analytics",
+                None,
+            )
+            or getattr(
+                components,
+                "analytic_rules",
+                None,
+            )
+        )
+
+        analytic_bindings = (
+            analytics.applicable_bindings(
+                principal
+            )
+            if analytics is not None
+            else []
+        )
+
         return connected_sql_bridge.resolve(
             scope=data_connection_scope(principal),
             question=question,
+            analytic_bindings=
+                analytic_bindings,
         )
 
     components.service.connected_sql_resolver = resolve_connected_sql
