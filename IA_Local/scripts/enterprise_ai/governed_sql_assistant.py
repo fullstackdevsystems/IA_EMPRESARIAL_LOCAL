@@ -4,6 +4,7 @@ import ast
 import re
 import time
 import unicodedata
+from datetime import date, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from enterprise_agent_orchestrator import answer_enterprise_question_orchestrated
@@ -12,6 +13,7 @@ from enterprise_sql_gateway import EnterpriseSqlError, EnterpriseSqlExecutor
 
 R10_24C2_GOVERNED_SQL_ASSISTANT_VERSION = "r10.24c2.1"
 R10_30_GOVERNED_ROW_FILTER_VERSION = "r10.30-row-filter-v1"
+R10_31_SEMANTIC_ANALYTICS_VERSION = "r10.31-semantic-plan-v1"
 
 _IDENTIFIER = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$"
@@ -43,6 +45,149 @@ _CONNECTED_CUES = (
 )
 
 
+class SemanticAnalyticsPlan:
+    """Governed semantic plan. It contains no SQL."""
+
+    def __init__(
+        self,
+        *,
+        domain: str,
+        entity: str,
+        operation: str,
+        metric: str,
+        direction: str,
+        limit: int = 10,
+        period: Optional[
+            Dict[str, Any]
+        ] = None,
+    ) -> None:
+        self.domain = domain
+        self.entity = entity
+        self.operation = operation
+        self.metric = metric
+        self.direction = direction
+        self.limit = int(limit)
+        self.period = (
+            dict(period)
+            if period is not None
+            else None
+        )
+
+    def as_dict(self) -> Dict[str, Any]:
+        output = {
+            "version":
+                R10_31_SEMANTIC_ANALYTICS_VERSION,
+            "domain":
+                self.domain,
+            "entity":
+                self.entity,
+            "operation":
+                self.operation,
+            "metric":
+                self.metric,
+            "direction":
+                self.direction,
+            "limit":
+                self.limit,
+        }
+
+        if self.period is not None:
+            output["period"] = dict(
+                self.period
+            )
+
+        return output
+
+
+class SemanticAnalyticsPlanner:
+    """Constrained natural-language to business-plan mapper."""
+
+    @staticmethod
+    def plan(
+        question: str,
+    ) -> Optional[SemanticAnalyticsPlan]:
+        normalized = _norm(
+            question
+        )
+
+        seller_cue = any(
+            cue in normalized
+            for cue in (
+                "persona",
+                "vendedor",
+                "vendedora",
+                "vendedores",
+                "vendedoras",
+                "quien",
+                "quienes",
+            )
+        )
+
+        sales_cue = any(
+            cue in normalized
+            for cue in (
+                "vendido",
+                "vendio",
+                "vendieron",
+                "vende",
+                "venden",
+                "ventas",
+            )
+        )
+
+        ranking_cue = any(
+            cue in normalized
+            for cue in (
+                "mas vendido",
+                "vendido mas",
+                "vendio mas",
+                "vendieron mas",
+                "vende mas",
+                "venden mas",
+                "mas ventas",
+                "mayor venta",
+                "mayores ventas",
+                "mejor vendedor",
+                "mejor vendedora",
+            )
+        )
+
+        if (
+            seller_cue
+            and sales_cue
+            and ranking_cue
+        ):
+            cardinality = (
+                _ranking_cardinality_hint(
+                    question
+                )
+            )
+
+            if (
+                cardinality is not None
+                and (
+                    cardinality < 1
+                    or cardinality > 50
+                )
+            ):
+                return None
+
+            return SemanticAnalyticsPlan(
+                domain="sales",
+                entity="seller",
+                operation="ranking",
+                metric="sales_amount",
+                direction="desc",
+                limit=(
+                    cardinality
+                    if cardinality is not None
+                    else 10
+                ),
+            )
+
+        return None
+
+
 def _norm(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(
@@ -50,6 +195,84 @@ def _norm(value: Any) -> str:
         if not unicodedata.combining(char)
     )
     return re.sub(r"\s+", " ", text.lower()).strip()
+
+
+def _ranking_cardinality_hint(
+    question: str,
+) -> Optional[int]:
+    normalized = _norm(question)
+
+    if not normalized:
+        return None
+
+    ranking_entity = (
+        r"(?:vendedor(?:es)?|vendedora(?:s)?|persona(?:s)?|"
+        r"cliente(?:s)?|sucursal(?:es)?|sede(?:s)?|tienda(?:s)?|"
+        r"producto(?:s)?|articulo(?:s)?)"
+    )
+
+    singular_entity = (
+        r"(?:vendedor|vendedora|persona|cliente|sucursal|"
+        r"sede|tienda|producto|articulo)"
+    )
+
+    explicit_patterns = (
+        r"\btop\s+(\d{1,3})\b",
+        r"\b(?:los|las)\s+(\d{1,3})\s+"
+        + ranking_entity
+        + r"\b",
+        r"\b(\d{1,3})\s+"
+        + ranking_entity
+        + r"\b",
+    )
+
+    for pattern in explicit_patterns:
+        match = re.search(
+            pattern,
+            normalized,
+        )
+
+        if match:
+            return int(
+                match.group(1)
+            )
+
+    singular_subject = (
+        re.search(
+            (
+                r"\b(?:que|cual)\s+"
+                + singular_entity
+                + r"\b"
+            ),
+            normalized,
+        )
+        or re.search(
+            (
+                r"\bcual\s+es\s+(?:el|la)\s+"
+                + singular_entity
+                + r"\b"
+            ),
+            normalized,
+        )
+    )
+
+    singular_superlative = re.search(
+        r"\b(?:el|la)\s+(?:mayor|menor|mejor|peor)\b",
+        normalized,
+    )
+
+    singular_comparative = re.search(
+        r"\b(?:mas|menos)\b",
+        normalized,
+    )
+
+    if singular_subject and (
+        singular_superlative
+        or singular_comparative
+    ):
+        return 1
+
+    return None
 
 
 def _safe_table(value: Any) -> Optional[str]:
@@ -65,9 +288,436 @@ class GovernedSqlAssistantBridge:
         *,
         store: Any,
         provider_factory: Callable[[], Any],
+        semantic_plan_resolver: Optional[
+            Callable[
+                [str],
+                Optional[Dict[str, Any]],
+            ]
+        ] = None,
     ) -> None:
         self.store = store
         self.provider_factory = provider_factory
+        self.semantic_plan_resolver = (
+            semantic_plan_resolver
+        )
+
+    @staticmethod
+    def _validated_period(
+        payload: Any,
+    ) -> Optional[Dict[str, str]]:
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            return None
+
+        kind = str(
+            payload.get("kind")
+            or ""
+        ).strip().lower()
+
+        try:
+            if kind == "month":
+                if set(payload.keys()) != {
+                    "kind",
+                    "year",
+                    "month",
+                }:
+                    return None
+
+                year = payload.get(
+                    "year"
+                )
+
+                month = payload.get(
+                    "month"
+                )
+
+                if (
+                    isinstance(year, bool)
+                    or isinstance(month, bool)
+                    or not isinstance(year, int)
+                    or not isinstance(month, int)
+                ):
+                    return None
+
+                if (
+                    year < 1900
+                    or year > 9998
+                    or month < 1
+                    or month > 12
+                ):
+                    return None
+
+                start = date(
+                    year,
+                    month,
+                    1,
+                )
+
+                if month == 12:
+                    end = date(
+                        year + 1,
+                        1,
+                        1,
+                    )
+                else:
+                    end = date(
+                        year,
+                        month + 1,
+                        1,
+                    )
+
+            elif kind == "year":
+                if set(payload.keys()) != {
+                    "kind",
+                    "year",
+                }:
+                    return None
+
+                year = payload.get(
+                    "year"
+                )
+
+                if (
+                    isinstance(year, bool)
+                    or not isinstance(year, int)
+                    or year < 1900
+                    or year > 9998
+                ):
+                    return None
+
+                start = date(
+                    year,
+                    1,
+                    1,
+                )
+
+                end = date(
+                    year + 1,
+                    1,
+                    1,
+                )
+
+            elif kind == "range":
+                if set(payload.keys()) != {
+                    "kind",
+                    "start",
+                    "end",
+                }:
+                    return None
+
+                start = date.fromisoformat(
+                    str(
+                        payload.get(
+                            "start"
+                        )
+                        or ""
+                    )
+                )
+
+                inclusive_end = (
+                    date.fromisoformat(
+                        str(
+                            payload.get(
+                                "end"
+                            )
+                            or ""
+                        )
+                    )
+                )
+
+                if inclusive_end < start:
+                    return None
+
+                end = (
+                    inclusive_end
+                    + timedelta(days=1)
+                )
+
+            else:
+                return None
+
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+        ):
+            return None
+
+        return {
+            "kind":
+                kind,
+            "start":
+                start.isoformat(),
+            "end_exclusive":
+                end.isoformat(),
+        }
+
+    @staticmethod
+    def _time_period_hint(
+        question: str,
+    ) -> bool:
+        normalized = _norm(
+            question
+        )
+
+        if re.search(
+            r"\b(?:19|20)\d{2}\b",
+            normalized,
+        ):
+            return True
+
+        if re.search(
+            r"\b\d{4}-\d{2}-\d{2}\b",
+            normalized,
+        ):
+            return True
+
+        month_names = (
+            "enero",
+            "febrero",
+            "marzo",
+            "abril",
+            "mayo",
+            "junio",
+            "julio",
+            "agosto",
+            "septiembre",
+            "octubre",
+            "noviembre",
+            "diciembre",
+        )
+
+        month_pattern = (
+            r"\b(?:"
+            + "|".join(
+                month_names
+            )
+            + r")\b"
+        )
+
+        if re.search(
+            month_pattern,
+            normalized,
+        ):
+            return True
+
+        relative_period_cues = (
+            "este mes",
+            "mes pasado",
+            "mes anterior",
+            "este ano",
+            "ano pasado",
+            "ano anterior",
+            "este trimestre",
+            "trimestre pasado",
+            "esta semana",
+            "semana pasada",
+            "semana anterior",
+            "hoy",
+            "ayer",
+            "periodo",
+        )
+
+        return any(
+            cue in normalized
+            for cue in relative_period_cues
+        )
+
+    @staticmethod
+    def _validated_external_semantic_plan(
+        payload: Any,
+        question: str = "",
+    ) -> Optional[SemanticAnalyticsPlan]:
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            return None
+
+        # limit is a bounded presentation parameter, not
+        # semantic or SQL authority. A local model may omit it.
+        # Recover cardinality only from explicit ranking counts
+        # or an unambiguous singular ranking request.
+        question_limit = (
+            _ranking_cardinality_hint(
+                question
+            )
+        )
+
+        if "limit" not in payload:
+            payload = dict(payload)
+            payload["limit"] = (
+                question_limit
+                if question_limit is not None
+                else 10
+            )
+
+        required_keys = {
+            "domain",
+            "entity",
+            "operation",
+            "metric",
+            "direction",
+            "limit",
+        }
+
+        supported_present = (
+            "supported"
+            in payload
+        )
+
+        if supported_present:
+            supported_value = (
+                payload.get(
+                    "supported"
+                )
+            )
+
+            if supported_value is not True:
+                return None
+
+        payload_keys = set(
+            payload.keys()
+        )
+
+        payload_keys.discard(
+            "supported"
+        )
+
+        allowed_without_period = (
+            required_keys
+        )
+
+        allowed_with_period = (
+            required_keys
+            | {
+                "period",
+            }
+        )
+
+        if payload_keys not in {
+            frozenset(
+                allowed_without_period
+            ),
+            frozenset(
+                allowed_with_period
+            ),
+        }:
+            return None
+
+        domain = str(
+            payload.get("domain")
+            or ""
+        ).strip().lower()
+
+        entity = str(
+            payload.get("entity")
+            or ""
+        ).strip().lower()
+
+        operation = str(
+            payload.get("operation")
+            or ""
+        ).strip().lower()
+
+        metric = str(
+            payload.get("metric")
+            or ""
+        ).strip().lower()
+
+        direction = str(
+            payload.get("direction")
+            or ""
+        ).strip().lower()
+
+        limit = payload.get(
+            "limit"
+        )
+
+        if isinstance(
+            limit,
+            bool,
+        ):
+            return None
+
+        if not isinstance(
+            limit,
+            int,
+        ):
+            return None
+
+        if limit < 1 or limit > 50:
+            return None
+
+        if question_limit is not None:
+            if (
+                question_limit < 1
+                or question_limit > 50
+            ):
+                return None
+
+            limit = question_limit
+
+        supported_metrics = {
+            "seller": {
+                "sales_amount",
+                "transaction_count",
+            },
+            "customer": {
+                "sales_amount",
+                "transaction_count",
+            },
+            "branch": {
+                "sales_amount",
+                "transaction_count",
+            },
+            "product": {
+                "sales_amount",
+                "quantity",
+            },
+        }
+
+        supported = (
+            domain == "sales"
+            and operation == "ranking"
+            and entity in supported_metrics
+            and metric
+            in supported_metrics[entity]
+            and direction in {
+                "asc",
+                "desc",
+            }
+        )
+
+        if not supported:
+            return None
+
+        period = None
+
+        if "period" in payload:
+            period = (
+                GovernedSqlAssistantBridge
+                ._validated_period(
+                    payload.get(
+                        "period"
+                    )
+                )
+            )
+
+            if period is None:
+                return None
+
+        return SemanticAnalyticsPlan(
+            domain=domain,
+            entity=entity,
+            operation=operation,
+            metric=metric,
+            direction=direction,
+            limit=limit,
+            period=period,
+        )
 
     @staticmethod
     def _count_intent(question: str) -> bool:
@@ -160,6 +810,158 @@ class GovernedSqlAssistantBridge:
             output[_norm(name)] = name
 
         return output
+
+    @classmethod
+    def _semantic_analytics_objects(
+        cls,
+        objects: List[Dict[str, Any]],
+        entity: str,
+    ) -> Optional[Dict[str, Any]]:
+        sales_candidates = []
+        customer_candidates = []
+        product_candidates = []
+        detail_candidates = []
+
+        for item in objects:
+            schema = str(
+                item.get("schema")
+                or ""
+            ).strip()
+
+            name = str(
+                item.get("name")
+                or ""
+            ).strip()
+
+            if not _safe_table(
+                f"{schema}.{name}"
+            ):
+                continue
+
+            columns = (
+                cls._metadata_column_map(
+                    item
+                )
+            )
+
+            if {
+                "ventaid",
+                "estatus",
+                "total",
+                "clienteid",
+                "vendedor",
+                "sucursal",
+            }.issubset(columns):
+                sales_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "clienteid",
+                "nombre",
+            }.issubset(columns):
+                customer_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "productoid",
+                "nombre",
+            }.issubset(columns):
+                product_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "ventaid",
+                "productoid",
+                "cantidad",
+                "importe",
+            }.issubset(columns):
+                detail_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+        if len(sales_candidates) != 1:
+            return None
+
+        sales_item, sales_columns = (
+            sales_candidates[0]
+        )
+
+        if entity in {
+            "seller",
+            "branch",
+        }:
+            return {
+                "sales":
+                    sales_item,
+                "sales_columns":
+                    sales_columns,
+            }
+
+        if entity == "customer":
+            if len(customer_candidates) != 1:
+                return None
+
+            customer_item, customer_columns = (
+                customer_candidates[0]
+            )
+
+            return {
+                "sales":
+                    sales_item,
+                "sales_columns":
+                    sales_columns,
+                "customer":
+                    customer_item,
+                "customer_columns":
+                    customer_columns,
+            }
+
+        if entity == "product":
+            if (
+                len(product_candidates) != 1
+                or len(detail_candidates) != 1
+            ):
+                return None
+
+            product_item, product_columns = (
+                product_candidates[0]
+            )
+
+            detail_item, detail_columns = (
+                detail_candidates[0]
+            )
+
+            return {
+                "sales":
+                    sales_item,
+                "sales_columns":
+                    sales_columns,
+                "product":
+                    product_item,
+                "product_columns":
+                    product_columns,
+                "detail":
+                    detail_item,
+                "detail_columns":
+                    detail_columns,
+            }
+
+        return None
 
     @classmethod
     def _top_products_objects(
@@ -807,6 +1609,18 @@ class GovernedSqlAssistantBridge:
             List[Dict[str, Any]]
         ] = None,
     ) -> Optional[Dict[str, Any]]:
+        semantic_plan = (
+            SemanticAnalyticsPlanner.plan(
+                question
+            )
+        )
+
+        semantic_plan_source = (
+            "deterministic"
+            if semantic_plan is not None
+            else None
+        )
+
         top_products_intent = (
             self._top_products_intent(
                 question
@@ -819,8 +1633,102 @@ class GovernedSqlAssistantBridge:
             )
         )
 
+        temporal_hint = (
+            self._time_period_hint(
+                question
+            )
+        )
+
+        semantic_enrichment_required = (
+            temporal_hint
+            and (
+                semantic_plan is not None
+                or top_products_intent
+                or count_intent
+            )
+        )
+
         if (
-            not top_products_intent
+            semantic_enrichment_required
+            and not callable(
+                self.semantic_plan_resolver
+            )
+        ):
+            return None
+
+        should_resolve_semantics = (
+            callable(
+                self.semantic_plan_resolver
+            )
+            and (
+                semantic_enrichment_required
+                or (
+                    semantic_plan is None
+                    and not top_products_intent
+                    and not count_intent
+                )
+            )
+        )
+
+        if should_resolve_semantics:
+            try:
+                proposed_plan = (
+                    self.semantic_plan_resolver(
+                        question
+                    )
+                )
+            except Exception:
+                return None
+
+            resolved_plan = (
+                self._validated_external_semantic_plan(
+                    proposed_plan,
+                    question,
+                )
+            )
+
+            if resolved_plan is None:
+                return None
+
+            if (
+                semantic_enrichment_required
+                and resolved_plan.period
+                is None
+            ):
+                return None
+
+            semantic_plan = (
+                resolved_plan
+            )
+
+            semantic_plan_source = (
+                "llm_structured"
+            )
+
+        semantic_ranking_intent = (
+            semantic_plan is not None
+            and semantic_plan.domain == "sales"
+            and semantic_plan.operation == "ranking"
+            and semantic_plan.entity in {
+                "seller",
+                "customer",
+                "branch",
+                "product",
+            }
+            and semantic_plan.metric in {
+                "sales_amount",
+                "transaction_count",
+                "quantity",
+            }
+            and semantic_plan.direction in {
+                "asc",
+                "desc",
+            }
+        )
+
+        if (
+            not semantic_ranking_intent
+            and not top_products_intent
             and not count_intent
         ):
             return None
@@ -841,6 +1749,7 @@ class GovernedSqlAssistantBridge:
         table = None
         state = "NO_MATCH"
         executor = None
+        semantic_context = None
         top_context = None
         governed_filter = {
             "sql": "",
@@ -849,7 +1758,76 @@ class GovernedSqlAssistantBridge:
             "compiler": None,
         }
 
-        if top_products_intent:
+        if semantic_ranking_intent:
+            matches = []
+
+            for candidate_profile in profiles:
+                connection_id = str(
+                    candidate_profile.get(
+                        "connection_id"
+                    )
+                    or ""
+                ).strip()
+
+                if not connection_id:
+                    continue
+
+                try:
+                    candidate_executor = (
+                        EnterpriseSqlExecutor(
+                            self.store,
+                            self.provider_factory(),
+                        )
+                    )
+
+                    discovery = (
+                        candidate_executor.discover(
+                            scope,
+                            connection_id,
+                        )
+                    )
+                except EnterpriseSqlError:
+                    continue
+
+                relational = (
+                    self._semantic_analytics_objects(
+                        list(
+                            discovery.get(
+                                "objects"
+                            )
+                            or []
+                        ),
+                        semantic_plan.entity,
+                    )
+                )
+
+                if relational is None:
+                    continue
+
+                matches.append(
+                    (
+                        candidate_profile,
+                        candidate_executor,
+                        relational,
+                    )
+                )
+
+            if len(matches) == 1:
+                (
+                    profile,
+                    executor,
+                    semantic_context,
+                ) = matches[0]
+
+                state = "MATCHED"
+
+            elif len(matches) > 1:
+                state = "AMBIGUOUS"
+
+            else:
+                return None
+
+        elif top_products_intent:
             matches = []
 
             for candidate_profile in profiles:
@@ -991,7 +1969,581 @@ class GovernedSqlAssistantBridge:
         resource = ""
         analytic_kind = "count"
 
-        if top_products_intent:
+        if semantic_ranking_intent:
+            if (
+                executor is None
+                or semantic_context is None
+                or semantic_plan is None
+            ):
+                return None
+
+            sales_item = (
+                semantic_context[
+                    "sales"
+                ]
+            )
+
+            sales_columns = (
+                semantic_context[
+                    "sales_columns"
+                ]
+            )
+
+            sales_schema = str(
+                sales_item.get(
+                    "schema"
+                )
+                or ""
+            )
+
+            sales_table = str(
+                sales_item.get(
+                    "name"
+                )
+                or ""
+            )
+
+            try:
+                compiled_filter = (
+                    self._compile_sales_row_filters(
+                        analytic_bindings,
+                        sales_columns,
+                    )
+                    if analytic_bindings
+                    is not None
+                    else None
+                )
+            except ValueError as exc:
+                return self._business_semantics_blocked(
+                    started=started,
+                    reason=str(exc),
+                )
+
+            if (
+                analytic_bindings is not None
+                and compiled_filter is None
+            ):
+                return self._business_semantics_blocked(
+                    started=started,
+                    reason=(
+                        "NO_VALIDATED_SALES_VALID_ROW_FILTER"
+                    ),
+                )
+
+            if compiled_filter is not None:
+                governed_filter = (
+                    compiled_filter
+                )
+
+            if (
+                semantic_plan.period
+                is not None
+            ):
+                sales_date_column = (
+                    sales_columns.get(
+                        "fechaventa"
+                    )
+                )
+
+                if not sales_date_column:
+                    return None
+
+                period_sql = (
+                    f"v.[{sales_date_column}] "
+                    ">= ? AND "
+                    f"v.[{sales_date_column}] "
+                    "< ?"
+                )
+
+                existing_sql = str(
+                    governed_filter.get(
+                        "sql"
+                    )
+                    or ""
+                ).strip()
+
+                if existing_sql:
+                    governed_filter["sql"] = (
+                        "("
+                        + existing_sql
+                        + ") AND ("
+                        + period_sql
+                        + ")"
+                    )
+                else:
+                    governed_filter["sql"] = (
+                        period_sql
+                    )
+
+                period_parameters = [
+                    semantic_plan.period[
+                        "start"
+                    ],
+                    semantic_plan.period[
+                        "end_exclusive"
+                    ],
+                ]
+
+                governed_filter[
+                    "parameters"
+                ] = (
+                    list(
+                        governed_filter.get(
+                            "parameters"
+                        )
+                        or []
+                    )
+                    + period_parameters
+                )
+
+            filter_clause = (
+                (
+                    "WHERE "
+                    + str(
+                        governed_filter.get(
+                            "sql"
+                        )
+                        or ""
+                    )
+                    + " "
+                )
+                if governed_filter.get(
+                    "sql"
+                )
+                else ""
+            )
+
+            direction_sql = (
+                "ASC"
+                if semantic_plan.direction
+                == "asc"
+                else "DESC"
+            )
+
+            limit = (
+                semantic_plan.limit
+            )
+
+            entity = (
+                semantic_plan.entity
+            )
+
+            metric = (
+                semantic_plan.metric
+            )
+
+            if entity == "seller":
+                dimension_column = (
+                    sales_columns[
+                        "vendedor"
+                    ]
+                )
+
+                dimension_sql = (
+                    f"v.[{dimension_column}]"
+                )
+
+                dimension_alias = (
+                    "Vendedor"
+                )
+
+                from_sql = (
+                    f"FROM "
+                    f"[{sales_schema}]"
+                    f".[{sales_table}] "
+                    "AS v "
+                )
+
+                if metric == "sales_amount":
+                    measure_sql = (
+                        f"SUM(v.["
+                        f"{sales_columns['total']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "ImporteVendido"
+                    )
+
+                elif metric == "transaction_count":
+                    measure_sql = (
+                        f"COUNT(v.["
+                        f"{sales_columns['ventaid']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "Operaciones"
+                    )
+
+                else:
+                    return None
+
+                group_sql = (
+                    dimension_sql
+                )
+
+                resource = (
+                    f"{sales_schema}."
+                    f"{sales_table}"
+                )
+
+            elif entity == "branch":
+                dimension_column = (
+                    sales_columns[
+                        "sucursal"
+                    ]
+                )
+
+                dimension_sql = (
+                    f"v.[{dimension_column}]"
+                )
+
+                dimension_alias = (
+                    "Sucursal"
+                )
+
+                from_sql = (
+                    f"FROM "
+                    f"[{sales_schema}]"
+                    f".[{sales_table}] "
+                    "AS v "
+                )
+
+                if metric == "sales_amount":
+                    measure_sql = (
+                        f"SUM(v.["
+                        f"{sales_columns['total']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "ImporteVendido"
+                    )
+
+                elif metric == "transaction_count":
+                    measure_sql = (
+                        f"COUNT(v.["
+                        f"{sales_columns['ventaid']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "Operaciones"
+                    )
+
+                else:
+                    return None
+
+                group_sql = (
+                    dimension_sql
+                )
+
+                resource = (
+                    f"{sales_schema}."
+                    f"{sales_table}"
+                )
+
+            elif entity == "customer":
+                customer_item = (
+                    semantic_context[
+                        "customer"
+                    ]
+                )
+
+                customer_columns = (
+                    semantic_context[
+                        "customer_columns"
+                    ]
+                )
+
+                customer_schema = str(
+                    customer_item.get(
+                        "schema"
+                    )
+                    or ""
+                )
+
+                customer_table = str(
+                    customer_item.get(
+                        "name"
+                    )
+                    or ""
+                )
+
+                customer_name = (
+                    customer_columns[
+                        "nombre"
+                    ]
+                )
+
+                customer_id = (
+                    customer_columns[
+                        "clienteid"
+                    ]
+                )
+
+                sales_customer_id = (
+                    sales_columns[
+                        "clienteid"
+                    ]
+                )
+
+                dimension_sql = (
+                    f"c.[{customer_name}]"
+                )
+
+                dimension_alias = (
+                    "Cliente"
+                )
+
+                from_sql = (
+                    f"FROM "
+                    f"[{sales_schema}]"
+                    f".[{sales_table}] "
+                    "AS v "
+                    f"JOIN "
+                    f"[{customer_schema}]"
+                    f".[{customer_table}] "
+                    "AS c "
+                    f"ON c.[{customer_id}] "
+                    f"= "
+                    f"v.[{sales_customer_id}] "
+                )
+
+                if metric == "sales_amount":
+                    measure_sql = (
+                        f"SUM(v.["
+                        f"{sales_columns['total']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "ImporteVendido"
+                    )
+
+                elif metric == "transaction_count":
+                    measure_sql = (
+                        f"COUNT(v.["
+                        f"{sales_columns['ventaid']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "Operaciones"
+                    )
+
+                else:
+                    return None
+
+                group_sql = (
+                    f"c.[{customer_id}], "
+                    f"{dimension_sql}"
+                )
+
+                resource = (
+                    f"{sales_schema}."
+                    f"{sales_table},"
+                    f"{customer_schema}."
+                    f"{customer_table}"
+                )
+
+            elif entity == "product":
+                product_item = (
+                    semantic_context[
+                        "product"
+                    ]
+                )
+
+                product_columns = (
+                    semantic_context[
+                        "product_columns"
+                    ]
+                )
+
+                detail_item = (
+                    semantic_context[
+                        "detail"
+                    ]
+                )
+
+                detail_columns = (
+                    semantic_context[
+                        "detail_columns"
+                    ]
+                )
+
+                product_schema = str(
+                    product_item.get(
+                        "schema"
+                    )
+                    or ""
+                )
+
+                product_table = str(
+                    product_item.get(
+                        "name"
+                    )
+                    or ""
+                )
+
+                detail_schema = str(
+                    detail_item.get(
+                        "schema"
+                    )
+                    or ""
+                )
+
+                detail_table = str(
+                    detail_item.get(
+                        "name"
+                    )
+                    or ""
+                )
+
+                product_name = (
+                    product_columns[
+                        "nombre"
+                    ]
+                )
+
+                product_id = (
+                    product_columns[
+                        "productoid"
+                    ]
+                )
+
+                detail_product_id = (
+                    detail_columns[
+                        "productoid"
+                    ]
+                )
+
+                detail_sale_id = (
+                    detail_columns[
+                        "ventaid"
+                    ]
+                )
+
+                sales_sale_id = (
+                    sales_columns[
+                        "ventaid"
+                    ]
+                )
+
+                dimension_sql = (
+                    f"p.[{product_name}]"
+                )
+
+                dimension_alias = (
+                    "Producto"
+                )
+
+                from_sql = (
+                    f"FROM "
+                    f"[{detail_schema}]"
+                    f".[{detail_table}] "
+                    "AS d "
+                    f"JOIN "
+                    f"[{product_schema}]"
+                    f".[{product_table}] "
+                    "AS p "
+                    f"ON p.[{product_id}] "
+                    f"= "
+                    f"d.[{detail_product_id}] "
+                    f"JOIN "
+                    f"[{sales_schema}]"
+                    f".[{sales_table}] "
+                    "AS v "
+                    f"ON v.[{sales_sale_id}] "
+                    f"= "
+                    f"d.[{detail_sale_id}] "
+                )
+
+                if metric == "quantity":
+                    measure_sql = (
+                        f"SUM(d.["
+                        f"{detail_columns['cantidad']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "CantidadVendida"
+                    )
+
+                elif metric == "sales_amount":
+                    measure_sql = (
+                        f"SUM(d.["
+                        f"{detail_columns['importe']}"
+                        f"])"
+                    )
+
+                    measure_alias = (
+                        "ImporteVendido"
+                    )
+
+                else:
+                    return None
+
+                group_sql = (
+                    f"p.[{product_id}], "
+                    f"{dimension_sql}"
+                )
+
+                resource = (
+                    f"{detail_schema}."
+                    f"{detail_table},"
+                    f"{product_schema}."
+                    f"{product_table},"
+                    f"{sales_schema}."
+                    f"{sales_table}"
+                )
+
+            else:
+                return None
+
+            query_plan = {
+                "operation": "SELECT",
+                "sql": (
+                    f"SELECT TOP ({limit}) "
+                    f"{dimension_sql} "
+                    f"AS [{dimension_alias}], "
+                    f"{measure_sql} "
+                    f"AS [{measure_alias}] "
+                    f"{from_sql}"
+                    f"{filter_clause}"
+                    f"GROUP BY "
+                    f"{group_sql} "
+                    f"ORDER BY "
+                    f"{measure_sql} "
+                    f"{direction_sql}, "
+                    f"{dimension_sql} "
+                    "ASC"
+                ),
+                "parameters": list(
+                    governed_filter.get(
+                        "parameters"
+                    )
+                    or []
+                ),
+                "limit":
+                    limit,
+                "timeout_seconds": int(
+                    profile.get(
+                        "timeout_seconds"
+                    )
+                    or 30
+                ),
+            }
+
+            analytic_kind = (
+                "ranking_"
+                + entity
+                + "_by_"
+                + metric
+            )
+
+        elif top_products_intent:
             if (
                 executor is None
                 or top_context is None
@@ -1346,7 +2898,115 @@ class GovernedSqlAssistantBridge:
             payload.get("rows") or []
         )
 
-        if top_products_intent:
+        if semantic_ranking_intent:
+
+            if not rows:
+                answer = (
+                    "No se encontraron "
+                    "datos válidos para "
+                    "construir el ranking."
+                )
+
+            else:
+                labels = {
+                    "seller":
+                        "Vendedores",
+                    "customer":
+                        "Clientes",
+                    "branch":
+                        "Sucursales",
+                    "product":
+                        "Productos",
+                }
+
+                metric_labels = {
+                    "sales_amount":
+                        "importe vendido",
+                    "transaction_count":
+                        "número de operaciones",
+                    "quantity":
+                        "cantidad vendida",
+                }
+
+                direction_label = (
+                    "menor a mayor"
+                    if semantic_plan.direction
+                    == "asc"
+                    else
+                    "mayor a menor"
+                )
+
+                output = [
+                    (
+                        labels.get(
+                            semantic_plan.entity,
+                            "Resultados",
+                        )
+                        + " por "
+                        + metric_labels.get(
+                            semantic_plan.metric,
+                            semantic_plan.metric,
+                        )
+                        + " ("
+                        + direction_label
+                        + "):"
+                    )
+                ]
+
+                for index, row in enumerate(
+                    rows[
+                        :semantic_plan.limit
+                    ],
+                    start=1,
+                ):
+                    if not isinstance(
+                        row,
+                        (list, tuple),
+                    ):
+                        continue
+
+                    label = (
+                        str(row[0])
+                        if len(row) > 0
+                        else ""
+                    )
+
+                    value = (
+                        row[1]
+                        if len(row) > 1
+                        else None
+                    )
+
+                    detail = (
+                        f"{index}. {label}"
+                    )
+
+                    if value is not None:
+                        detail += (
+                            f": {value}"
+                        )
+
+                    if (
+                        semantic_plan.entity
+                        == "product"
+                        and len(row) > 2
+                    ):
+                        extra = row[2]
+
+                        if extra is not None:
+                            detail += (
+                                f"; {extra}"
+                            )
+
+                    output.append(
+                        detail
+                    )
+
+                answer = "\n".join(
+                    output
+                )
+
+        elif top_products_intent:
 
             if not rows:
                 answer = (
@@ -1496,7 +3156,31 @@ class GovernedSqlAssistantBridge:
             }
         )
 
-        if top_products_intent:
+        if semantic_plan is not None:
+            governance.update(
+                {
+                    "semantic_analytics_plan":
+                        semantic_plan.as_dict(),
+                    "semantic_planner":
+                        R10_31_SEMANTIC_ANALYTICS_VERSION,
+                    "semantic_plan_source":
+                        semantic_plan_source,
+                    "semantic_plan_validation_authority":
+                        "strict_allowlist",
+                    "llm_semantic_proposal":
+                        (
+                            semantic_plan_source
+                            == "llm_structured"
+                        ),
+                    "llm_semantic_planning_authority":
+                        False,
+                }
+            )
+
+        if (
+            top_products_intent
+            or semantic_ranking_intent
+        ):
             applied_rules = list(
                 governed_filter.get(
                     "rules"

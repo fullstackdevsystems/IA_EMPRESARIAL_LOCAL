@@ -893,9 +893,109 @@ def install_enterprise_routes(app, root: str | Path):
 
 
 
+    def resolve_semantic_analytics_plan(
+        question: str,
+    ):
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Eres un clasificador semántico empresarial. "
+                    "No generes SQL, nombres de tablas, nombres de "
+                    "columnas, joins, filtros SQL ni explicaciones. "
+                    "Devuelve únicamente JSON. "
+                    "Clasifica únicamente preguntas analíticas "
+                    "de ranking del dominio de ventas. "
+                    "Si corresponde, devuelve exactamente estas seis "
+                    "claves: domain, entity, operation, metric, "
+                    "direction, limit. "
+                    "Valores permitidos: domain=sales; "
+                    "entity=seller|customer|branch|product; "
+                    "operation=ranking; "
+                    "metric=sales_amount|transaction_count|quantity; "
+                    "direction=asc|desc; "
+                    "limit entero entre 1 y 50. "
+                    "Combinaciones válidas: seller admite "
+                    "sales_amount y transaction_count; customer admite "
+                    "sales_amount y transaction_count; branch admite "
+                    "sales_amount y transaction_count; product admite "
+                    "sales_amount y quantity. "
+                    "Ontología de entidades: seller representa una persona "
+                    "vendedora, vendedor, vendedora o integrante del equipo "
+                    "comercial; customer representa un cliente o comprador; "
+                    "branch representa una ubicación o unidad operativa, por "
+                    "ejemplo sucursal, sede, tienda, punto de venta o punto "
+                    "de operación; product representa un bien vendido, por "
+                    "ejemplo producto, artículo, mercancía o insumo. "
+                    "Regla de desambiguación: cuando el sujeto es una "
+                    "ubicación, sucursal, sede, tienda o punto operativo, "
+                    "elige branch. Elige product únicamente cuando el sujeto "
+                    "es un artículo o bien que se vende. "
+                    "Ontología de métricas: sales_amount representa "
+                    "importe monetario vendido, facturación, ingreso o dinero "
+                    "generado por ventas; transaction_count representa número "
+                    "de operaciones, ventas, tickets o transacciones; quantity "
+                    "representa cantidad física vendida, unidades, piezas, "
+                    "volumen vendido o volumen desplazado de productos. "
+                    "Ontología de ranking: expresiones como ordenar, clasificar, "
+                    "encabezar, mayor, menor, más, menos, mejor o peor dentro "
+                    "de una métrica solicitan operation=ranking. "
+                    "Para product, cuando la pregunta compare cantidad física, "
+                    "unidades o volumen desplazado usa metric=quantity; cuando "
+                    "compare facturación, importe, ingreso o dinero generado "
+                    "usa metric=sales_amount. "
+                    "Si la pregunta contiene un periodo temporal, agrega "
+                    "una séptima clave period. Formatos permitidos: "
+                    'month={kind:"month",year:YYYY,month:1-12}; '
+                    'year={kind:"year",year:YYYY}; '
+                    'range={kind:"range",start:"YYYY-MM-DD",'
+                    'end:"YYYY-MM-DD"}. '
+                    "En range, start y end representan fechas empresariales "
+                    "inclusivas. Si no existe periodo explícito, omite period. "
+                    "Nunca incluyas SQL, tablas, columnas o expresiones dentro "
+                    "de period. "
+                    "Interpreta sinónimos empresariales y lenguaje "
+                    "natural, pero no inventes dimensiones ni métricas. "
+                    "Si no corresponde a una combinación válida, devuelve "
+                    "un objeto JSON con supported=false. "
+                    "Nunca incluyas una clave sql."
+                ),
+            },
+            {
+                "role": "user",
+                "content": str(
+                    question
+                    or ""
+                ),
+            },
+        ]
+
+        raw, _semantic_llm_ms, _semantic_queue_ms = components.service._llm_chat_with_queue(
+            messages,
+            max_tokens=180,
+            num_ctx=2048,
+        )
+
+        try:
+            payload = json.loads(
+                str(raw or "")
+            )
+        except Exception:
+            return None
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            return None
+
+        return payload
+
     connected_sql_bridge = GovernedSqlAssistantBridge(
         store=enterprise_onboarding.sql,
         provider_factory=data_connection_provider,
+        semantic_plan_resolver=
+            resolve_semantic_analytics_plan,
     )
 
     def resolve_connected_sql(
