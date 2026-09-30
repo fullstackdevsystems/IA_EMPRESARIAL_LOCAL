@@ -14,6 +14,7 @@ from enterprise_sql_gateway import EnterpriseSqlError, EnterpriseSqlExecutor
 R10_24C2_GOVERNED_SQL_ASSISTANT_VERSION = "r10.24c2.1"
 R10_30_GOVERNED_ROW_FILTER_VERSION = "r10.30-row-filter-v1"
 R10_31_SEMANTIC_ANALYTICS_VERSION = "r10.31-semantic-plan-v1"
+R10_32_SALES_DETAIL_VERSION = "r10.32-sales-detail-v1"
 
 _IDENTIFIER = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$"
@@ -195,6 +196,474 @@ def _norm(value: Any) -> str:
         if not unicodedata.combining(char)
     )
     return re.sub(r"\s+", " ", text.lower()).strip()
+
+
+
+def _sales_detail_explicit_limit(
+    question: str,
+) -> Tuple[bool, Optional[int]]:
+    """Return explicit sales-detail limit and validity."""
+
+    normalized = _norm(
+        question
+    )
+
+    match = re.search(
+        r"\b(\d{1,9})\s+ventas?"
+        r"(?:\s+detalladas?)?\b",
+        normalized,
+    )
+
+    if match is None:
+        return (
+            False,
+            None,
+        )
+
+    value = int(
+        match.group(1)
+    )
+
+    if value < 1 or value > 500:
+        return (
+            True,
+            None,
+        )
+
+    return (
+        True,
+        value,
+    )
+
+
+def _sales_detail_period_payload(
+    question: str,
+) -> Optional[Dict[str, Any]]:
+    """Parse deterministic bounded sales-detail periods."""
+
+    normalized = _norm(
+        question
+    )
+
+    months = {
+        "enero": 1,
+        "febrero": 2,
+        "marzo": 3,
+        "abril": 4,
+        "mayo": 5,
+        "junio": 6,
+        "julio": 7,
+        "agosto": 8,
+        "septiembre": 9,
+        "octubre": 10,
+        "noviembre": 11,
+        "diciembre": 12,
+    }
+
+    month_pattern = (
+        r"\b("
+        + "|".join(
+            months.keys()
+        )
+        + r")"
+        + r"(?:\s+de)?\s+"
+        + r"((?:19|20)\d{2})\b"
+    )
+
+    match = re.search(
+        month_pattern,
+        normalized,
+    )
+
+    if match is not None:
+        return {
+            "kind": "month",
+            "year": int(
+                match.group(2)
+            ),
+            "month": months[
+                match.group(1)
+            ],
+        }
+
+    range_match = re.search(
+        (
+            r"\b(?:del|desde)\s+"
+            r"(\d{4}-\d{2}-\d{2})\s+"
+            r"(?:al|hasta)\s+"
+            r"(\d{4}-\d{2}-\d{2})\b"
+        ),
+        normalized,
+    )
+
+    if range_match is not None:
+        return {
+            "kind": "range",
+            "start":
+                range_match.group(1),
+            "end":
+                range_match.group(2),
+        }
+
+    today = date.today()
+
+    if "este mes" in normalized:
+        return {
+            "kind": "month",
+            "year": today.year,
+            "month": today.month,
+        }
+
+    if (
+        "mes pasado" in normalized
+        or "mes anterior" in normalized
+    ):
+        first_this_month = date(
+            today.year,
+            today.month,
+            1,
+        )
+
+        previous_day = (
+            first_this_month
+            - timedelta(days=1)
+        )
+
+        return {
+            "kind": "month",
+            "year":
+                previous_day.year,
+            "month":
+                previous_day.month,
+        }
+
+    if (
+        "este ano" in normalized
+    ):
+        return {
+            "kind": "year",
+            "year": today.year,
+        }
+
+    if (
+        "ano pasado" in normalized
+        or "ano anterior" in normalized
+    ):
+        return {
+            "kind": "year",
+            "year": today.year - 1,
+        }
+
+    year_match = re.search(
+        r"\b((?:19|20)\d{2})\b",
+        normalized,
+    )
+
+    if year_match is not None:
+        return {
+            "kind": "year",
+            "year": int(
+                year_match.group(1)
+            ),
+        }
+
+    return None
+
+
+def _sales_detail_seller(
+    question: str,
+) -> Tuple[bool, Optional[str]]:
+    """Extract an exact parameterized seller value when present."""
+
+    raw = re.sub(
+        r"\s+",
+        " ",
+        str(
+            question
+            or ""
+        ),
+    ).strip()
+
+    patterns = (
+        (
+            r"\bventas?"
+            r"(?:\s+detalladas?)?"
+            r"\s+de\s+(.+)$"
+        ),
+        (
+            r"\b(?:que\s+)?productos?"
+            r"\s+vend(?:io|ió)\s+(.+)$"
+        ),
+        (
+            r"\bproductos?\s+que\s+"
+            r"vend(?:io|ió)\s+(.+)$"
+        ),
+    )
+
+    match = None
+
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            raw,
+            flags=re.IGNORECASE,
+        )
+
+        if match is not None:
+            break
+
+    if match is None:
+        return (
+            False,
+            None,
+        )
+
+    candidate = (
+        match.group(1)
+        .strip()
+        .strip(" .,:")
+    )
+
+    month_suffix = (
+        r"\s+de\s+"
+        r"(?:enero|febrero|marzo|abril|mayo|junio|"
+        r"julio|agosto|septiembre|octubre|noviembre|diciembre)"
+        r"(?:\s+de)?\s+(?:19|20)\d{2}\s*$"
+    )
+
+    candidate = re.sub(
+        month_suffix,
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    relative_suffix = (
+        r"\s+(?:de\s+)?"
+        r"(?:este mes|mes pasado|mes anterior|"
+        r"este a(?:ñ|n)o|a(?:ñ|n)o pasado|a(?:ñ|n)o anterior)"
+        r"\s*$"
+    )
+
+    candidate = re.sub(
+        relative_suffix,
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    normalized_candidate = _norm(
+        candidate
+    )
+
+    period_only = (
+        normalized_candidate
+        in {
+            "este mes",
+            "mes pasado",
+            "mes anterior",
+            "este ano",
+            "ano pasado",
+            "ano anterior",
+        }
+        or bool(
+            re.fullmatch(
+                r"(?:19|20)\d{2}",
+                normalized_candidate,
+            )
+        )
+        or bool(
+            re.fullmatch(
+                (
+                    r"(?:enero|febrero|marzo|abril|mayo|junio|"
+                    r"julio|agosto|septiembre|octubre|noviembre|diciembre)"
+                    r"(?:\s+de)?\s+(?:19|20)\d{2}"
+                ),
+                normalized_candidate,
+            )
+        )
+    )
+
+    if period_only:
+        return (
+            False,
+            None,
+        )
+
+    if not candidate:
+        return (
+            False,
+            None,
+        )
+
+    unsafe_tokens = (
+        "--",
+        "/*",
+        "*/",
+        ";",
+        "=",
+        "\x00",
+    )
+
+    if any(
+        token in candidate
+        for token in unsafe_tokens
+    ):
+        return (
+            True,
+            None,
+        )
+
+    if len(candidate) > 80:
+        return (
+            True,
+            None,
+        )
+
+    if re.fullmatch(
+        (
+            r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]"
+            r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'\-]{0,79}"
+        ),
+        candidate,
+    ) is None:
+        return (
+            True,
+            None,
+        )
+
+    return (
+        True,
+        candidate,
+    )
+
+
+def _sales_detail_mode(
+    question: str,
+) -> Optional[str]:
+    """Choose deterministic sale-header or line-item mode."""
+
+    normalized = _norm(
+        question
+    )
+
+    sales_cue = bool(
+        re.search(
+            r"\bventas?\b",
+            normalized,
+        )
+    )
+
+    product_by_seller = bool(
+        re.search(
+            (
+                r"\b(?:que\s+)?productos?"
+                r"\s+vendio\b"
+            ),
+            normalized,
+        )
+        or re.search(
+            (
+                r"\bproductos?\s+que\s+"
+                r"vendio\b"
+            ),
+            normalized,
+        )
+    )
+
+    explicit_detail = any(
+        cue in normalized
+        for cue in (
+            "ventas detalladas",
+            "venta detallada",
+            "detalle de ventas",
+        )
+    )
+
+    explicit_line_fields = (
+        sales_cue
+        and "cliente" in normalized
+        and "producto" in normalized
+        and (
+            "cantidad" in normalized
+            or "importe" in normalized
+        )
+    )
+
+    if (
+        product_by_seller
+        or explicit_detail
+        or explicit_line_fields
+    ):
+        return "line_item"
+
+    if not sales_cue:
+        return None
+
+    simple_list = any(
+        cue in normalized
+        for cue in (
+            "lista de ventas",
+            "lista las ventas",
+            "listar ventas",
+        )
+    )
+
+    action_list = bool(
+        re.search(
+            (
+                r"\b(?:dame|muestrame|pasame)"
+                r"\s+(?:las\s+)?"
+                r"(?:\d+\s+)?ventas?\b"
+            ),
+            normalized,
+        )
+    )
+
+    (
+        seller_requested,
+        _,
+    ) = _sales_detail_seller(
+        question
+    )
+
+    period_requested = (
+        _sales_detail_period_payload(
+            question
+        )
+        is not None
+    )
+
+    (
+        limit_requested,
+        _,
+    ) = _sales_detail_explicit_limit(
+        question
+    )
+
+    if (
+        simple_list
+        or action_list
+        or seller_requested
+        or period_requested
+        or limit_requested
+    ):
+        return "sale"
+
+    return None
+
+
+def _sales_detail_intent(
+    question: str,
+) -> bool:
+    """Recognize deterministic governed sales-list requests."""
+
+    return (
+        _sales_detail_mode(
+            question
+        )
+        is not None
+    )
 
 
 def _ranking_cardinality_hint(
@@ -810,6 +1279,262 @@ class GovernedSqlAssistantBridge:
             output[_norm(name)] = name
 
         return output
+
+    @classmethod
+    def _sales_header_objects(
+        cls,
+        objects: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve only the metadata required for sale-header mode."""
+
+        sales_candidates = []
+        customer_candidates = []
+
+        for item in objects:
+            schema = str(
+                item.get("schema")
+                or ""
+            ).strip()
+
+            name = str(
+                item.get("name")
+                or ""
+            ).strip()
+
+            if not _safe_table(
+                f"{schema}.{name}"
+            ):
+                continue
+
+            columns = (
+                cls._metadata_column_map(
+                    item
+                )
+            )
+
+            if {
+                "ventaid",
+                "folio",
+                "clienteid",
+                "fechaventa",
+                "vendedor",
+                "sucursal",
+                "estatus",
+                "subtotal",
+                "iva",
+                "total",
+            }.issubset(columns):
+                sales_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "clienteid",
+                "nombre",
+            }.issubset(columns):
+                customer_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+        if (
+            len(sales_candidates) != 1
+            or len(customer_candidates) != 1
+        ):
+            return None
+
+        sales_item, sales_columns = (
+            sales_candidates[0]
+        )
+
+        customer_item, customer_columns = (
+            customer_candidates[0]
+        )
+
+        names = {
+            _norm(
+                f"{sales_item.get('schema')}."
+                f"{sales_item.get('name')}"
+            ),
+            _norm(
+                f"{customer_item.get('schema')}."
+                f"{customer_item.get('name')}"
+            ),
+        }
+
+        if len(names) != 2:
+            return None
+
+        return {
+            "sales":
+                sales_item,
+            "sales_columns":
+                sales_columns,
+            "customer":
+                customer_item,
+            "customer_columns":
+                customer_columns,
+        }
+
+
+    @classmethod
+    def _sales_detail_objects(
+        cls,
+        objects: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        sales_candidates = []
+        customer_candidates = []
+        detail_candidates = []
+        product_candidates = []
+
+        for item in objects:
+            schema = str(
+                item.get("schema")
+                or ""
+            ).strip()
+
+            name = str(
+                item.get("name")
+                or ""
+            ).strip()
+
+            if not _safe_table(
+                f"{schema}.{name}"
+            ):
+                continue
+
+            columns = (
+                cls._metadata_column_map(
+                    item
+                )
+            )
+
+            if {
+                "ventaid",
+                "folio",
+                "clienteid",
+                "fechaventa",
+                "vendedor",
+                "sucursal",
+                "estatus",
+                "subtotal",
+                "iva",
+                "total",
+            }.issubset(columns):
+                sales_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "clienteid",
+                "nombre",
+            }.issubset(columns):
+                customer_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "detalleventaid",
+                "ventaid",
+                "productoid",
+                "cantidad",
+                "preciounitario",
+                "importe",
+            }.issubset(columns):
+                detail_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+            if {
+                "productoid",
+                "nombre",
+            }.issubset(columns):
+                product_candidates.append(
+                    (
+                        item,
+                        columns,
+                    )
+                )
+
+        if (
+            len(sales_candidates) != 1
+            or len(customer_candidates) != 1
+            or len(detail_candidates) != 1
+            or len(product_candidates) != 1
+        ):
+            return None
+
+        sales_item, sales_columns = (
+            sales_candidates[0]
+        )
+
+        customer_item, customer_columns = (
+            customer_candidates[0]
+        )
+
+        detail_item, detail_columns = (
+            detail_candidates[0]
+        )
+
+        product_item, product_columns = (
+            product_candidates[0]
+        )
+
+        names = {
+            _norm(
+                f"{sales_item.get('schema')}."
+                f"{sales_item.get('name')}"
+            ),
+            _norm(
+                f"{customer_item.get('schema')}."
+                f"{customer_item.get('name')}"
+            ),
+            _norm(
+                f"{detail_item.get('schema')}."
+                f"{detail_item.get('name')}"
+            ),
+            _norm(
+                f"{product_item.get('schema')}."
+                f"{product_item.get('name')}"
+            ),
+        }
+
+        if len(names) != 4:
+            return None
+
+        return {
+            "sales":
+                sales_item,
+            "sales_columns":
+                sales_columns,
+            "customer":
+                customer_item,
+            "customer_columns":
+                customer_columns,
+            "detail":
+                detail_item,
+            "detail_columns":
+                detail_columns,
+            "product":
+                product_item,
+            "product_columns":
+                product_columns,
+        }
+
 
     @classmethod
     def _semantic_analytics_objects(
@@ -1571,7 +2296,7 @@ class GovernedSqlAssistantBridge:
                 "regla empresarial VALIDADA "
                 "para determinar qué ventas "
                 "son válidas antes de calcular "
-                "el ranking."
+                "el análisis."
             ),
             structured=False,
             fast_path=(
@@ -1633,6 +2358,49 @@ class GovernedSqlAssistantBridge:
             )
         )
 
+        sales_detail_mode = (
+            _sales_detail_mode(
+                question
+            )
+        )
+
+        sales_detail_intent = (
+            sales_detail_mode
+            is not None
+        )
+
+        (
+            detail_limit_requested,
+            detail_limit,
+        ) = _sales_detail_explicit_limit(
+            question
+        )
+
+        if not detail_limit_requested:
+            detail_limit = 100
+
+        (
+            detail_seller_requested,
+            detail_seller,
+        ) = _sales_detail_seller(
+            question
+        )
+
+        detail_period_payload = (
+            _sales_detail_period_payload(
+                question
+            )
+        )
+
+        detail_period = None
+
+        if detail_period_payload is not None:
+            detail_period = (
+                self._validated_period(
+                    detail_period_payload
+                )
+            )
+
         temporal_hint = (
             self._time_period_hint(
                 question
@@ -1666,6 +2434,7 @@ class GovernedSqlAssistantBridge:
                     semantic_plan is None
                     and not top_products_intent
                     and not count_intent
+                    and not sales_detail_intent
                 )
             )
         )
@@ -1730,19 +2499,122 @@ class GovernedSqlAssistantBridge:
             not semantic_ranking_intent
             and not top_products_intent
             and not count_intent
+            and not sales_detail_intent
         ):
             return None
 
         started = time.perf_counter()
+
+        def detail_blocked(
+            reason: str,
+            message: str,
+        ) -> Dict[str, Any]:
+            return self._result(
+                answer=message,
+                structured=False,
+                fast_path="governed_sql_blocked",
+                elapsed_ms=(
+                    (
+                        time.perf_counter()
+                        - started
+                    )
+                    * 1000
+                ),
+                governance={
+                    "read_only": True,
+                    "allowlist_enforced":
+                        True,
+                    "fail_closed":
+                        True,
+                    "reason": reason,
+                    "llm_sql_generation":
+                        False,
+                    "llm_computational_authority":
+                        False,
+                },
+            )
+
+        if sales_detail_intent:
+            if (
+                detail_limit_requested
+                and detail_limit is None
+            ):
+                return detail_blocked(
+                    "SALES_DETAIL_LIMIT_INVALID",
+                    (
+                        "El límite solicitado para el detalle "
+                        "de ventas no es válido. Debe estar "
+                        "entre 1 y 500."
+                    ),
+                )
+
+            if (
+                detail_seller_requested
+                and detail_seller is None
+            ):
+                return detail_blocked(
+                    "SALES_DETAIL_SELLER_INVALID",
+                    (
+                        "El vendedor solicitado no pasó la "
+                        "validación gobernada."
+                    ),
+                )
+
+            if (
+                temporal_hint
+                and detail_period_payload
+                is None
+            ):
+                return detail_blocked(
+                    "SALES_DETAIL_PERIOD_UNSUPPORTED",
+                    (
+                        "El periodo solicitado fue reconocido, "
+                        "pero no pudo normalizarse de forma "
+                        "gobernada."
+                    ),
+                )
+
+            if (
+                detail_period_payload
+                is not None
+                and detail_period is None
+            ):
+                return detail_blocked(
+                    "SALES_DETAIL_PERIOD_INVALID",
+                    (
+                        "El periodo solicitado no pasó la "
+                        "validación gobernada."
+                    ),
+                )
 
         try:
             profiles = self._profiles(
                 scope
             )
         except EnterpriseSqlError:
+            if sales_detail_intent:
+                return detail_blocked(
+                    "SALES_DETAIL_PROFILE_DISCOVERY_FAILED",
+                    (
+                        "La solicitud de detalle de ventas "
+                        "no pudo acceder a una fuente SQL "
+                        "gobernada."
+                    ),
+                )
+
             return None
 
         if not profiles:
+            if sales_detail_intent:
+                return detail_blocked(
+                    "SALES_DETAIL_SQL_PROFILE_NOT_AVAILABLE",
+                    (
+                        "La solicitud de detalle de ventas "
+                        "requiere una fuente SQL gobernada "
+                        "disponible."
+                    ),
+                )
+
             return None
 
         profile = None
@@ -1751,6 +2623,7 @@ class GovernedSqlAssistantBridge:
         executor = None
         semantic_context = None
         top_context = None
+        detail_context = None
         governed_filter = {
             "sql": "",
             "parameters": [],
@@ -1758,7 +2631,111 @@ class GovernedSqlAssistantBridge:
             "compiler": None,
         }
 
-        if semantic_ranking_intent:
+        if sales_detail_intent:
+            matches = []
+
+            for candidate_profile in profiles:
+                connection_id = str(
+                    candidate_profile.get(
+                        "connection_id"
+                    )
+                    or ""
+                ).strip()
+
+                if not connection_id:
+                    continue
+
+                try:
+                    candidate_executor = (
+                        EnterpriseSqlExecutor(
+                            self.store,
+                            self.provider_factory(),
+                        )
+                    )
+
+                    discovery = (
+                        candidate_executor.discover(
+                            scope,
+                            connection_id,
+                        )
+                    )
+                except EnterpriseSqlError:
+                    continue
+
+                discovered_objects = list(
+                    discovery.get(
+                        "objects"
+                    )
+                    or []
+                )
+
+                if sales_detail_mode == "sale":
+                    relational = (
+                        self._sales_header_objects(
+                            discovered_objects
+                        )
+                    )
+                else:
+                    relational = (
+                        self._sales_detail_objects(
+                            discovered_objects
+                        )
+                    )
+
+                if relational is None:
+                    continue
+
+                matches.append(
+                    (
+                        candidate_profile,
+                        candidate_executor,
+                        relational,
+                    )
+                )
+
+            if len(matches) == 1:
+                (
+                    profile,
+                    executor,
+                    detail_context,
+                ) = matches[0]
+
+                state = "MATCHED"
+
+            elif len(matches) > 1:
+                state = "AMBIGUOUS"
+
+            else:
+                return self._result(
+                    answer=(
+                        "La solicitud de detalle de ventas "
+                        "fue reconocida, pero no existe una "
+                        "fuente SQL gobernada con el esquema "
+                        "requerido."
+                    ),
+                    structured=False,
+                    fast_path="governed_sql_blocked",
+                    elapsed_ms=(
+                        (
+                            time.perf_counter()
+                            - started
+                        )
+                        * 1000
+                    ),
+                    governance={
+                        "read_only": True,
+                        "allowlist_enforced":
+                            True,
+                        "fail_closed":
+                            True,
+                        "reason":
+                            "SALES_DETAIL_METADATA_NOT_AVAILABLE",
+                        "llm_sql_generation":
+                            False,
+                    },
+                )
+
+        elif semantic_ranking_intent:
             matches = []
 
             for candidate_profile in profiles:
@@ -1969,7 +2946,420 @@ class GovernedSqlAssistantBridge:
         resource = ""
         analytic_kind = "count"
 
-        if semantic_ranking_intent:
+        if sales_detail_intent:
+            if (
+                executor is None
+                or detail_context is None
+            ):
+                return self._result(
+                    answer=(
+                        "La solicitud de ventas "
+                        "no pudo compilarse de forma "
+                        "gobernada."
+                    ),
+                    structured=False,
+                    fast_path="governed_sql_blocked",
+                    elapsed_ms=elapsed_ms,
+                    governance={
+                        "read_only": True,
+                        "allowlist_enforced":
+                            True,
+                        "fail_closed":
+                            True,
+                        "reason":
+                            "SALES_DETAIL_CONTEXT_NOT_AVAILABLE",
+                        "llm_sql_generation":
+                            False,
+                    },
+                )
+
+            sales_item = (
+                detail_context[
+                    "sales"
+                ]
+            )
+
+            sales_columns = (
+                detail_context[
+                    "sales_columns"
+                ]
+            )
+
+            customer_item = (
+                detail_context[
+                    "customer"
+                ]
+            )
+
+            customer_columns = (
+                detail_context[
+                    "customer_columns"
+                ]
+            )
+
+            if analytic_bindings is None:
+                return self._business_semantics_blocked(
+                    started=started,
+                    reason=(
+                        "NO_VALIDATED_SALES_VALID_ROW_FILTER"
+                    ),
+                )
+
+            try:
+                compiled_filter = (
+                    self._compile_sales_row_filters(
+                        analytic_bindings,
+                        sales_columns,
+                    )
+                )
+            except ValueError as exc:
+                return self._business_semantics_blocked(
+                    started=started,
+                    reason=str(exc),
+                )
+
+            if compiled_filter is None:
+                return self._business_semantics_blocked(
+                    started=started,
+                    reason=(
+                        "NO_VALIDATED_SALES_VALID_ROW_FILTER"
+                    ),
+                )
+
+            governed_filter = (
+                compiled_filter
+            )
+
+            sales_schema = str(
+                sales_item.get("schema")
+                or ""
+            )
+
+            sales_table = str(
+                sales_item.get("name")
+                or ""
+            )
+
+            customer_schema = str(
+                customer_item.get("schema")
+                or ""
+            )
+
+            customer_table = str(
+                customer_item.get("name")
+                or ""
+            )
+
+            sales_sale_id = (
+                sales_columns[
+                    "ventaid"
+                ]
+            )
+
+            sales_customer_id = (
+                sales_columns[
+                    "clienteid"
+                ]
+            )
+
+            customer_id = (
+                customer_columns[
+                    "clienteid"
+                ]
+            )
+
+            customer_name = (
+                customer_columns[
+                    "nombre"
+                ]
+            )
+
+            filter_parts = [
+                str(
+                    governed_filter.get(
+                        "sql"
+                    )
+                    or ""
+                )
+            ]
+
+            detail_parameters = list(
+                governed_filter.get(
+                    "parameters"
+                )
+                or []
+            )
+
+            if detail_seller is not None:
+                filter_parts.append(
+                    (
+                        f"v.[{sales_columns['vendedor']}] "
+                        "= ?"
+                    )
+                )
+
+                detail_parameters.append(
+                    detail_seller
+                )
+
+            if detail_period is not None:
+                filter_parts.append(
+                    (
+                        f"v.[{sales_columns['fechaventa']}] "
+                        ">= ?"
+                    )
+                )
+
+                filter_parts.append(
+                    (
+                        f"v.[{sales_columns['fechaventa']}] "
+                        "< ?"
+                    )
+                )
+
+                detail_parameters.extend(
+                    [
+                        detail_period[
+                            "start"
+                        ],
+                        detail_period[
+                            "end_exclusive"
+                        ],
+                    ]
+                )
+
+            filter_clause = (
+                "WHERE "
+                + " AND ".join(
+                    (
+                        "("
+                        + part
+                        + ")"
+                    )
+                    for part in filter_parts
+                    if part
+                )
+                + " "
+            )
+
+            if sales_detail_mode == "sale":
+                query_plan = {
+                    "operation": "SELECT",
+                    "sql": (
+                        f"SELECT TOP ({detail_limit}) "
+                        f"v.[{sales_sale_id}] "
+                        "AS [_VentaID], "
+                        f"v.[{sales_columns['vendedor']}] "
+                        "AS [Vendedor], "
+                        f"v.[{sales_columns['fechaventa']}] "
+                        "AS [FechaVenta], "
+                        f"v.[{sales_columns['folio']}] "
+                        "AS [Folio], "
+                        f"c.[{customer_name}] "
+                        "AS [Cliente], "
+                        f"v.[{sales_columns['sucursal']}] "
+                        "AS [Sucursal], "
+                        f"v.[{sales_columns['estatus']}] "
+                        "AS [Estatus], "
+                        f"v.[{sales_columns['subtotal']}] "
+                        "AS [Subtotal], "
+                        f"v.[{sales_columns['iva']}] "
+                        "AS [IVA], "
+                        f"v.[{sales_columns['total']}] "
+                        "AS [Total] "
+                        f"FROM [{sales_schema}]"
+                        f".[{sales_table}] AS v "
+                        f"LEFT JOIN [{customer_schema}]"
+                        f".[{customer_table}] AS c "
+                        f"ON c.[{customer_id}] "
+                        f"= v.[{sales_customer_id}] "
+                        f"{filter_clause}"
+                        "ORDER BY "
+                        f"v.[{sales_columns['vendedor']}] ASC, "
+                        f"v.[{sales_columns['fechaventa']}] DESC, "
+                        f"v.[{sales_columns['folio']}] DESC"
+                    ),
+                    "parameters":
+                        detail_parameters,
+                    "limit":
+                        detail_limit,
+                    "timeout_seconds": int(
+                        profile.get(
+                            "timeout_seconds"
+                        )
+                        or 30
+                    ),
+                }
+
+                resource = (
+                    f"{sales_schema}."
+                    f"{sales_table},"
+                    f"{customer_schema}."
+                    f"{customer_table}"
+                )
+
+                analytic_kind = (
+                    "sales_header"
+                )
+
+            else:
+                detail_item = (
+                    detail_context[
+                        "detail"
+                    ]
+                )
+
+                detail_columns = (
+                    detail_context[
+                        "detail_columns"
+                    ]
+                )
+
+                product_item = (
+                    detail_context[
+                        "product"
+                    ]
+                )
+
+                product_columns = (
+                    detail_context[
+                        "product_columns"
+                    ]
+                )
+
+                detail_schema = str(
+                    detail_item.get("schema")
+                    or ""
+                )
+
+                detail_table = str(
+                    detail_item.get("name")
+                    or ""
+                )
+
+                product_schema = str(
+                    product_item.get("schema")
+                    or ""
+                )
+
+                product_table = str(
+                    product_item.get("name")
+                    or ""
+                )
+
+                detail_sale_id = (
+                    detail_columns[
+                        "ventaid"
+                    ]
+                )
+
+                detail_id = (
+                    detail_columns[
+                        "detalleventaid"
+                    ]
+                )
+
+                detail_product_id = (
+                    detail_columns[
+                        "productoid"
+                    ]
+                )
+
+                product_id = (
+                    product_columns[
+                        "productoid"
+                    ]
+                )
+
+                product_name = (
+                    product_columns[
+                        "nombre"
+                    ]
+                )
+
+                query_plan = {
+                    "operation": "SELECT",
+                    "sql": (
+                        f"SELECT TOP ({detail_limit}) "
+                        f"v.[{sales_sale_id}] "
+                        "AS [_VentaID], "
+                        f"d.[{detail_id}] "
+                        "AS [_DetalleVentaID], "
+                        f"v.[{sales_columns['vendedor']}] "
+                        "AS [Vendedor], "
+                        f"v.[{sales_columns['fechaventa']}] "
+                        "AS [FechaVenta], "
+                        f"v.[{sales_columns['folio']}] "
+                        "AS [Folio], "
+                        f"c.[{customer_name}] "
+                        "AS [Cliente], "
+                        f"v.[{sales_columns['sucursal']}] "
+                        "AS [Sucursal], "
+                        f"v.[{sales_columns['estatus']}] "
+                        "AS [Estatus], "
+                        f"v.[{sales_columns['subtotal']}] "
+                        "AS [Subtotal], "
+                        f"v.[{sales_columns['iva']}] "
+                        "AS [IVA], "
+                        f"v.[{sales_columns['total']}] "
+                        "AS [Total], "
+                        f"p.[{product_name}] "
+                        "AS [Producto], "
+                        f"d.[{detail_columns['cantidad']}] "
+                        "AS [Cantidad], "
+                        f"d.[{detail_columns['preciounitario']}] "
+                        "AS [PrecioUnitario], "
+                        f"d.[{detail_columns['importe']}] "
+                        "AS [Importe] "
+                        f"FROM [{sales_schema}]"
+                        f".[{sales_table}] AS v "
+                        f"LEFT JOIN [{customer_schema}]"
+                        f".[{customer_table}] AS c "
+                        f"ON c.[{customer_id}] "
+                        f"= v.[{sales_customer_id}] "
+                        f"LEFT JOIN [{detail_schema}]"
+                        f".[{detail_table}] AS d "
+                        f"ON d.[{detail_sale_id}] "
+                        f"= v.[{sales_sale_id}] "
+                        f"LEFT JOIN [{product_schema}]"
+                        f".[{product_table}] AS p "
+                        f"ON p.[{product_id}] "
+                        f"= d.[{detail_product_id}] "
+                        f"{filter_clause}"
+                        "ORDER BY "
+                        f"v.[{sales_columns['vendedor']}] ASC, "
+                        f"v.[{sales_columns['fechaventa']}] DESC, "
+                        f"v.[{sales_columns['folio']}] DESC, "
+                        f"d.[{detail_id}] ASC"
+                    ),
+                    "parameters":
+                        detail_parameters,
+                    "limit":
+                        detail_limit,
+                    "timeout_seconds": int(
+                        profile.get(
+                            "timeout_seconds"
+                        )
+                        or 30
+                    ),
+                }
+
+                resource = (
+                    f"{sales_schema}."
+                    f"{sales_table},"
+                    f"{customer_schema}."
+                    f"{customer_table},"
+                    f"{detail_schema}."
+                    f"{detail_table},"
+                    f"{product_schema}."
+                    f"{product_table}"
+                )
+
+                analytic_kind = (
+                    "sales_line_item"
+                )
+
+        elif semantic_ranking_intent:
             if (
                 executor is None
                 or semantic_context is None
@@ -2898,9 +4288,285 @@ class GovernedSqlAssistantBridge:
             payload.get("rows") or []
         )
 
-        if semantic_ranking_intent:
+        if sales_detail_intent:
 
             if not rows:
+                answer = (
+                    "No se encontraron ventas válidas "
+                    "para la consulta solicitada."
+                )
+
+            elif sales_detail_mode == "sale":
+                output = [
+                    (
+                        "Ventas "
+                        f"(se muestran hasta {detail_limit} ventas):"
+                    )
+                ]
+
+                for row in rows[:detail_limit]:
+                    if not isinstance(
+                        row,
+                        (list, tuple),
+                    ):
+                        continue
+
+                    seller = (
+                        str(
+                            row[1]
+                            or "Sin vendedor"
+                        )
+                        if len(row) > 1
+                        else "Sin vendedor"
+                    )
+
+                    sale_date = (
+                        row[2]
+                        if len(row) > 2
+                        else None
+                    )
+
+                    folio = (
+                        row[3]
+                        if len(row) > 3
+                        else None
+                    )
+
+                    customer = (
+                        row[4]
+                        if len(row) > 4
+                        else None
+                    )
+
+                    branch = (
+                        row[5]
+                        if len(row) > 5
+                        else None
+                    )
+
+                    status = (
+                        row[6]
+                        if len(row) > 6
+                        else None
+                    )
+
+                    subtotal = (
+                        row[7]
+                        if len(row) > 7
+                        else None
+                    )
+
+                    tax = (
+                        row[8]
+                        if len(row) > 8
+                        else None
+                    )
+
+                    total = (
+                        row[9]
+                        if len(row) > 9
+                        else None
+                    )
+
+                    output.append(
+                        (
+                            f"- {sale_date}"
+                            " | Folio "
+                            f"{folio}"
+                            " | Vendedor "
+                            f"{seller}"
+                            " | Cliente "
+                            f"{customer}"
+                            " | Sucursal "
+                            f"{branch}"
+                            " | Estatus "
+                            f"{status}"
+                            " | Subtotal "
+                            f"{subtotal}"
+                            " | IVA "
+                            f"{tax}"
+                            " | Total "
+                            f"{total}"
+                        )
+                    )
+
+                answer = "\n".join(
+                    output
+                )
+
+            else:
+                output = [
+                    (
+                        "Ventas detalladas por vendedor "
+                        f"(se muestran hasta {detail_limit} renglones):"
+                    )
+                ]
+
+                current_seller = None
+                current_sale = object()
+
+                for row in rows[:detail_limit]:
+                    if not isinstance(
+                        row,
+                        (list, tuple),
+                    ):
+                        continue
+
+                    sale_id = (
+                        row[0]
+                        if len(row) > 0
+                        else None
+                    )
+
+                    detail_id = (
+                        row[1]
+                        if len(row) > 1
+                        else None
+                    )
+
+                    seller = (
+                        str(
+                            row[2]
+                            or "Sin vendedor"
+                        )
+                        if len(row) > 2
+                        else "Sin vendedor"
+                    )
+
+                    sale_date = (
+                        row[3]
+                        if len(row) > 3
+                        else None
+                    )
+
+                    folio = (
+                        row[4]
+                        if len(row) > 4
+                        else None
+                    )
+
+                    customer = (
+                        row[5]
+                        if len(row) > 5
+                        else None
+                    )
+
+                    branch = (
+                        row[6]
+                        if len(row) > 6
+                        else None
+                    )
+
+                    status = (
+                        row[7]
+                        if len(row) > 7
+                        else None
+                    )
+
+                    subtotal = (
+                        row[8]
+                        if len(row) > 8
+                        else None
+                    )
+
+                    tax = (
+                        row[9]
+                        if len(row) > 9
+                        else None
+                    )
+
+                    total = (
+                        row[10]
+                        if len(row) > 10
+                        else None
+                    )
+
+                    product = (
+                        row[11]
+                        if len(row) > 11
+                        else None
+                    )
+
+                    quantity = (
+                        row[12]
+                        if len(row) > 12
+                        else None
+                    )
+
+                    unit_price = (
+                        row[13]
+                        if len(row) > 13
+                        else None
+                    )
+
+                    amount = (
+                        row[14]
+                        if len(row) > 14
+                        else None
+                    )
+
+                    if seller != current_seller:
+                        output.append(
+                            "Vendedor: "
+                            + seller
+                        )
+
+                        current_seller = seller
+                        current_sale = object()
+
+                    sale_key = (
+                        seller,
+                        sale_id,
+                    )
+
+                    if sale_key != current_sale:
+                        output.append(
+                            (
+                                "  Venta: "
+                                f"{sale_date}"
+                                " | Folio "
+                                f"{folio}"
+                                " | Cliente "
+                                f"{customer}"
+                                " | Sucursal "
+                                f"{branch}"
+                                " | Estatus "
+                                f"{status}"
+                                " | Subtotal "
+                                f"{subtotal}"
+                                " | IVA "
+                                f"{tax}"
+                                " | Total "
+                                f"{total}"
+                            )
+                        )
+
+                        current_sale = sale_key
+
+                    if (
+                        detail_id is not None
+                        or product is not None
+                    ):
+                        output.append(
+                            (
+                                "    - Producto "
+                                f"{product}"
+                                " | Cantidad "
+                                f"{quantity}"
+                                " | Precio unitario "
+                                f"{unit_price}"
+                                " | Importe "
+                                f"{amount}"
+                            )
+                        )
+
+                answer = "\n".join(
+                    output
+                )
+
+        elif semantic_ranking_intent:
+            if not rows:
+
                 answer = (
                     "No se encontraron "
                     "datos válidos para "
@@ -3156,6 +4822,54 @@ class GovernedSqlAssistantBridge:
             }
         )
 
+        if sales_detail_intent:
+            governance.update(
+                {
+                    "semantic_analytics_plan": {
+                        "version":
+                            R10_32_SALES_DETAIL_VERSION,
+                        "domain":
+                            "sales",
+                        "entity":
+                            "sale",
+                        "operation":
+                            "detail",
+                        "detail_level":
+                            sales_detail_mode,
+                        "grouping":
+                            (
+                                "seller"
+                                if sales_detail_mode
+                                == "line_item"
+                                else None
+                            ),
+                        "limit":
+                            detail_limit,
+                        "seller":
+                            detail_seller,
+                        "period":
+                            (
+                                dict(
+                                    detail_period
+                                )
+                                if detail_period
+                                is not None
+                                else None
+                            ),
+                    },
+                    "semantic_planner":
+                        R10_32_SALES_DETAIL_VERSION,
+                    "semantic_plan_source":
+                        "deterministic",
+                    "semantic_plan_validation_authority":
+                        "strict_allowlist",
+                    "llm_semantic_proposal":
+                        False,
+                    "llm_semantic_planning_authority":
+                        False,
+                }
+            )
+
         if semantic_plan is not None:
             governance.update(
                 {
@@ -3180,6 +4894,7 @@ class GovernedSqlAssistantBridge:
         if (
             top_products_intent
             or semantic_ranking_intent
+            or sales_detail_intent
         ):
             applied_rules = list(
                 governed_filter.get(
