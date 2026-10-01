@@ -15,6 +15,9 @@ R10_24C2_GOVERNED_SQL_ASSISTANT_VERSION = "r10.24c2.1"
 R10_30_GOVERNED_ROW_FILTER_VERSION = "r10.30-row-filter-v1"
 R10_31_SEMANTIC_ANALYTICS_VERSION = "r10.31-semantic-plan-v1"
 R10_32_SALES_DETAIL_VERSION = "r10.32-sales-detail-v1"
+R10_33_SALES_DETAIL_PAGINATION_VERSION = (
+    "r10.33-sales-detail-pagination-v1"
+)
 
 _IDENTIFIER = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$"
@@ -233,6 +236,83 @@ def _sales_detail_explicit_limit(
     return (
         True,
         value,
+    )
+
+
+def _sales_detail_page_request(
+    question: str,
+) -> Tuple[bool, Optional[int], Optional[str]]:
+    """Parse an explicit terminal governed sales-detail page suffix."""
+
+    raw = re.sub(
+        r"\s+",
+        " ",
+        str(
+            question
+            or ""
+        ),
+    ).strip()
+
+    normalized = _norm(
+        raw
+    )
+
+    page_cue_present = bool(
+        re.search(
+            r"\bpagina\b",
+            normalized,
+        )
+    )
+
+    if not page_cue_present:
+        return (
+            False,
+            None,
+            raw,
+        )
+
+    match = re.search(
+        r"(?:^|\s)p[áa]gina\s+(\d{1,9})\s*$",
+        raw,
+        flags=re.IGNORECASE,
+    )
+
+    if match is None:
+        return (
+            True,
+            None,
+            None,
+        )
+
+    page = int(
+        match.group(1)
+    )
+
+    if page < 1 or page > 1000:
+        return (
+            True,
+            None,
+            None,
+        )
+
+    base_question = (
+        raw[
+            :match.start()
+        ]
+        .strip()
+    )
+
+    if not base_question:
+        return (
+            True,
+            None,
+            None,
+        )
+
+    return (
+        True,
+        page,
+        base_question,
     )
 
 
@@ -2358,9 +2438,24 @@ class GovernedSqlAssistantBridge:
             )
         )
 
+        (
+            detail_page_requested,
+            detail_page,
+            detail_page_question,
+        ) = _sales_detail_page_request(
+            question
+        )
+
+        detail_parse_question = (
+            detail_page_question
+            if detail_page_question
+            is not None
+            else question
+        )
+
         sales_detail_mode = (
             _sales_detail_mode(
-                question
+                detail_parse_question
             )
         )
 
@@ -2373,7 +2468,7 @@ class GovernedSqlAssistantBridge:
             detail_limit_requested,
             detail_limit,
         ) = _sales_detail_explicit_limit(
-            question
+            detail_parse_question
         )
 
         if not detail_limit_requested:
@@ -2383,12 +2478,12 @@ class GovernedSqlAssistantBridge:
             detail_seller_requested,
             detail_seller,
         ) = _sales_detail_seller(
-            question
+            detail_parse_question
         )
 
         detail_period_payload = (
             _sales_detail_period_payload(
-                question
+                detail_parse_question
             )
         )
 
@@ -2403,7 +2498,7 @@ class GovernedSqlAssistantBridge:
 
         temporal_hint = (
             self._time_period_hint(
-                question
+                detail_parse_question
             )
         )
 
@@ -2535,6 +2630,20 @@ class GovernedSqlAssistantBridge:
             )
 
         if sales_detail_intent:
+            if (
+                detail_page_requested
+                and detail_page is None
+            ):
+                return detail_blocked(
+                    "SALES_DETAIL_PAGE_INVALID",
+                    (
+                        "La página solicitada para el detalle "
+                        "de ventas no es válida. Debe ser un "
+                        "número entre 1 y 1000 colocado al "
+                        "final de la solicitud."
+                    ),
+                )
+
             if (
                 detail_limit_requested
                 and detail_limit is None
@@ -3142,12 +3251,48 @@ class GovernedSqlAssistantBridge:
                 + " "
             )
 
+            detail_paged = (
+                detail_page_requested
+                and detail_page is not None
+            )
+
+            detail_offset = (
+                (
+                    detail_page - 1
+                )
+                * detail_limit
+                if detail_paged
+                else 0
+            )
+
+            detail_pagination_parameters = (
+                [
+                    detail_offset,
+                    detail_limit + 1,
+                ]
+                if detail_paged
+                else []
+            )
+
+            detail_select_prefix = (
+                "SELECT "
+                if detail_paged
+                else f"SELECT TOP ({detail_limit}) "
+            )
+
+            detail_pagination_clause = (
+                " OFFSET ? ROWS "
+                "FETCH NEXT ? ROWS ONLY"
+                if detail_paged
+                else ""
+            )
+
             if sales_detail_mode == "sale":
                 query_plan = {
                     "operation": "SELECT",
                     "sql": (
-                        f"SELECT TOP ({detail_limit}) "
-                        f"v.[{sales_sale_id}] "
+                        detail_select_prefix
+                        +                         f"v.[{sales_sale_id}] "
                         "AS [_VentaID], "
                         f"v.[{sales_columns['vendedor']}] "
                         "AS [Vendedor], "
@@ -3178,9 +3323,16 @@ class GovernedSqlAssistantBridge:
                         f"v.[{sales_columns['vendedor']}] ASC, "
                         f"v.[{sales_columns['fechaventa']}] DESC, "
                         f"v.[{sales_columns['folio']}] DESC"
+                        + (
+                            f", v.[{sales_sale_id}] DESC"
+                            if detail_paged
+                            else ""
+                        )
+                        + detail_pagination_clause
                     ),
                     "parameters":
-                        detail_parameters,
+                        detail_parameters
+                        + detail_pagination_parameters,
                     "limit":
                         detail_limit,
                     "timeout_seconds": int(
@@ -3280,8 +3432,8 @@ class GovernedSqlAssistantBridge:
                 query_plan = {
                     "operation": "SELECT",
                     "sql": (
-                        f"SELECT TOP ({detail_limit}) "
-                        f"v.[{sales_sale_id}] "
+                        detail_select_prefix
+                        +                         f"v.[{sales_sale_id}] "
                         "AS [_VentaID], "
                         f"d.[{detail_id}] "
                         "AS [_DetalleVentaID], "
@@ -3329,11 +3481,18 @@ class GovernedSqlAssistantBridge:
                         "ORDER BY "
                         f"v.[{sales_columns['vendedor']}] ASC, "
                         f"v.[{sales_columns['fechaventa']}] DESC, "
-                        f"v.[{sales_columns['folio']}] DESC, "
-                        f"d.[{detail_id}] ASC"
+                        f"v.[{sales_columns['folio']}] DESC"
+                        + (
+                            f", v.[{sales_sale_id}] DESC"
+                            if detail_paged
+                            else ""
+                        )
+                        + f", d.[{detail_id}] ASC"
+                        + detail_pagination_clause
                     ),
                     "parameters":
-                        detail_parameters,
+                        detail_parameters
+                        + detail_pagination_parameters,
                     "limit":
                         detail_limit,
                     "timeout_seconds": int(
@@ -4288,6 +4447,19 @@ class GovernedSqlAssistantBridge:
             payload.get("rows") or []
         )
 
+        detail_has_more = (
+            bool(
+                payload.get(
+                    "truncated"
+                )
+            )
+            if (
+                sales_detail_intent
+                and detail_page_requested
+            )
+            else None
+        )
+
         if sales_detail_intent:
 
             if not rows:
@@ -4827,7 +4999,11 @@ class GovernedSqlAssistantBridge:
                 {
                     "semantic_analytics_plan": {
                         "version":
-                            R10_32_SALES_DETAIL_VERSION,
+                            (
+                                R10_33_SALES_DETAIL_PAGINATION_VERSION
+                                if detail_page_requested
+                                else R10_32_SALES_DETAIL_VERSION
+                            ),
                         "domain":
                             "sales",
                         "entity":
@@ -4845,6 +5021,24 @@ class GovernedSqlAssistantBridge:
                             ),
                         "limit":
                             detail_limit,
+                        **(
+                            {
+                                "page":
+                                    detail_page,
+                                "page_size":
+                                    detail_limit,
+                                "offset":
+                                    detail_offset,
+                                "explicit":
+                                    True,
+                                "has_more":
+                                    bool(
+                                        detail_has_more
+                                    ),
+                            }
+                            if detail_page_requested
+                            else {}
+                        ),
                         "seller":
                             detail_seller,
                         "period":
@@ -4858,7 +5052,11 @@ class GovernedSqlAssistantBridge:
                             ),
                     },
                     "semantic_planner":
-                        R10_32_SALES_DETAIL_VERSION,
+                        (
+                            R10_33_SALES_DETAIL_PAGINATION_VERSION
+                            if detail_page_requested
+                            else R10_32_SALES_DETAIL_VERSION
+                        ),
                     "semantic_plan_source":
                         "deterministic",
                     "semantic_plan_validation_authority":
