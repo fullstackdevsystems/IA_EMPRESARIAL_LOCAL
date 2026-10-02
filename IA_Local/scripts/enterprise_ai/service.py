@@ -54,6 +54,18 @@ BRIEF_CUES = (
     "conciso", "concisamente", "solo define", "respuesta corta", "rapido", "rápido",
 )
 
+ENTERPRISE_ANALYSIS_CUES = (
+    "resumen ejecutivo",
+    "información importante",
+    "informacion importante",
+    "debería revisar hoy",
+    "deberia revisar hoy",
+    "tendencias, cambios o anomal",
+    "tendencias cambios o anomal",
+    "mi empresa",
+)
+
+
 SYSTEM_CAPABILITY_CUES = (
     "de qué eres capaz", "de que eres capaz", "qué puedes hacer", "que puedes hacer",
     "cuáles son tus capacidades", "cuales son tus capacidades", "qué capacidades tienes", "que capacidades tienes",
@@ -118,6 +130,8 @@ class EnterpriseAIService:
         """
         low = " ".join((question or "").strip().lower().split())
         if not low:
+            return False
+        if any(cue in low for cue in ENTERPRISE_ANALYSIS_CUES):
             return False
         if any(cue in low for cue in INTERNAL_OWNERSHIP_CUES):
             return False

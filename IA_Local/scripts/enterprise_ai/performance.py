@@ -140,7 +140,11 @@ def can_stream_exact(dataset: Dict[str, Any], plan: Dict[str, Any], *, analytics
     # Analytic row filters/metric rules must preserve exactly the existing evaluator.
     if analytics is not None and principal is not None:
         try:
-            context = analytics.build_context(principal, dataset.get("roles") or {})
+            context = analytics.build_context(
+            principal,
+            dataset.get("roles") or {},
+            columns=list(dataset.get("columns") or []),
+        )
             if context and (context.get("bindings") or context.get("rules")):
                 return False, "validated_analytic_rules_present"
         except Exception:

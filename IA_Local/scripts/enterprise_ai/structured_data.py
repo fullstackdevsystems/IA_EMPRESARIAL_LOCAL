@@ -283,7 +283,15 @@ class StructuredDataService:
         if self.precedence:
             roles, semantic_applied = self.precedence.semantic_overrides(principal, list(map(str, df.columns)), roles)
         work = df.copy()
-        analytic_context = self.analytics.build_context(principal, roles) if self.analytics else None
+        analytic_context = (
+            self.analytics.build_context(
+                principal,
+                roles,
+                columns=list(map(str, work.columns)),
+            )
+            if self.analytics
+            else None
+        )
         analytic_eval = None
         if analytic_context:
             from .analytic_rules import evaluate_analytic_context

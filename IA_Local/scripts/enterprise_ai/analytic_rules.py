@@ -185,6 +185,68 @@ class SafeRuleEvaluator:
 
 
 
+def _rule_expression_symbols(expression: Any) -> Optional[List[str]]:
+    """Return referenced identifiers for a validated analytic expression.
+
+    A syntax error intentionally returns None so malformed validated rules stay
+    fail-closed in the normal evaluator instead of being silently skipped.
+    """
+    try:
+        tree = ast.parse(str(expression or ""), mode="eval")
+    except SyntaxError:
+        return None
+
+    return sorted({
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+    })
+
+
+def _row_filter_binding_applicability(
+    binding: Dict[str, Any],
+    roles: Dict[str, Any],
+    columns: Optional[List[str]],
+) -> Tuple[bool, List[str]]:
+    """Decide whether a row_filter belongs to the current structured source.
+
+    Only source incompatibility is skipped. Once a rule is source-compatible,
+    evaluation errors remain fail-closed.
+    """
+    if str(binding.get("rule_type") or "").strip().lower() != "row_filter":
+        return True, []
+
+    if columns is None:
+        return True, []
+
+    rule = binding.get("rule") or {}
+    symbols = _rule_expression_symbols(rule.get("expression", ""))
+
+    if symbols is None:
+        return True, []
+
+    bridged = bridge_roles(roles or {})
+
+    available = {
+        _norm(column)
+        for column in columns
+        if str(column or "").strip()
+    }
+
+    for role, physical in (bridged or {}).items():
+        if physical:
+            available.add(_norm(role))
+            available.add(_norm(physical))
+
+    missing = [
+        symbol
+        for symbol in symbols
+        if _norm(symbol) not in available
+    ]
+
+    return not missing, missing
+
+
 def evaluate_analytic_context(frame: pd.DataFrame, roles: Dict[str, Any], analytic_context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Ejecuta un contexto ya autorizado, sin acceso a DB ni identidad global.
 
@@ -321,14 +383,49 @@ class AnalyticRuleEngine:
             out.append(item)
         return out
 
-    def build_context(self, principal: Principal, roles: Dict[str, Any], *, on_date: Optional[str] = None) -> Dict[str, Any]:
-        bindings = self.applicable_bindings(principal, on_date=on_date)
+    def build_context(
+        self,
+        principal: Principal,
+        roles: Dict[str, Any],
+        *,
+        columns: Optional[List[str]] = None,
+        on_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        bindings = self.applicable_bindings(
+            principal,
+            on_date=on_date,
+        )
+
+        applicable = []
+        skipped = []
+
+        for binding in bindings:
+            is_applicable, missing = _row_filter_binding_applicability(
+                binding,
+                roles,
+                columns,
+            )
+
+            if is_applicable:
+                applicable.append(binding)
+                continue
+
+            skipped.append({
+                "binding_id": binding.get("id"),
+                "rule_id": binding.get("rule_id"),
+                "rule_type": binding.get("rule_type"),
+                "target": binding.get("target"),
+                "reason": "SOURCE_INCOMPATIBLE_MISSING_FIELDS",
+                "missing_fields": missing,
+            })
+
         return {
-            "version": "r10.6",
+            "version": "r10.34",
             "company_id": principal.company_id,
             "user_id": principal.user_id,
             "roles": bridge_roles(roles),
-            "bindings": bindings,
+            "bindings": applicable,
+            "skipped_bindings": skipped,
             "precedence": "validated_business_rule > validated_semantic_definition > system_inference",
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
